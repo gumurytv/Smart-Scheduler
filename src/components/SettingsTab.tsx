@@ -44,13 +44,14 @@ import {
   AppLanguage,
   SchoolTimeConfig,
   DEFAULT_SCHOOL_TIME_CONFIG,
+  DEFAULT_WIDGET_CONFIG,
   MasterTimetable,
   HOME_WIDGET_IDS,
   HomeWidgetId,
   WidgetConfig,
 } from '../types';
 import { isAiTimetableEnabled } from '../utils/featureFlags';
-import { formatDateKey, generatePeriodSchedule } from '../data/initialData';
+import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
   translateDay,
@@ -251,6 +252,62 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ id, open, onToggle, tone, i
         </div>
       )}
     </section>
+  );
+};
+
+interface SectionResetButtonProps {
+  lang: AppLanguage;
+  label: string;
+  onConfirm: () => void;
+}
+
+/** Per-section "restore defaults" row with an inline (in-page) confirmation step. */
+const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, onConfirm }) => {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="pt-3 border-t border-divider">
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[11px] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors"
+        >
+          <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
+          {label}
+        </button>
+      ) : (
+        <div role="alertdialog" className="flex flex-wrap items-center gap-2">
+          <p className="flex-1 min-w-[180px] text-[11px] font-semibold text-accent-900 leading-snug">
+            {tr(
+              lang,
+              '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
+              'Restore defaults? Only this section’s settings will change.',
+              '确定要恢复吗？只有本部分的设置会恢复为默认值。'
+            )}
+          </p>
+          <div className="flex gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="h-8 px-3 rounded-full border border-divider text-ink text-[11px] font-semibold hover:bg-slate-100"
+            >
+              {tr(lang, '취소', 'Cancel', '取消')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(false);
+                onConfirm();
+              }}
+              className="h-8 px-3 rounded-full bg-accent-800 text-paper text-[11px] font-bold inline-flex items-center gap-1 hover:bg-accent-900"
+            >
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
+              {tr(lang, '되돌리기', 'Restore', '恢复')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -559,6 +616,75 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const showMasterToast = (msg: string) => {
     setMasterFeedback(msg);
     setTimeout(() => setMasterFeedback(null), 2800);
+  };
+
+  // ================= SECTION RESETS (only the section's own settings; overrides/attendance/memos/schedules untouched) =================
+  const sectionResetLabel = tr(lang, '이 섹션 기본값으로 되돌리기', 'Restore this section’s defaults', '将本部分恢复默认');
+
+  const handleResetTimelineRange = () => {
+    onUpdateState((prev) => ({ ...prev, timelineConfig: { startHour: 8, endHour: 24 } }));
+    showMasterToast(
+      tr(lang, '시간표 표시 범위를 기본값으로 되돌렸어요', 'Timeline range restored to defaults', '时间轴显示范围已恢复默认')
+    );
+  };
+
+  const handleResetSchoolSection = () => {
+    const sample = createInitialPlannerState().masterTimetable;
+    onUpdateState((prev) => {
+      const nextMaster = { ...prev.masterTimetable } as MasterTimetable;
+      DAYS_OF_WEEK.forEach((d) => {
+        nextMaster[d] = {
+          ...(prev.masterTimetable[d] || { school: [], academy: [] }),
+          school: (sample[d]?.school || []).map((p) => ({ ...p })),
+        };
+      });
+      return { ...prev, schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG }, masterTimetable: nextMaster };
+    });
+    setSchoolSheet(null);
+    setRemovePeriodConfirm(false);
+    showMasterToast(
+      tr(lang, '학교 시간표를 기본값으로 되돌렸어요', 'School timetable restored to defaults', '学校课表已恢复默认')
+    );
+  };
+
+  const handleResetAcademySection = () => {
+    const sample = createInitialPlannerState().masterTimetable;
+    onUpdateState((prev) => {
+      const nextMaster = { ...prev.masterTimetable } as MasterTimetable;
+      DAYS_OF_WEEK.forEach((d) => {
+        nextMaster[d] = {
+          ...(prev.masterTimetable[d] || { school: [], academy: [] }),
+          academy: (sample[d]?.academy || []).map((a) => ({ ...a })),
+        };
+      });
+      return { ...prev, masterTimetable: nextMaster };
+    });
+    showMasterToast(
+      tr(lang, '학원 시간표를 기본값으로 되돌렸어요', 'Academy timetable restored to defaults', '补习班课表已恢复默认')
+    );
+  };
+
+  const handleResetSubjectPool = () => {
+    const sample = createInitialPlannerState().subjectPool;
+    onUpdateState((prev) => ({
+      ...prev,
+      subjectPool: { school: [...sample.school], academy: [...sample.academy] },
+    }));
+    setNewSchoolSubject('');
+    setNewAcademySubject('');
+    showMasterToast(
+      tr(lang, '과목 후보군을 기본값으로 되돌렸어요', 'Subject pool restored to defaults', '候选科目库已恢复默认')
+    );
+  };
+
+  const handleResetWidgets = () => {
+    onUpdateState((prev) => ({
+      ...prev,
+      widgetConfig: { ...DEFAULT_WIDGET_CONFIG, enabled: [...DEFAULT_WIDGET_CONFIG.enabled] },
+    }));
+    showMasterToast(
+      tr(lang, '홈 화면 위젯을 기본값으로 되돌렸어요', 'Home screen widgets restored to defaults', '主屏幕小组件已恢复默认')
+    );
   };
 
   const handleUpdateTimelineRange = (newStart: number, newEnd: number) => {
@@ -1467,6 +1593,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </button>
               ))}
             </div>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetTimelineRange} />
           </div>
         </SettingsCard>
 
@@ -2019,6 +2147,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </button>
               </div>
             </div>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSchoolSection} />
           </div>
         </SettingsCard>
 
@@ -2147,6 +2277,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 `在${translateDay(selectedMasterDay, lang)}添加补习班`
               )}
             </button>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetAcademySection} />
           </div>
         </SettingsCard>
 
@@ -2164,8 +2296,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             `学校 ${state.subjectPool.school.length} 个 · 补习班 ${state.subjectPool.academy.length} 个`
           )}
         >
-          <div className="p-4 space-y-5">
-            <p className="text-[11px] text-slate-600 leading-relaxed -mb-2">
+          <div className="p-4 space-y-4">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
               {tr(
                 lang,
                 '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요.',
@@ -2286,6 +2418,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </button>
               </form>
             </div>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSubjectPool} />
           </div>
         </SettingsCard>
       </div>
@@ -3123,6 +3257,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <Smartphone className="w-4 h-4" strokeWidth={2.75} />
           {tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')}
         </button>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
           </div>
         </SettingsCard>
 
