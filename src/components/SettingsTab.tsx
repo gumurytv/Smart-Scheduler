@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   X,
@@ -11,7 +11,7 @@ import {
   AlertCircle,
   Trash2,
   ChevronDown,
-  ChevronUp,
+  ChevronsDownUp,
   Loader2,
   RotateCcw,
   Clock,
@@ -22,6 +22,20 @@ import {
   Smartphone,
   Sun,
   Moon,
+  Minus,
+  GraduationCap,
+  Building2,
+  Settings2,
+  Tags,
+  ScanLine,
+  DatabaseBackup,
+  ShieldAlert,
+  type LucideIcon,
+  FlaskConical,
+  Lock,
+  IdCard,
+  UserRound,
+  PenLine,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -31,8 +45,17 @@ import {
   SchoolPeriod,
   AcademyItem,
   AppLanguage,
+  SchoolTimeConfig,
+  DEFAULT_SCHOOL_TIME_CONFIG,
+  DEFAULT_WIDGET_CONFIG,
+  MasterTimetable,
+  HOME_WIDGET_IDS,
+  HomeWidgetId,
+  WidgetConfig,
+  UserProfile,
 } from '../types';
-import { formatDateKey, generatePeriodSchedule } from '../data/initialData';
+import { isAiTimetableEnabled } from '../utils/featureFlags';
+import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
   translateDay,
@@ -40,15 +63,312 @@ import {
   translateSampleText,
   USER_GUIDE_TOPICS,
 } from '../i18n/translations';
-import { buildWidgetSyncPayload, syncWidgetData } from '../utils/widgetSync';
+import { buildHomeWidgetsData, getWidgetConfig, syncWidgetData } from '../utils/widgetSync';
+import { HOME_WIDGET_META, HomeWidgetPreview } from './HomeWidgets';
 
 interface SettingsTabProps {
   state: PlannerState;
   onUpdateState: (updater: (prev: PlannerState) => PlannerState) => void;
   onResetSampleData: () => void;
+  focusSection?: 'profile' | null;
+  onFocusHandled?: () => void;
 }
 
-function createSampleTimetableImageBase64(): string {
+function minutesToTimeStr(total: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(total)));
+  return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+}
+
+function timeStrToMinutes(time: string): number {
+  const [h, m] = (time || '00:00').split(':').map((v) => Number(v) || 0);
+  return h * 60 + m;
+}
+
+interface PresetPeriodRow {
+  period: number;
+  startTime: string;
+  endTime: string;
+}
+
+/** Build period start/end times from a preset-mode school time config. */
+function buildPresetPeriods(config: SchoolTimeConfig, count = config.periodCount): PresetPeriodRow[] {
+  const rows: PresetPeriodRow[] = [];
+  let cur = timeStrToMinutes(config.firstStart);
+  for (let p = 1; p <= count; p++) {
+    const end = cur + config.classMinutes;
+    rows.push({ period: p, startTime: minutesToTimeStr(cur), endTime: minutesToTimeStr(end) });
+    cur = end + (p === config.lunchAfterPeriod ? config.lunchMinutes : config.breakMinutes);
+  }
+  return rows;
+}
+
+/** Vertical scale of the preset preview ruler. */
+const PREVIEW_PX_PER_MIN = 0.9;
+
+const WEEKDAYS: DayOfWeek[] = ['월', '화', '수', '목', '금'];
+
+/** Highest school period number across all days of the master timetable. */
+function getMaxPeriod(master: MasterTimetable): number {
+  let max = 0;
+  DAYS_OF_WEEK.forEach((d) => {
+    (master[d]?.school || []).forEach((p) => {
+      if (p.period > max) max = p.period;
+    });
+  });
+  return max;
+}
+
+/**
+ * Start/end for a period row. Preset mode → computed from the preset.
+ * Custom mode → the first day that has this period, otherwise extrapolated from the previous row.
+ */
+function resolveRowTimes(
+  master: MasterTimetable,
+  cfg: SchoolTimeConfig,
+  period: number
+): { startTime: string; endTime: string } {
+  if (cfg.mode === 'preset') {
+    const row = buildPresetPeriods(cfg, Math.max(1, period))[Math.max(1, period) - 1];
+    return { startTime: row.startTime, endTime: row.endTime };
+  }
+  for (const d of DAYS_OF_WEEK) {
+    const found = master[d]?.school.find((p) => p.period === period);
+    if (found) return { startTime: found.startTime, endTime: found.endTime };
+  }
+  if (period <= 1) {
+    return {
+      startTime: cfg.firstStart,
+      endTime: minutesToTimeStr(timeStrToMinutes(cfg.firstStart) + cfg.classMinutes),
+    };
+  }
+  const prevRow = resolveRowTimes(master, cfg, period - 1);
+  const duration = Math.max(5, timeStrToMinutes(prevRow.endTime) - timeStrToMinutes(prevRow.startTime));
+  const start = timeStrToMinutes(prevRow.endTime) + cfg.breakMinutes;
+  return { startTime: minutesToTimeStr(start), endTime: minutesToTimeStr(start + duration) };
+}
+
+interface StepperProps {
+  value: number;
+  onChange: (next: number) => void;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  decLabel: string;
+  incLabel: string;
+}
+
+/** Pill-shaped "−  value  +" number stepper. */
+const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, suffix, decLabel, incLabel }) => (
+  <div className="flex items-center h-9 rounded-full bg-paper border border-divider overflow-hidden">
+    <button
+      type="button"
+      onClick={() => onChange(Math.max(min, value - step))}
+      disabled={value <= min}
+      aria-label={decLabel}
+      className="w-9 h-9 grid place-items-center text-sage-800 hover:bg-sage-100 disabled:opacity-30 disabled:hover:bg-transparent shrink-0"
+    >
+      <Minus className="w-3.5 h-3.5" strokeWidth={2.75} />
+    </button>
+    <span className="flex-1 min-w-0 text-center font-mono text-[13px] text-ink tabular-nums">
+      {value}
+      {suffix && <span className="ml-0.5 font-sans text-[11px] font-semibold text-slate-600">{suffix}</span>}
+    </span>
+    <button
+      type="button"
+      onClick={() => onChange(Math.min(max, value + step))}
+      disabled={value >= max}
+      aria-label={incLabel}
+      className="w-9 h-9 grid place-items-center text-sage-800 hover:bg-sage-100 disabled:opacity-30 disabled:hover:bg-transparent shrink-0"
+    >
+      <Plus className="w-3.5 h-3.5" strokeWidth={2.75} />
+    </button>
+  </div>
+);
+
+type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'widgets' | 'guide';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'widgets', 'guide'];
+const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
+
+function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
+  try {
+    const raw = window.localStorage.getItem(OPEN_CARDS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    const out: Partial<Record<SettingsCardId, boolean>> = {};
+    SETTINGS_CARD_IDS.forEach((id) => {
+      if (parsed[id] === true) out[id] = true;
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+type SettingsCardTone = 'neutral' | 'sage' | 'accent' | 'other';
+const CARD_TONES: Record<SettingsCardTone, { icon: string; openRing: string; chevron: string }> = {
+  neutral: { icon: 'bg-paper text-ink', openRing: 'ring-1 ring-slate-300', chevron: 'text-slate-600' },
+  sage: { icon: 'bg-sage-700 text-paper', openRing: 'ring-1 ring-sage-400', chevron: 'text-sage-800' },
+  accent: { icon: 'bg-accent-700 text-paper', openRing: 'ring-1 ring-accent-300', chevron: 'text-accent-800' },
+  other: { icon: 'bg-other-600 text-paper', openRing: 'ring-1 ring-other-300', chevron: 'text-other-700' },
+};
+
+interface SettingsCardProps {
+  id: SettingsCardId;
+  open: boolean;
+  onToggle: (id: SettingsCardId) => void;
+  tone: SettingsCardTone;
+  icon: LucideIcon;
+  title: string;
+  summary: React.ReactNode;
+  children: React.ReactNode;
+}
+
+/** Collapsible settings card: icon · title · one-line state summary · chevron. */
+const SettingsCard: React.FC<SettingsCardProps> = ({ id, open, onToggle, tone, icon: Icon, title, summary, children }) => {
+  const t = CARD_TONES[tone];
+  return (
+    <section
+      id={`settings-card-${id}`}
+      className={`bg-surface rounded-2xl shadow-xs overflow-hidden scroll-mt-4 transition-shadow ${open ? t.openRing : ''}`}
+    >
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        aria-expanded={open}
+        aria-controls={`settings-panel-${id}`}
+        className="w-full px-3.5 py-3 flex items-center gap-3 text-left hover:bg-paper/40 transition-colors"
+      >
+        <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${t.icon}`}>
+          <Icon strokeWidth={2.5} className="w-[18px] h-[18px]" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[13px] font-bold text-ink truncate">{title}</span>
+          <span className="block text-[11px] text-slate-600 truncate">{summary}</span>
+        </span>
+        <ChevronDown
+          strokeWidth={2.5}
+          className={`w-4 h-4 shrink-0 transition-transform duration-200 ${t.chevron} ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div id={`settings-panel-${id}`} className="border-t border-divider">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+};
+
+interface SectionResetButtonProps {
+  lang: AppLanguage;
+  label: string;
+  onConfirm: () => void;
+  confirmText?: string;
+  confirmLabel?: string;
+}
+
+/** Per-section "restore defaults" row with an inline (in-page) confirmation step. */
+const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, onConfirm, confirmText, confirmLabel }) => {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="pt-3 border-t border-divider">
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[11px] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors"
+        >
+          <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
+          {label}
+        </button>
+      ) : (
+        <div role="alertdialog" className="flex flex-wrap items-center gap-2">
+          <p className="flex-1 min-w-[180px] text-[11px] font-semibold text-accent-900 leading-snug">
+            {confirmText ??
+              tr(
+                lang,
+                '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
+                'Restore defaults? Only this section’s settings will change.',
+                '确定要恢复吗？只有本部分的设置会恢复为默认值。'
+              )}
+          </p>
+          <div className="flex gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="h-8 px-3 rounded-full border border-divider text-ink text-[11px] font-semibold hover:bg-slate-100"
+            >
+              {tr(lang, '취소', 'Cancel', '取消')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(false);
+                onConfirm();
+              }}
+              className="h-8 px-3 rounded-full bg-accent-800 text-paper text-[11px] font-bold inline-flex items-center gap-1 hover:bg-accent-900"
+            >
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
+              {confirmLabel ?? tr(lang, '되돌리기', 'Restore', '恢复')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Quick grade chips (초1…고3). The chip fills only the grade part; the user can keep typing 반.
+type SchoolLevel = 'e' | 'm' | 'h';
+interface GradeChip {
+  key: string;
+  level: SchoolLevel;
+  n: number;
+}
+const GRADE_CHIPS: GradeChip[] = [
+  ...[1, 2, 3, 4, 5, 6].map((n) => ({ key: `e${n}`, level: 'e' as SchoolLevel, n })),
+  ...[1, 2, 3].map((n) => ({ key: `m${n}`, level: 'm' as SchoolLevel, n })),
+  ...[1, 2, 3].map((n) => ({ key: `h${n}`, level: 'h' as SchoolLevel, n })),
+];
+const ZH_NUM = ['', '一', '二', '三', '四', '五', '六'];
+function gradeChipLabel(c: GradeChip, lang: AppLanguage): string {
+  const ko = `${{ e: '초', m: '중', h: '고' }[c.level]}${c.n}`;
+  const en = `${{ e: 'E', m: 'M', h: 'H' }[c.level]}${c.n}`;
+  const zh = `${{ e: '小', m: '初', h: '高' }[c.level]}${ZH_NUM[c.n]}`;
+  return tr(lang, ko, en, zh);
+}
+function gradeChipFill(c: GradeChip, lang: AppLanguage): string {
+  const usGrade = c.level === 'e' ? c.n : c.level === 'm' ? c.n + 6 : c.n + 9;
+  const zhLevel = { e: '小学', m: '初', h: '高' }[c.level];
+  return tr(lang, `${c.n}학년`, `Grade ${usGrade}`, c.level === 'e' ? `${zhLevel}${ZH_NUM[c.n]}年级` : `${zhLevel}${ZH_NUM[c.n]}`);
+}
+/** Every possible chip fill text (all languages), longest first — used to swap the grade part but keep 반. */
+const ALL_GRADE_FILLS: string[] = Array.from(
+  new Set(GRADE_CHIPS.flatMap((c) => (['ko', 'en', 'zh'] as AppLanguage[]).map((l) => gradeChipFill(c, l))))
+).sort((a, b) => b.length - a.length);
+
+function profileInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && /^[A-Za-z]/.test(words[0])) {
+    return (Array.from(words[0])[0] + Array.from(words[1])[0]).toUpperCase();
+  }
+  return (Array.from(name.trim())[0] ?? '').toUpperCase();
+}
+
+const GroupHeader: React.FC<{ label: string }> = ({ label }) => (
+  <h3 className="px-1.5 pt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600">{label}</h3>
+);
+
+/** "2026-10-15 08:00" → "10/15 08:00" (falls back to the raw string). */
+function formatBackupShort(raw: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}:\d{2})/.exec(raw || '');
+  if (!m) return raw;
+  return `${Number(m[2])}/${Number(m[3])} ${m[4]}`;
+}
+
+function createSampleTimetableImageBase64(lang: AppLanguage): string {
   const canvas = document.createElement('canvas');
   canvas.width = 680;
   canvas.height = 460;
@@ -60,16 +380,33 @@ function createSampleTimetableImageBase64(): string {
 
   ctx.fillStyle = '#1e293b';
   ctx.font = 'bold 22px sans-serif';
-  ctx.fillText('2학년 3반 주간 시간표 및 방과후 학원 안내', 24, 42);
+  ctx.fillText(
+    tr(
+      lang,
+      '2학년 3반 주간 시간표 및 방과후 학원 안내',
+      'Grade 2 Class 3 Weekly Timetable & After-school Academies',
+      '二年级3班 每周课表及课后补习班安排'
+    ),
+    24,
+    42
+  );
 
-  const cols = ['교시', '월', '화', '수', '목', '금'];
-  const rows = [
-    ['1교시 (09:00~09:45)', '국어', '수학', '영어', '과학', '수학'],
-    ['2교시 (09:55~10:40)', '수학', '영어', '국어', '한국사', '과학'],
-    ['3교시 (10:50~11:35)', '영어', '과학', '수학', '국어', '체육'],
-    ['4교시 (11:45~12:30)', '사회', '체육', '정보', '영어', '국어'],
-    ['5교시 (13:25~14:10)', '과학', '음악', '미술', '수학', '동아리'],
+  const periodLabel = (n: number) => tr(lang, `${n}교시`, `P${n}`, `第${n}节`);
+  const cols = [
+    tr(lang, '교시', 'Period', '节次'),
+    ...(['월', '화', '수', '목', '금'] as DayOfWeek[]).map((d) => translateDay(d, lang)),
   ];
+  const rawRows: Array<[string, string[]]> = [
+    ['09:00~09:45', ['국어', '수학', '영어', '과학', '수학']],
+    ['09:55~10:40', ['수학', '영어', '국어', '한국사', '과학']],
+    ['10:50~11:35', ['영어', '과학', '수학', '국어', '체육']],
+    ['11:45~12:30', ['사회', '체육', '정보', '영어', '국어']],
+    ['13:25~14:10', ['과학', '음악', '미술', '수학', '동아리']],
+  ];
+  const rows = rawRows.map(([time, subjects], i) => [
+    `${periodLabel(i + 1)} (${time})`,
+    ...subjects.map((sub) => translateSubject(sub, lang)),
+  ]);
 
   ctx.strokeStyle = '#cbd5e1';
   ctx.lineWidth = 1;
@@ -98,7 +435,7 @@ function createSampleTimetableImageBase64(): string {
       ctx.fillRect(x, y, colWidths[cIdx], rowH);
       ctx.strokeRect(x, y, colWidths[cIdx], rowH);
       ctx.fillStyle = '#334155';
-      ctx.font = cIdx === 0 ? '12px monospace' : 'bold 14px sans-serif';
+      ctx.font = cIdx === 0 ? '12px monospace' : lang === 'en' ? 'bold 11px sans-serif' : 'bold 14px sans-serif';
       ctx.fillText(cellText, x + 12, y + 24);
       x += colWidths[cIdx];
     });
@@ -110,13 +447,27 @@ function createSampleTimetableImageBase64(): string {
 
   ctx.fillStyle = '#4f46e5';
   ctx.font = 'bold 16px sans-serif';
-  ctx.fillText('[방과후 저녁 학원 시간표]', 40, 338);
+  ctx.fillText(
+    tr(lang, '[방과후 저녁 학원 시간표]', '[After-school Academy Schedule]', '【课后补习班时间表】'),
+    40,
+    338
+  );
 
   ctx.fillStyle = '#1e293b';
   ctx.font = '14px sans-serif';
-  ctx.fillText('• 월요일 17:00 ~ 19:00 : 수학학원   /   19:30 ~ 21:30 : 영어학원', 40, 368);
-  ctx.fillText('• 수요일 17:00 ~ 19:00 : 수학학원   /   19:30 ~ 21:00 : 과학학원', 40, 394);
-  ctx.fillText('• 토요일 10:00 ~ 12:30 : 논술학원', 40, 420);
+  const ts = (sub: string) => translateSubject(sub, lang);
+  const dayFull = (d: DayOfWeek) => tr(lang, `${d}요일`, translateDay(d, lang), translateDay(d, lang));
+  ctx.fillText(
+    `• ${dayFull('월')} 17:00 ~ 19:00 : ${ts('수학학원')}   /   19:30 ~ 21:30 : ${ts('영어학원')}`,
+    40,
+    368
+  );
+  ctx.fillText(
+    `• ${dayFull('수')} 17:00 ~ 19:00 : ${ts('수학학원')}   /   19:30 ~ 21:00 : ${ts('과학학원')}`,
+    40,
+    394
+  );
+  ctx.fillText(`• ${dayFull('토')} 10:00 ~ 12:30 : ${ts('논술학원')}`, 40, 420);
 
   const dataUrl = canvas.toDataURL('image/png');
   return dataUrl.replace(/^data:image\/png;base64,/, '');
@@ -126,23 +477,107 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   state,
   onUpdateState,
   onResetSampleData,
+  focusSection,
+  onFocusHandled,
 }) => {
   const lang: AppLanguage = state.language || 'ko';
 
   // Selected interactive guide topic (default to first topic so user immediately sees step-by-step instructions)
   const [selectedGuideId, setSelectedGuideId] = useState<string>(USER_GUIDE_TOPICS[0].id);
-  const [isGuideExpanded, setIsGuideExpanded] = useState<boolean>(true);
 
-  const [openSections, setOpenSections] = useState<Record<number, boolean>>({
-    1: true,
-    2: true,
-    3: true,
-    4: true,
-  });
-
-  const toggleSection = (idx: number) => {
-    setOpenSections((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  // Accordion open state (all collapsed by default; remembered per device)
+  const [openCards, setOpenCards] = useState<Partial<Record<SettingsCardId, boolean>>>(loadOpenCards);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(OPEN_CARDS_STORAGE_KEY, JSON.stringify(openCards));
+    } catch {
+      /* storage unavailable — keep in memory only */
+    }
+  }, [openCards]);
+  const toggleCard = (id: SettingsCardId) => setOpenCards((prev) => ({ ...prev, [id]: !prev[id] }));
+  const anyCardOpen = SETTINGS_CARD_IDS.some((id) => openCards[id]);
+  const collapseAllCards = () => setOpenCards({});
+  const openCardAndScroll = (id: SettingsCardId) => {
+    setOpenCards((prev) => ({ ...prev, [id]: true }));
+    window.setTimeout(() => {
+      document.getElementById(`settings-card-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 30);
   };
+
+  // --- SECTION 0: MY PROFILE (shown on the timetable's "지금" card) ---
+  const profile: UserProfile = {
+    name: state.profile?.name ?? '',
+    school: state.profile?.school ?? '',
+    grade: state.profile?.grade ?? '',
+  };
+  const profileNameRef = useRef<HTMLInputElement | null>(null);
+  const profileGradeRef = useRef<HTMLInputElement | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [lastGradeChip, setLastGradeChip] = useState<string | null>(null);
+  const profileSavedTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (profileSavedTimer.current) window.clearTimeout(profileSavedTimer.current);
+    },
+    []
+  );
+  const flashProfileSaved = () => {
+    setProfileSaved(true);
+    if (profileSavedTimer.current) window.clearTimeout(profileSavedTimer.current);
+    profileSavedTimer.current = window.setTimeout(() => setProfileSaved(false), 1600);
+  };
+  const updateProfile = (patch: Partial<UserProfile>) => {
+    onUpdateState((prev) => ({
+      ...prev,
+      profile: {
+        name: prev.profile?.name ?? '',
+        school: prev.profile?.school ?? '',
+        grade: prev.profile?.grade ?? '',
+        ...patch,
+      },
+    }));
+    flashProfileSaved();
+  };
+  const applyGradeChip = (chip: GradeChip) => {
+    const fill = gradeChipFill(chip, lang);
+    let rest = profile.grade.trim();
+    const prefix = ALL_GRADE_FILLS.find((f) => rest.startsWith(f));
+    if (prefix) rest = rest.slice(prefix.length).trim();
+    updateProfile({ grade: rest ? `${fill} ${rest}` : fill });
+    setLastGradeChip(chip.key);
+    window.setTimeout(() => {
+      const el = profileGradeRef.current;
+      if (el) {
+        el.focus();
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      }
+    }, 0);
+  };
+  const handleClearProfile = () => {
+    onUpdateState((prev) => ({ ...prev, profile: undefined }));
+    setLastGradeChip(null);
+  };
+
+  // App asks us to open "내 정보" (e.g. tapped from the timetable's 지금 card)
+  const onFocusHandledRef = useRef(onFocusHandled);
+  useEffect(() => {
+    onFocusHandledRef.current = onFocusHandled;
+  }, [onFocusHandled]);
+  useEffect(() => {
+    if (focusSection !== 'profile') return;
+    setOpenCards((prev) => ({ ...prev, profile: true }));
+    const timer = window.setTimeout(() => {
+      document.getElementById('settings-card-profile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      profileNameRef.current?.focus({ preventScroll: true });
+      onFocusHandledRef.current?.();
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [focusSection]);
+
+  // In-page confirmations (no window.confirm)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [removePeriodConfirm, setRemovePeriodConfirm] = useState(false);
 
   // --- SECTION 1: SUBJECT POOL STATE ---
   const [newSchoolSubject, setNewSchoolSubject] = useState('');
@@ -153,6 +588,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [copySourceDay, setCopySourceDay] = useState<DayOfWeek>('월');
   const [copyTargetDay, setCopyTargetDay] = useState<DayOfWeek>('화');
   const [masterFeedback, setMasterFeedback] = useState<string | null>(null);
+  // null = auto (show 토/일 columns only when a weekend day has school periods)
+  const [showWeekendPref, setShowWeekendPref] = useState<boolean | null>(null);
+  const [schoolSheet, setSchoolSheet] = useState<
+    { kind: 'cell'; day: DayOfWeek; period: number } | { kind: 'row'; period: number } | null
+  >(null);
+  const [customSubjectDraft, setCustomSubjectDraft] = useState('');
 
   // --- SECTION 3: AI TIMETABLE IMAGE RECOGNITION STATE ---
   const [aiLoading, setAiLoading] = useState<boolean>(false);
@@ -170,16 +611,57 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   } | null>(null);
   const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // --- SECTION 5: HOME SCREEN WIDGET PREVIEW STATE ---
-  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('light');
+  // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
   const [widgetSyncToast, setWidgetSyncToast] = useState<string | null>(null);
-  const widgetPayload = buildWidgetSyncPayload(state);
-  const activeSchoolClasses = widgetPayload.schoolTimetable.filter(
-    (s) => !s.isCancelled && s.subject.trim() !== ''
-  );
-  const activeAcademyClasses = widgetPayload.academyTimetable.filter(
-    (a) => !a.isCancelled
-  );
+  const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
+
+  // 위젯 선택 시트: Esc로 닫기 + 열려 있는 동안 뒤 화면 스크롤 잠금
+  useEffect(() => {
+    if (!isWidgetSheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsWidgetSheetOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isWidgetSheetOpen]);
+  const [widgetNow, setWidgetNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setWidgetNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const widgetConfig = getWidgetConfig(state);
+  const widgetTheme = widgetConfig.theme;
+  const widgetPreviewData = buildHomeWidgetsData(state, widgetNow);
+  const updateWidgetConfig = (patch: Partial<WidgetConfig>) => {
+    onUpdateState((prev) => {
+      const base = getWidgetConfig(prev);
+      const next: WidgetConfig = { ...base, ...patch };
+      const enabledSet = new Set(next.enabled);
+      return {
+        ...prev,
+        widgetConfig: { ...next, enabled: HOME_WIDGET_IDS.filter((id) => enabledSet.has(id)) },
+      };
+    });
+  };
+  const toggleWidget = (id: HomeWidgetId) => {
+    const isOn = widgetConfig.enabled.includes(id);
+    updateWidgetConfig({
+      enabled: isOn ? widgetConfig.enabled.filter((x) => x !== id) : [...widgetConfig.enabled, id],
+    });
+  };
+
+  // --- SCHOOL CLASS-TIME CONFIG (preset vs custom) ---
+  const schoolTimeConfig: SchoolTimeConfig = {
+    ...DEFAULT_SCHOOL_TIME_CONFIG,
+    ...(state.schoolTimeConfig || {}),
+  };
+  const isPresetMode = schoolTimeConfig.mode === 'preset';
+  const presetPreviewRows = buildPresetPeriods(schoolTimeConfig);
 
   const timelineStartHour = state.timelineConfig?.startHour ?? 8;
   const timelineEndHour = state.timelineConfig?.endHour ?? 24;
@@ -255,6 +737,75 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setTimeout(() => setMasterFeedback(null), 2800);
   };
 
+  // ================= SECTION RESETS (only the section's own settings; overrides/attendance/memos/schedules untouched) =================
+  const sectionResetLabel = tr(lang, '이 섹션 기본값으로 되돌리기', 'Restore this section’s defaults', '将本部分恢复默认');
+
+  const handleResetTimelineRange = () => {
+    onUpdateState((prev) => ({ ...prev, timelineConfig: { startHour: 8, endHour: 24 } }));
+    showMasterToast(
+      tr(lang, '시간표 표시 범위를 기본값으로 되돌렸어요', 'Timeline range restored to defaults', '时间轴显示范围已恢复默认')
+    );
+  };
+
+  const handleResetSchoolSection = () => {
+    const sample = createInitialPlannerState().masterTimetable;
+    onUpdateState((prev) => {
+      const nextMaster = { ...prev.masterTimetable } as MasterTimetable;
+      DAYS_OF_WEEK.forEach((d) => {
+        nextMaster[d] = {
+          ...(prev.masterTimetable[d] || { school: [], academy: [] }),
+          school: (sample[d]?.school || []).map((p) => ({ ...p })),
+        };
+      });
+      return { ...prev, schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG }, masterTimetable: nextMaster };
+    });
+    setSchoolSheet(null);
+    setRemovePeriodConfirm(false);
+    showMasterToast(
+      tr(lang, '학교 시간표를 기본값으로 되돌렸어요', 'School timetable restored to defaults', '学校课表已恢复默认')
+    );
+  };
+
+  const handleResetAcademySection = () => {
+    const sample = createInitialPlannerState().masterTimetable;
+    onUpdateState((prev) => {
+      const nextMaster = { ...prev.masterTimetable } as MasterTimetable;
+      DAYS_OF_WEEK.forEach((d) => {
+        nextMaster[d] = {
+          ...(prev.masterTimetable[d] || { school: [], academy: [] }),
+          academy: (sample[d]?.academy || []).map((a) => ({ ...a })),
+        };
+      });
+      return { ...prev, masterTimetable: nextMaster };
+    });
+    showMasterToast(
+      tr(lang, '학원 시간표를 기본값으로 되돌렸어요', 'Academy timetable restored to defaults', '补习班课表已恢复默认')
+    );
+  };
+
+  const handleResetSubjectPool = () => {
+    const sample = createInitialPlannerState().subjectPool;
+    onUpdateState((prev) => ({
+      ...prev,
+      subjectPool: { school: [...sample.school], academy: [...sample.academy] },
+    }));
+    setNewSchoolSubject('');
+    setNewAcademySubject('');
+    showMasterToast(
+      tr(lang, '과목 후보군을 기본값으로 되돌렸어요', 'Subject pool restored to defaults', '候选科目库已恢复默认')
+    );
+  };
+
+  const handleResetWidgets = () => {
+    onUpdateState((prev) => ({
+      ...prev,
+      widgetConfig: { ...DEFAULT_WIDGET_CONFIG, enabled: [...DEFAULT_WIDGET_CONFIG.enabled] },
+    }));
+    showMasterToast(
+      tr(lang, '홈 화면 위젯을 기본값으로 되돌렸어요', 'Home screen widgets restored to defaults', '主屏幕小组件已恢复默认')
+    );
+  };
+
   const handleUpdateTimelineRange = (newStart: number, newEnd: number) => {
     const validStart = Math.max(0, Math.min(22, newStart));
     const validEnd = Math.max(validStart + 2, Math.min(24, newEnd));
@@ -277,33 +828,65 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     );
   };
 
-  const handleApplySchoolDurationPreset = (minutes: 40 | 45 | 50, label: string) => {
+  const updateSchoolTimeConfig = (patch: Partial<SchoolTimeConfig>) => {
+    onUpdateState((prev) => {
+      const base: SchoolTimeConfig = {
+        ...DEFAULT_SCHOOL_TIME_CONFIG,
+        ...(prev.schoolTimeConfig || {}),
+        ...patch,
+      };
+      const periodCount = Math.max(1, Math.min(12, Math.round(base.periodCount) || 1));
+      const next: SchoolTimeConfig = {
+        ...base,
+        classMinutes: Math.max(5, Math.min(180, Math.round(base.classMinutes) || 5)),
+        breakMinutes: Math.max(0, Math.min(120, Math.round(base.breakMinutes) || 0)),
+        lunchMinutes: Math.max(0, Math.min(180, Math.round(base.lunchMinutes) || 0)),
+        periodCount,
+        lunchAfterPeriod: Math.max(0, Math.min(periodCount, Math.round(base.lunchAfterPeriod) || 0)),
+        firstStart: /^\d{2}:\d{2}$/.test(base.firstStart) ? base.firstStart : '09:00',
+      };
+      return { ...prev, schoolTimeConfig: next };
+    });
+  };
+
+  const handleApplySchoolTimePresetToAllDays = () => {
+    const config = schoolTimeConfig;
+    const rows = buildPresetPeriods(config);
+    let appliedDays = 0;
+    DAYS_OF_WEEK.forEach((day) => {
+      if (state.masterTimetable[day]?.school.length) appliedDays += 1;
+    });
     onUpdateState((prev) => {
       const nextMaster = { ...prev.masterTimetable };
-      (['월', '화', '수', '목', '금', '토', '일'] as DayOfWeek[]).forEach((day) => {
-        const currentPeriods = nextMaster[day].school;
-        if (currentPeriods.length === 0) return;
-        const currentSubjects = currentPeriods.map((p) => p.subject);
-        const generated = generatePeriodSchedule(minutes, currentSubjects).slice(
-          0,
-          currentPeriods.length
-        );
+      const fillSubject = prev.subjectPool.school.includes('자습')
+        ? '자습'
+        : prev.subjectPool.school[0] || '자습';
+      DAYS_OF_WEEK.forEach((day) => {
+        const dayData = nextMaster[day];
+        if (!dayData || dayData.school.length === 0) return;
+        const existing = dayData.school;
         nextMaster[day] = {
-          ...nextMaster[day],
-          school: generated,
+          ...dayData,
+          school: rows.map((row) => {
+            const match = existing.find((p) => p.period === row.period);
+            return {
+              ...(match || {}),
+              period: row.period,
+              startTime: row.startTime,
+              endTime: row.endTime,
+              subject: match?.subject ?? fillSubject,
+            };
+          }),
         };
       });
-      return {
-        ...prev,
-        masterTimetable: nextMaster,
-      };
+      return { ...prev, masterTimetable: nextMaster };
     });
     showMasterToast(
       tr(
         lang,
-        `${label}(${minutes}분) 교시 시간 프리셋이 전체 요일에 적용되었습니다.`,
-        `${label} (${minutes}-min) period preset applied to all days.`,
-        `${label}（${minutes}分钟）标准课时预设已应用到所有星期。`
+        `${appliedDays}개 요일의 학교 시간표에 ${config.periodCount}교시 (${config.firstStart} 시작, 수업 ${config.classMinutes}분)가 적용되었습니다.`,
+        `Applied ${config.periodCount} periods (from ${config.firstStart}, ${config.classMinutes}-min classes) to ${appliedDays} day(s).`,
+        `已将 ${config.periodCount} 节课（${config.firstStart} 开始，每节 ${config.classMinutes} 分钟）应用到 ${appliedDays} 个星期。`
       )
     );
   };
@@ -349,65 +932,110 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     );
   };
 
-  const handleUpdateMasterSchoolPeriod = (
-    periodNum: number,
-    patch: Partial<SchoolPeriod>
+  // ================= SCHOOL MASTER GRID (table editor) HANDLERS =================
+  const getCfg = (prev: PlannerState): SchoolTimeConfig => ({
+    ...DEFAULT_SCHOOL_TIME_CONFIG,
+    ...(prev.schoolTimeConfig || {}),
+  });
+
+  const updateDaySchool = (
+    day: DayOfWeek,
+    fn: (school: SchoolPeriod[], prev: PlannerState) => SchoolPeriod[]
   ) => {
     onUpdateState((prev) => {
-      const dayData = prev.masterTimetable[selectedMasterDay];
-      const updatedSchool = dayData.school.map((p) =>
-        p.period === periodNum ? { ...p, ...patch } : p
-      );
+      const dayData = prev.masterTimetable[day] || { school: [], academy: [] };
+      const nextSchool = fn(dayData.school, prev)
+        .slice()
+        .sort((a, b) => a.period - b.period);
       return {
         ...prev,
         masterTimetable: {
           ...prev.masterTimetable,
-          [selectedMasterDay]: {
-            ...dayData,
-            school: updatedSchool,
-          },
+          [day]: { ...dayData, school: nextSchool },
         },
       };
     });
   };
 
-  const handleAddMasterSchoolPeriod = () => {
-    onUpdateState((prev) => {
-      const dayData = prev.masterTimetable[selectedMasterDay];
-      const nextPeriodNum = dayData.school.length + 1;
-      const newPeriod: SchoolPeriod = {
-        period: nextPeriodNum,
-        startTime: '15:20',
-        endTime: '16:05',
-        subject: prev.subjectPool.school[0] || '국어',
-      };
-      return {
-        ...prev,
-        masterTimetable: {
-          ...prev.masterTimetable,
-          [selectedMasterDay]: {
-            ...dayData,
-            school: [...dayData.school, newPeriod],
-          },
-        },
-      };
+  const handleSetSchoolCell = (day: DayOfWeek, period: number, subject: string) => {
+    const clean = subject.trim();
+    if (!clean) return;
+    updateDaySchool(day, (school, prev) => {
+      const idx = school.findIndex((p) => p.period === period);
+      if (idx >= 0) return school.map((p, i) => (i === idx ? { ...p, subject: clean } : p));
+      return [
+        ...school,
+        { period, ...resolveRowTimes(prev.masterTimetable, getCfg(prev), period), subject: clean },
+      ];
     });
   };
 
-  const handleRemoveLastMasterSchoolPeriod = () => {
+  const handleClearSchoolCell = (day: DayOfWeek, period: number) => {
+    updateDaySchool(day, (school) => school.filter((p) => p.period !== period));
+  };
+
+  const handleUpdateDayPeriodTime = (
+    day: DayOfWeek,
+    period: number,
+    patch: Partial<Pick<SchoolPeriod, 'startTime' | 'endTime'>>
+  ) => {
+    updateDaySchool(day, (school) =>
+      school.map((p) => (p.period === period ? { ...p, ...patch } : p))
+    );
+  };
+
+  const handleUpdateRowTimeAllDays = (
+    period: number,
+    patch: Partial<Pick<SchoolPeriod, 'startTime' | 'endTime'>>
+  ) => {
     onUpdateState((prev) => {
-      const dayData = prev.masterTimetable[selectedMasterDay];
-      if (dayData.school.length === 0) return prev;
-      return {
-        ...prev,
-        masterTimetable: {
-          ...prev.masterTimetable,
-          [selectedMasterDay]: {
-            ...dayData,
-            school: dayData.school.slice(0, -1),
-          },
-        },
-      };
+      const next = { ...prev.masterTimetable };
+      DAYS_OF_WEEK.forEach((d) => {
+        const dd = next[d];
+        if (!dd || !dd.school.some((p) => p.period === period)) return;
+        next[d] = {
+          ...dd,
+          school: dd.school.map((p) => (p.period === period ? { ...p, ...patch } : p)),
+        };
+      });
+      return { ...prev, masterTimetable: next };
+    });
+  };
+
+  const handleAddSchoolRow = () => {
+    onUpdateState((prev) => {
+      const cfg = getCfg(prev);
+      const n = getMaxPeriod(prev.masterTimetable) + 1;
+      const times = resolveRowTimes(prev.masterTimetable, cfg, n);
+      let targets = DAYS_OF_WEEK.filter((d) => (prev.masterTimetable[d]?.school.length ?? 0) > 0);
+      if (targets.length === 0) targets = WEEKDAYS;
+      const subject = prev.subjectPool.school.includes('자습')
+        ? '자습'
+        : prev.subjectPool.school[0] || '자습';
+      const next = { ...prev.masterTimetable };
+      targets.forEach((d) => {
+        const dd = next[d] || { school: [], academy: [] };
+        next[d] = {
+          ...dd,
+          school: [...dd.school, { period: n, ...times, subject }].sort((a, b) => a.period - b.period),
+        };
+      });
+      return { ...prev, masterTimetable: next };
+    });
+  };
+
+  const handleRemoveLastSchoolRow = () => {
+    const maxP = getMaxPeriod(state.masterTimetable);
+    setRemovePeriodConfirm(false);
+    if (maxP === 0) return;
+    onUpdateState((prev) => {
+      const next = { ...prev.masterTimetable };
+      DAYS_OF_WEEK.forEach((d) => {
+        const dd = next[d];
+        if (!dd) return;
+        next[d] = { ...dd, school: dd.school.filter((p) => p.period !== maxP) };
+      });
+      return { ...prev, masterTimetable: next };
     });
   };
 
@@ -501,7 +1129,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'AI analysis failed.');
+        throw new Error(
+          data.error || tr(lang, 'AI 분석에 실패했습니다.', 'AI analysis failed.', 'AI 分析失败。')
+        );
       }
 
       const rawEntries = Array.isArray(data.entries) ? data.entries : [];
@@ -536,7 +1166,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       );
 
       setAiSummary(
-        data.summary ||
+        (lang === 'ko' && data.summary) ||
           tr(
             lang,
             `총 ${mapped.length}개의 수업/학원 항목이 인식되었습니다.`,
@@ -577,7 +1207,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   const handleRunSampleImageDemo = () => {
-    const base64Clean = createSampleTimetableImageBase64();
+    const base64Clean = createSampleTimetableImageBase64(lang);
     if (!base64Clean) return;
     setUploadedPreviewUrl(`data:image/png;base64,${base64Clean}`);
     runAiTimetableAnalysis(base64Clean, 'image/png');
@@ -760,6 +1390,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             startHour: 8,
             endHour: 24,
           },
+          schoolTimeConfig: parsed.schoolTimeConfig || prev.schoolTimeConfig,
         }));
 
         setBackupFeedback({
@@ -786,253 +1417,1189 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     e.target.value = '';
   };
 
-  const currentMasterDayData = state.masterTimetable[selectedMasterDay];
+  // --- Derived data for the school table / academy card ---
+  const academyDayData = state.masterTimetable[selectedMasterDay] || { school: [], academy: [] };
+  const totalAcademyCount = DAYS_OF_WEEK.reduce(
+    (sum, d) => sum + (state.masterTimetable[d]?.academy.length ?? 0),
+    0
+  );
+  const hasWeekendSchool = (['토', '일'] as DayOfWeek[]).some(
+    (d) => (state.masterTimetable[d]?.school.length ?? 0) > 0
+  );
+  const showWeekend = showWeekendPref ?? hasWeekendSchool;
+  const gridDays: DayOfWeek[] = showWeekend ? DAYS_OF_WEEK : WEEKDAYS;
+  const maxSchoolPeriod = getMaxPeriod(state.masterTimetable);
+  const schoolRows = Array.from({ length: maxSchoolPeriod }, (_, i) => i + 1);
+  const periodLabel = (n: number) => tr(lang, `${n}교시`, `P${n}`, `第${n}节`);
+  const getRowInfo = (period: number) => {
+    const entries: Array<{ day: DayOfWeek; p: SchoolPeriod }> = [];
+    DAYS_OF_WEEK.forEach((d) => {
+      const p = state.masterTimetable[d]?.school.find((x) => x.period === period);
+      if (p) entries.push({ day: d, p });
+    });
+    const ref = entries[0]?.p;
+    const times = ref
+      ? { startTime: ref.startTime, endTime: ref.endTime }
+      : resolveRowTimes(state.masterTimetable, schoolTimeConfig, period);
+    const mismatch = entries.some(
+      (e) => e.p.startTime !== times.startTime || e.p.endTime !== times.endTime
+    );
+    return { entries, times, mismatch };
+  };
+  const sheetCell =
+    schoolSheet?.kind === 'cell'
+      ? state.masterTimetable[schoolSheet.day]?.school.find((p) => p.period === schoolSheet.period)
+      : undefined;
+  const presetHasLunch =
+    schoolTimeConfig.lunchAfterPeriod > 0 &&
+    schoolTimeConfig.lunchAfterPeriod < schoolTimeConfig.periodCount &&
+    schoolTimeConfig.lunchMinutes > 0;
+  const presetEndTime =
+    presetPreviewRows[presetPreviewRows.length - 1]?.endTime ?? schoolTimeConfig.firstStart;
+
+  // --- One-line summaries shown on collapsed cards ---
+  const schoolSummary = isPresetMode
+    ? tr(
+        lang,
+        `프리셋 · ${schoolTimeConfig.periodCount}교시 · ${schoolTimeConfig.firstStart} 시작`,
+        `Preset · ${schoolTimeConfig.periodCount} periods · from ${schoolTimeConfig.firstStart}`,
+        `预设 · ${schoolTimeConfig.periodCount}节 · ${schoolTimeConfig.firstStart} 开始`
+      )
+    : tr(
+        lang,
+        `직접 입력 · ${maxSchoolPeriod}교시`,
+        `Custom · ${maxSchoolPeriod} periods`,
+        `自定义 · ${maxSchoolPeriod}节`
+      );
+  const academyDaysUsed = DAYS_OF_WEEK.filter((d) => (state.masterTimetable[d]?.academy.length ?? 0) > 0).length;
+  const academySummary =
+    totalAcademyCount > 0
+      ? tr(
+          lang,
+          `주 ${totalAcademyCount}개 수업 · ${academyDaysUsed}개 요일`,
+          `${totalAcademyCount} classes/week · ${academyDaysUsed} days`,
+          `每周 ${totalAcademyCount} 节 · ${academyDaysUsed} 天`
+        )
+      : tr(lang, '등록된 학원 없음', 'No academy classes yet', '尚未登记补习班');
+  const aiEnabled = isAiTimetableEnabled();
+  const aiSummaryLine = aiLoading
+    ? tr(lang, '이미지 분석 중…', 'Analyzing image…', '正在分析图片…')
+    : aiPreviewEntries.length > 0
+    ? tr(
+        lang,
+        `검수 대기 ${aiPreviewEntries.length}건`,
+        `${aiPreviewEntries.length} items to review`,
+        `待核对 ${aiPreviewEntries.length} 条`
+      )
+    : tr(lang, '사진 한 장으로 시간표 자동 입력', 'Fill your timetable from a photo', '一张照片自动录入课表');
+  const lastBackup = state.backupMeta?.lastBackupDate;
+  const backupSummary = lastBackup
+    ? tr(
+        lang,
+        `마지막 백업 ${formatBackupShort(lastBackup)}`,
+        `Last backup ${formatBackupShort(lastBackup)}`,
+        `上次备份 ${formatBackupShort(lastBackup)}`
+      )
+    : tr(lang, '백업 기록 없음', 'Never backed up', '暂无备份记录');
 
   return (
     <div className="space-y-4">
-      {/* TOP BAR 1: LANGUAGE SWITCHER (한국어 / English / 中文) */}
-      <section className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-              <Globe className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                {tr(lang, '앱 표시 언어 설정 (Language)', 'App Language Settings', '应用显示语言设置 (Language)')}
-              </h2>
-              <p className="text-[11px] text-slate-500">
+      {/* ===== HERO: 설정 헤더 + 요약 통계 + 언어 전환 ===== */}
+      <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-12 h-12 rounded-2xl bg-accent-700 text-paper grid place-items-center shrink-0">
+              <Settings2 strokeWidth={2.5} className="w-6 h-6" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-[20px] font-bold text-ink leading-tight">{tr(lang, '설정', 'Settings', '设置')}</h2>
+              <p className="text-[12px] text-slate-600 leading-snug">
                 {tr(
                   lang,
-                  '선택 즉시 앱의 모든 메뉴·과목·가이드가 해당 언어로 전환됩니다.',
-                  'Instantly switches all menus, subjects, and guides to the selected language.',
-                  '点击后立即将应用内所有菜单、科目及使用指南切换为所选语言。'
+                  '시간표 · 데이터 · 위젯을 한곳에서 관리해요',
+                  'Manage timetables, data and widgets in one place',
+                  '在这里统一管理课表、数据与小组件'
                 )}
               </p>
             </div>
           </div>
+          {anyCardOpen && (
+            <button
+              type="button"
+              onClick={collapseAllCards}
+              className="h-8 px-3 rounded-full border border-divider bg-paper text-[11px] font-semibold text-slate-700 inline-flex items-center gap-1 hover:bg-slate-100 shrink-0"
+            >
+              <ChevronsDownUp strokeWidth={2.5} className="w-3.5 h-3.5" />
+              {tr(lang, '모두 접기', 'Collapse all', '全部收起')}
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           {(
             [
-              { code: 'ko', label: '한국어', sub: 'Korean' },
-              { code: 'en', label: 'English', sub: '영어권' },
-              { code: 'zh', label: '中文', sub: '중국어권' },
-            ] as Array<{ code: AppLanguage; label: string; sub: string }>
-          ).map((item) => {
-            const isSelected = lang === item.code;
-            return (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => handleSetLanguage(item.code)}
-                className={`min-h-[46px] px-3 py-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200/90 hover:border-indigo-300 hover:bg-indigo-50/30'
-                }`}
-              >
-                <div className="flex items-center gap-1 text-xs font-bold">
-                  {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                  <span>{item.label}</span>
-                </div>
-                <span
-                  className={`text-[10px] ${
-                    isSelected ? 'text-indigo-100' : 'text-slate-400'
+              {
+                key: 'subjects',
+                value: state.subjectPool.school.length,
+                label: tr(lang, '학교 과목', 'Subjects', '学校科目'),
+                tone: 'text-sage-700',
+                card: 'pool' as SettingsCardId,
+              },
+              {
+                key: 'academy',
+                value: totalAcademyCount,
+                label: tr(lang, '주간 학원', 'Academy/wk', '每周补习'),
+                tone: 'text-accent-700',
+                card: 'academy' as SettingsCardId,
+              },
+              {
+                key: 'widgets',
+                value: widgetConfig.enabled.length,
+                label: tr(lang, '위젯', 'Widgets', '小组件'),
+                tone: 'text-other-700',
+                card: 'widgets' as SettingsCardId,
+              },
+            ]
+          ).map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => openCardAndScroll(s.card)}
+              className="rounded-xl bg-paper px-3 py-2.5 text-left hover:bg-slate-100 transition-colors min-w-0"
+            >
+              <span className={`block font-mono text-[22px] leading-none tabular-nums ${s.tone}`}>{s.value}</span>
+              <span className="block mt-1 text-[11px] font-semibold text-slate-600 truncate">{s.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Globe strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-700" />
+            <span className="text-[12px] font-bold text-ink">{tr(lang, '언어', 'Language', '语言')}</span>
+          </div>
+          <div
+            role="radiogroup"
+            aria-label={tr(lang, '앱 표시 언어', 'App language', '应用显示语言')}
+            className="grid grid-cols-3 gap-1 p-1 rounded-full bg-paper border border-divider"
+          >
+            {(
+              [
+                { code: 'ko', label: '한국어', htmlLang: 'ko' },
+                { code: 'en', label: 'English', htmlLang: 'en' },
+                { code: 'zh', label: '中文', htmlLang: 'zh' },
+              ] as Array<{ code: AppLanguage; label: string; htmlLang: string }>
+            ).map((item) => {
+              const isSelected = lang === item.code;
+              return (
+                <button
+                  key={item.code}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  lang={item.htmlLang}
+                  onClick={() => handleSetLanguage(item.code)}
+                  className={`h-9 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1 transition-colors ${
+                    isSelected ? 'bg-accent-700 text-paper shadow-xs' : 'text-ink hover:bg-slate-100'
                   }`}
                 >
-                  {item.sub}
-                </span>
-              </button>
-            );
-          })}
+                  {isSelected && <Check strokeWidth={3} className="w-3.5 h-3.5" />}
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* TOP BAR 2: INTERACTIVE STEP-BY-STEP APP USER GUIDE */}
-      <section className="bg-white rounded-2xl border-2 border-indigo-500/80 shadow-xs overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setIsGuideExpanded((prev) => !prev)}
-          className="w-full px-4 py-3.5 bg-indigo-50/70 border-b border-indigo-100 flex items-center justify-between text-left"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
-              <BookOpen className="w-4 h-4" />
+      {/* ===== 내 정보 (profile shown on the timetable's 지금 card) ===== */}
+      <SettingsCard
+        id="profile"
+        open={!!openCards.profile}
+        onToggle={toggleCard}
+        tone="sage"
+        icon={IdCard}
+        title={tr(lang, '내 정보', 'My profile', '我的信息')}
+        summary={
+          [profile.name, profile.school, profile.grade].map((v) => v.trim()).filter(Boolean).join(' · ') ||
+          tr(lang, '이름·학교·학년을 입력해 주세요', 'Add your name, school and grade', '请填写姓名、学校和年级')
+        }
+      >
+        <div className="p-3.5 space-y-3.5">
+          {/* Live preview of the 지금 card identity row */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold text-slate-600">
+                {tr(lang, '시간표 「지금」 카드 미리보기', 'Preview on the timetable “Now” card', '课表「现在」卡片预览')}
+              </span>
+              <span
+                aria-live="polite"
+                className={`inline-flex items-center gap-1 text-[11px] font-bold text-sage-800 transition-opacity ${
+                  profileSaved ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <Check strokeWidth={3} className="w-3.5 h-3.5" />
+                {profileSaved ? tr(lang, '저장됨', 'Saved', '已保存') : ''}
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-bold text-slate-900">
+            {(() => {
+              const name = profile.name.trim();
+              const school = profile.school.trim();
+              const grade = profile.grade.trim();
+              const initials = profileInitials(name);
+              return (
+                <div className="bg-ink text-paper rounded-[24px] p-4 flex items-center gap-3" aria-hidden="true">
+                  <span className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[18px] font-bold">
+                    {initials || <UserRound className="w-5 h-5" strokeWidth={2.5} />}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[12px] font-semibold text-paper/80 truncate">
+                      {(() => {
+                        const hour = new Date().getHours();
+                        return hour < 12
+                          ? tr(lang, '좋은 아침이에요,', 'Good morning,', '早上好，')
+                          : hour < 18
+                          ? tr(lang, '좋은 오후예요,', 'Good afternoon,', '下午好，')
+                          : tr(lang, '좋은 저녁이에요,', 'Good evening,', '晚上好，');
+                      })()}
+                    </span>
+                    <span className="block text-[20px] leading-tight font-bold text-paper truncate">
+                      {name
+                        ? tr(lang, `${name} 님`, name, name)
+                        : tr(lang, '이름', 'Your name', '姓名')}
+                    </span>
+                    <span className="mt-1.5 flex items-center gap-1.5 min-w-0">
+                      <span className="inline-flex items-center gap-1 min-w-0 h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold">
+                        <GraduationCap className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{school || tr(lang, '학교', 'School', '学校')}</span>
+                      </span>
+                      <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold whitespace-nowrap shrink-0 max-w-[45%]">
+                        <span className="truncate">{grade || tr(lang, '학년', 'Grade', '年级')}</span>
+                      </span>
+                    </span>
+                  </span>
+                  <PenLine className="w-4 h-4 text-paper/60 shrink-0 self-start mt-1" strokeWidth={2.5} />
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Fields */}
+          <div className="space-y-2.5">
+            <label className="block space-y-1">
+              <span className="text-[12px] font-bold text-ink">{tr(lang, '이름', 'Name', '姓名')}</span>
+              <input
+                ref={profileNameRef}
+                type="text"
+                value={profile.name}
+                maxLength={30}
+                autoComplete="name"
+                onChange={(e) => updateProfile({ name: e.target.value })}
+                placeholder={tr(lang, '예: 김민준', 'e.g. Minjun Kim', '例如：金敏俊')}
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-[12px] font-bold text-ink">{tr(lang, '학교', 'School', '学校')}</span>
+              <input
+                type="text"
+                value={profile.school}
+                maxLength={40}
+                autoComplete="organization"
+                onChange={(e) => updateProfile({ school: e.target.value })}
+                placeholder={tr(lang, '예: 한빛중학교', 'e.g. Hanbit Middle School', '例如：韩光中学')}
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+              />
+            </label>
+            <div className="space-y-1">
+              <label htmlFor="settings-profile-grade" className="block text-[12px] font-bold text-ink">
+                {tr(lang, '학년·반', 'Grade & class', '年级·班级')}
+              </label>
+              <input
+                id="settings-profile-grade"
+                ref={profileGradeRef}
+                type="text"
+                value={profile.grade}
+                maxLength={30}
+                onChange={(e) => {
+                  setLastGradeChip(null);
+                  updateProfile({ grade: e.target.value });
+                }}
+                placeholder={tr(lang, '예: 2학년 3반', 'e.g. Grade 8, Class 3', '例如：初二 3班')}
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+              />
+              <div
+                role="group"
+                aria-label={tr(lang, '학년 빠른 선택', 'Quick grade pick', '快速选择年级')}
+                className="flex flex-wrap gap-1.5 pt-1"
+              >
+                {GRADE_CHIPS.map((chip) => {
+                  const active = lastGradeChip === chip.key;
+                  return (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => applyGradeChip(chip)}
+                      className={`h-7 min-w-[40px] px-2.5 rounded-full text-[11px] font-bold transition-colors ${
+                        active
+                          ? 'bg-sage-700 text-paper'
+                          : chip.level === 'e'
+                            ? 'bg-paper border border-divider text-ink hover:bg-slate-100'
+                            : chip.level === 'm'
+                              ? 'bg-paper border border-sage-300 text-sage-800 hover:bg-sage-100'
+                              : 'bg-paper border border-accent-300 text-accent-800 hover:bg-accent-100'
+                      }`}
+                    >
+                      {gradeChipLabel(chip, lang)}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-600 leading-snug">
+                {tr(
+                  lang,
+                  '학년을 고른 뒤 반을 이어서 입력할 수 있어요. 정보는 이 기기에만 저장돼요.',
+                  'Pick a grade, then type your class after it. Saved on this device only.',
+                  '选好年级后可以继续输入班级。信息只保存在本设备上。'
+                )}
+              </p>
+            </div>
+          </div>
+
+          {(profile.name || profile.school || profile.grade) && (
+            <SectionResetButton
+              lang={lang}
+              label={tr(lang, '내 정보 지우기', 'Clear my profile', '清除我的信息')}
+              confirmText={tr(
+                lang,
+                '이름·학교·학년을 모두 지울까요?',
+                'Clear your name, school and grade?',
+                '要清除姓名、学校和年级吗？'
+              )}
+              confirmLabel={tr(lang, '지우기', 'Clear', '清除')}
+              onConfirm={handleClearProfile}
+            />
+          )}
+        </div>
+      </SettingsCard>
+
+      {/* ===== GROUP: 시간표 ===== */}
+      <div className="space-y-2">
+        <GroupHeader label={tr(lang, '시간표', 'Timetable', '课表')} />
+
+        <SettingsCard
+          id="range"
+          open={!!openCards.range}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={Clock}
+          title={tr(lang, '시간표 표시 범위', 'Timeline Display Range', '时间轴显示范围')}
+          summary={
+            <>
+              <span className="font-mono tabular-nums">
+                {String(timelineStartHour).padStart(2, '0')}:00–{String(timelineEndHour).padStart(2, '0')}:00
+              </span>
+              {' · '}
+              {tr(
+                lang,
+                `하루 ${timelineEndHour - timelineStartHour}시간`,
+                `${timelineEndHour - timelineStartHour} hrs/day`,
+                `每天 ${timelineEndHour - timelineStartHour} 小时`
+              )}
+            </>
+          }
+        >
+          <div className="p-4 space-y-3">
+            <p className="text-[11px] text-slate-600">
+              {tr(
+                lang,
+                '[시간표 > 일별 상세 보기]의 타임라인 표와 빈 시간 계산에 적용할 하루의 시작 시각과 종료 시각을 선택하세요.',
+                'Choose the start and end hours displayed on the Daily Timeline and used for free-time calculation.',
+                '选择应用于【课程表 > 每日详情】时间轴视图及空闲时间计算的每日起止时间。'
+              )}
+            </p>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <label className="space-y-1">
+                <span className="block text-[11px] font-medium text-slate-600">
+                  {tr(lang, '하루 시작 시간', 'Start Hour', '开始时间')}
+                </span>
+                <select
+                  value={timelineStartHour}
+                  onChange={(e) => {
+                    const nextStart = Number(e.target.value);
+                    const adjustedEnd =
+                      timelineEndHour <= nextStart + 1 ? Math.min(24, nextStart + 2) : timelineEndHour;
+                    handleUpdateTimelineRange(nextStart, adjustedEnd);
+                  }}
+                  className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
+                >
+                  {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}:00
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="block text-[11px] font-medium text-slate-600">
+                  {tr(lang, '하루 종료 시간', 'End Hour', '结束时间')}
+                </span>
+                <select
+                  value={timelineEndHour}
+                  onChange={(e) => handleUpdateTimelineRange(timelineStartHour, Number(e.target.value))}
+                  className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
+                >
+                  {[16, 17, 18, 19, 20, 21, 22, 23, 24]
+                    .filter((h) => h >= timelineStartHour + 2)
+                    .map((h) => (
+                      <option key={h} value={h}>
+                        {String(h).padStart(2, '0')}:00
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  { s: 6, e: 24, label: tr(lang, '얼리버드 (06~24시)', 'Early (06-24h)', '早鸟 (06~24时)') },
+                  { s: 8, e: 24, label: tr(lang, '기본 (08~24시)', 'Default (08-24h)', '默认 (08~24时)') },
+                  { s: 8, e: 22, label: tr(lang, '표준 (08~22시)', 'Compact (08-22h)', '紧凑 (08~22时)') },
+                ] as Array<{ s: number; e: number; label: string }>
+              ).map((p) => (
+                <button
+                  key={`${p.s}-${p.e}`}
+                  type="button"
+                  onClick={() => handleUpdateTimelineRange(p.s, p.e)}
+                  className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
+                    timelineStartHour === p.s && timelineEndHour === p.e
+                      ? 'bg-ink text-paper border-transparent'
+                      : 'bg-transparent text-ink border-divider hover:bg-slate-100'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetTimelineRange} />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="school"
+          open={!!openCards.school}
+          onToggle={toggleCard}
+          tone="sage"
+          icon={GraduationCap}
+          title={tr(lang, '학교 시간표', 'School Timetable', '学校课表')}
+          summary={schoolSummary}
+        >
+          <div className="p-4 space-y-5">
+            {/* STEP A: class times */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-sage-700 text-paper font-mono text-[11px] grid place-items-center shrink-0">
+                  1
+                </span>
+                <span className="text-xs font-bold text-ink">
+                  {tr(lang, '수업 시간 정하기', 'Class Times', '设定上课时间')}
+                </span>
+              </div>
+
+              <div
+                role="radiogroup"
+                aria-label={tr(lang, '수업 시간 설정 방식', 'Class time setup mode', '上课时间设置方式')}
+                className="grid grid-cols-2 p-1 rounded-full bg-paper gap-1"
+              >
+                {(
+                  [
+                    { mode: 'preset', label: tr(lang, '프리셋으로 자동 계산', 'Auto (Preset)', '按预设自动计算') },
+                    { mode: 'custom', label: tr(lang, '교시별 직접 입력', 'Set Each Period', '逐节自定义') },
+                  ] as Array<{ mode: SchoolTimeConfig['mode']; label: string }>
+                ).map((opt) => {
+                  const active = schoolTimeConfig.mode === opt.mode;
+                  return (
+                    <button
+                      key={opt.mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => updateSchoolTimeConfig({ mode: opt.mode })}
+                      className={`h-8 rounded-full text-[11px] font-bold transition-colors ${
+                        active ? 'bg-sage-700 text-paper' : 'text-ink hover:bg-sage-100'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {isPresetMode ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {(
+                      [
+                        { min: 40, label: tr(lang, '초등 (40분)', 'Elem (40m)', '小学 (40分)') },
+                        { min: 45, label: tr(lang, '중등 (45분)', 'Middle (45m)', '初中 (45分)') },
+                        { min: 50, label: tr(lang, '고등 (50분)', 'High (50m)', '高中 (50分)') },
+                      ] as Array<{ min: number; label: string }>
+                    ).map((q) => (
+                      <button
+                        key={q.min}
+                        type="button"
+                        onClick={() => updateSchoolTimeConfig({ classMinutes: q.min })}
+                        className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
+                          schoolTimeConfig.classMinutes === q.min
+                            ? 'bg-sage-700 text-paper border-transparent'
+                            : 'border-divider text-ink hover:bg-sage-100 hover:border-sage-300'
+                        }`}
+                      >
+                        {q.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-2.5 gap-y-2">
+                    <label className="space-y-1">
+                      <span className="block text-[11px] font-medium text-slate-600">
+                        {tr(lang, '첫 수업 시작', 'First Class Starts', '第一节开始')}
+                      </span>
+                      <input
+                        type="time"
+                        value={schoolTimeConfig.firstStart}
+                        onChange={(e) => e.target.value && updateSchoolTimeConfig({ firstStart: e.target.value })}
+                        className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-sage"
+                      />
+                    </label>
+                    <div className="space-y-1">
+                      <span className="block text-[11px] font-medium text-slate-600">
+                        {tr(lang, '교시 수', 'Periods', '节数')}
+                      </span>
+                      <Stepper
+                        value={schoolTimeConfig.periodCount}
+                        min={1}
+                        max={12}
+                        suffix={tr(lang, '교시', '', '节')}
+                        onChange={(v) => updateSchoolTimeConfig({ periodCount: v })}
+                        decLabel={tr(lang, '교시 수 줄이기', 'Fewer periods', '减少节数')}
+                        incLabel={tr(lang, '교시 수 늘리기', 'More periods', '增加节数')}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block text-[11px] font-medium text-slate-600">
+                        {tr(lang, '수업 시간', 'Class Length', '每节时长')}
+                      </span>
+                      <Stepper
+                        value={schoolTimeConfig.classMinutes}
+                        min={5}
+                        max={180}
+                        step={5}
+                        suffix={tr(lang, '분', 'min', '分')}
+                        onChange={(v) => updateSchoolTimeConfig({ classMinutes: v })}
+                        decLabel={tr(lang, '수업 시간 줄이기', 'Shorter classes', '缩短上课时长')}
+                        incLabel={tr(lang, '수업 시간 늘리기', 'Longer classes', '延长上课时长')}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block text-[11px] font-medium text-slate-600">
+                        {tr(lang, '쉬는 시간', 'Break', '课间休息')}
+                      </span>
+                      <Stepper
+                        value={schoolTimeConfig.breakMinutes}
+                        min={0}
+                        max={120}
+                        step={5}
+                        suffix={tr(lang, '분', 'min', '分')}
+                        onChange={(v) => updateSchoolTimeConfig({ breakMinutes: v })}
+                        decLabel={tr(lang, '쉬는 시간 줄이기', 'Shorter breaks', '缩短课间')}
+                        incLabel={tr(lang, '쉬는 시간 늘리기', 'Longer breaks', '延长课间')}
+                      />
+                    </div>
+                    <div className="space-y-1 col-span-2">
+                      <span className="block text-[11px] font-medium text-slate-600">
+                        {tr(lang, '점심시간', 'Lunch Length', '午休时长')}
+                      </span>
+                      <Stepper
+                        value={schoolTimeConfig.lunchMinutes}
+                        min={0}
+                        max={180}
+                        step={5}
+                        suffix={tr(lang, '분', 'min', '分')}
+                        onChange={(v) => updateSchoolTimeConfig({ lunchMinutes: v })}
+                        decLabel={tr(lang, '점심시간 줄이기', 'Shorter lunch', '缩短午休')}
+                        incLabel={tr(lang, '점심시간 늘리기', 'Longer lunch', '延长午休')}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="block text-[11px] font-medium text-slate-600">
+                      {tr(lang, '점심은 언제?', 'Lunch comes after', '午休位置')}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[0, ...Array.from({ length: Math.max(0, schoolTimeConfig.periodCount - 1) }, (_, i) => i + 1)].map(
+                        (n) => {
+                          const current =
+                            schoolTimeConfig.lunchAfterPeriod >= schoolTimeConfig.periodCount
+                              ? 0
+                              : schoolTimeConfig.lunchAfterPeriod;
+                          const active = current === n;
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => updateSchoolTimeConfig({ lunchAfterPeriod: n })}
+                              className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
+                                active
+                                  ? n === 0
+                                    ? 'bg-ink text-paper border-transparent'
+                                    : 'bg-accent-200 text-accent-900 border-transparent'
+                                  : 'border-divider text-ink hover:bg-slate-100'
+                              }`}
+                            >
+                              {n === 0
+                                ? tr(lang, '없음', 'None', '无')
+                                : tr(lang, `${n}교시 후`, `After P${n}`, `第${n}节后`)}
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Live visual preview: vertical time ruler */}
+                  <div className="rounded-xl bg-paper p-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-slate-600">
+                        {tr(lang, '미리보기', 'Preview', '预览')}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-sage-100 text-sage-900 text-[11px] font-bold">
+                        {tr(
+                          lang,
+                          `${schoolTimeConfig.periodCount}교시 · ${schoolTimeConfig.firstStart} 시작 · ${presetEndTime} 종료`,
+                          `${schoolTimeConfig.periodCount} periods · ${schoolTimeConfig.firstStart} start · ${presetEndTime} end`,
+                          `${schoolTimeConfig.periodCount}节 · ${schoolTimeConfig.firstStart} 开始 · ${presetEndTime} 结束`
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      {presetPreviewRows.map((row, idx) => {
+                        const isLast = idx === presetPreviewRows.length - 1;
+                        const lunchHere = presetHasLunch && row.period === schoolTimeConfig.lunchAfterPeriod;
+                        const gapMin = lunchHere ? schoolTimeConfig.lunchMinutes : schoolTimeConfig.breakMinutes;
+                        const gapEnd = minutesToTimeStr(timeStrToMinutes(row.endTime) + gapMin);
+                        return (
+                          <React.Fragment key={row.period}>
+                            <div className="flex gap-2">
+                              <div className="w-10 shrink-0 text-right text-[11px] font-mono text-slate-600 tabular-nums leading-none pt-1">
+                                {row.startTime}
+                              </div>
+                              <div className="flex-1 min-w-0 border-l-2 border-sage-300 pl-2">
+                                <div
+                                  style={{ height: Math.max(30, schoolTimeConfig.classMinutes * PREVIEW_PX_PER_MIN) }}
+                                  className="rounded-xl bg-sage-200 text-sage-900 px-2.5 flex items-center justify-between gap-2"
+                                >
+                                  <span className="text-[11px] font-bold">{periodLabel(row.period)}</span>
+                                  <span className="text-[11px] font-mono tabular-nums">
+                                    {row.startTime}–{row.endTime}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {!isLast &&
+                              (lunchHere ? (
+                                <div className="flex gap-2">
+                                  <div className="w-10 shrink-0 text-right text-[11px] font-mono text-accent-700 tabular-nums leading-none pt-1.5">
+                                    {row.endTime}
+                                  </div>
+                                  <div className="flex-1 min-w-0 border-l-2 border-accent-300 pl-2 py-1">
+                                    <div
+                                      style={{ height: Math.max(28, gapMin * PREVIEW_PX_PER_MIN) }}
+                                      className="rounded-xl bg-accent-100 border border-dashed border-accent-300 text-accent-800 px-2.5 flex items-center justify-between gap-2"
+                                    >
+                                      <span className="text-[11px] font-bold">
+                                        {tr(lang, `점심 ${gapMin}분`, `Lunch ${gapMin} min`, `午休 ${gapMin} 分钟`)}
+                                      </span>
+                                      <span className="text-[11px] font-mono tabular-nums">
+                                        {row.endTime}–{gapEnd}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <div className="w-10 shrink-0" />
+                                  <div
+                                    className="flex-1 min-w-0 border-l-2 border-dotted border-slate-300 pl-2 flex items-center"
+                                    style={{ height: gapMin > 0 ? Math.max(18, gapMin * PREVIEW_PX_PER_MIN) : 6 }}
+                                  >
+                                    {gapMin > 0 && (
+                                      <span className="text-[11px] text-slate-600">
+                                        {tr(lang, `쉬는 시간 ${gapMin}분`, `Break ${gapMin} min`, `课间 ${gapMin} 分钟`)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                          </React.Fragment>
+                        );
+                      })}
+                      <div className="flex gap-2 pt-1">
+                        <div className="w-10 shrink-0 text-right text-[11px] font-mono font-bold text-ink tabular-nums">
+                          {presetEndTime}
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-600">
+                          {tr(lang, '하교', 'School ends', '放学')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleApplySchoolTimePresetToAllDays}
+                    className="w-full h-10 rounded-full bg-accent-700 text-paper text-xs font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-800"
+                  >
+                    <Check className="w-4 h-4" />
+                    {tr(lang, '모든 요일에 적용', 'Apply to All Days', '应用到所有星期')}
+                  </button>
+                  <p className="text-[11px] text-slate-600 text-center">
+                    {tr(
+                      lang,
+                      '기존 과목은 교시 순서대로 유지되며, 학교 수업이 없는 요일(예: 토·일)은 건너뜁니다.',
+                      'Existing subjects are kept by period order; days without school periods (e.g. Sat/Sun) are skipped.',
+                      '现有科目按节次顺序保留；没有学校课程的星期（如周六、周日）将被跳过。'
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-600 px-3 py-2 rounded-xl bg-paper">
                   {tr(
                     lang,
-                    '스마트 플래너 핵심 기능 & 단계별 사용 가이드',
-                    'Interactive Feature & Step-by-Step Guide',
-                    '智能规划器核心功能与分步使用指南'
+                    '아래 표에서 왼쪽 교시 칸을 누르면 그 교시의 시작·종료 시간을 바꿀 수 있어요. 요일마다 다르게 정할 수도 있습니다.',
+                    'Tap a period label on the left of the table below to change its start/end time — for all days or a single day.',
+                    '点击下方表格左侧的节次即可修改该节的开始与结束时间，也可按星期分别设置。'
                   )}
-                </h2>
-                <span className="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
-                  GUIDE
+                </p>
+              )}
+            </div>
+
+            {/* STEP B: weekly subject table */}
+            <div className="space-y-2.5 pt-4 border-t border-divider">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-sage-700 text-paper font-mono text-[11px] grid place-items-center shrink-0">
+                    2
+                  </span>
+                  <span className="text-xs font-bold text-ink">
+                    {tr(lang, '요일별 과목 표', 'Weekly Subject Table', '每周科目表')}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowWeekendPref(!showWeekend)}
+                  aria-pressed={showWeekend}
+                  className={`h-7 px-2.5 rounded-full text-[11px] font-semibold border transition-colors ${
+                    showWeekend
+                      ? 'bg-sage-100 text-sage-900 border-transparent'
+                      : 'border-divider text-ink hover:bg-slate-100'
+                  }`}
+                >
+                  {showWeekend
+                    ? tr(lang, '토·일 숨기기', 'Hide Sat/Sun', '隐藏周六日')
+                    : tr(lang, '+ 토·일 보기', '+ Sat/Sun', '+ 显示周六日')}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                {tr(
+                  lang,
+                  '칸을 눌러 과목을 고르세요. 빈 칸(+)을 누르면 그 요일에 해당 교시가 생깁니다.',
+                  'Tap a cell to pick a subject. Tapping an empty cell (+) adds that period to the day.',
+                  '点击单元格选择科目。点击空白单元格（+）会为该星期添加此节课。'
+                )}
+              </p>
+
+              {schoolRows.length === 0 ? (
+                <div className="rounded-xl bg-paper px-3 py-5 text-center space-y-2">
+                  <p className="text-[11px] text-slate-600">
+                    {tr(
+                      lang,
+                      '아직 등록된 교시가 없습니다. 첫 교시를 추가해 보세요.',
+                      'No periods yet. Add the first period to start.',
+                      '尚未登记任何节次，请先添加第一节课。'
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleAddSchoolRow}
+                    className="h-8 px-3 rounded-full bg-sage-700 text-paper text-[11px] font-bold inline-flex items-center gap-1 hover:bg-sage-800"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {tr(lang, '교시 추가', 'Add Period', '添加节次')}
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-paper overflow-x-auto">
+                  <table className="w-full text-center border-collapse table-fixed min-w-[300px]">
+                    <thead>
+                      <tr className="border-b border-divider">
+                        <th className="w-[62px] py-2 px-1 text-[11px] font-semibold text-slate-600 border-r border-divider">
+                          {tr(lang, '교시', 'Per', '课时')}
+                        </th>
+                        {gridDays.map((d) => (
+                          <th key={d} className="py-2 px-0.5 text-xs font-bold text-ink">
+                            {translateDay(d, lang)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-divider text-xs">
+                      {schoolRows.map((periodNum) => {
+                        const info = getRowInfo(periodNum);
+                        return (
+                          <tr key={periodNum}>
+                            <td className="p-0 border-r border-divider">
+                              <button
+                                type="button"
+                                onClick={() => setSchoolSheet({ kind: 'row', period: periodNum })}
+                                className="w-full px-1 py-1.5 flex flex-col items-center leading-tight hover:bg-sage-100 transition-colors"
+                                aria-label={tr(
+                                  lang,
+                                  `${periodNum}교시 시간 편집`,
+                                  `Edit period ${periodNum} time`,
+                                  `编辑第${periodNum}节时间`
+                                )}
+                              >
+                                <span className="text-[11px] font-bold text-sage-800 inline-flex items-center gap-0.5">
+                                  {periodLabel(periodNum)}
+                                  {info.mismatch && (
+                                    <span
+                                      className="w-1.5 h-1.5 rounded-full bg-accent-400"
+                                      title={tr(lang, '요일별 시간이 다름', 'Times differ by day', '各星期时间不同')}
+                                    />
+                                  )}
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-600 tabular-nums">
+                                  {info.times.startTime}
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-600 tabular-nums">
+                                  {info.times.endTime}
+                                </span>
+                              </button>
+                            </td>
+                            {gridDays.map((d) => {
+                              const cell = state.masterTimetable[d]?.school.find((p) => p.period === periodNum);
+                              return (
+                                <td key={d} className="p-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCustomSubjectDraft('');
+                                      setSchoolSheet({ kind: 'cell', day: d, period: periodNum });
+                                    }}
+                                    className={`w-full h-11 rounded-lg px-0.5 transition-colors ${
+                                      cell
+                                        ? cell.subject === '자습'
+                                          ? 'bg-slate-200 text-ink hover:bg-slate-300'
+                                          : 'bg-sage-100 text-sage-900 font-semibold hover:bg-sage-200'
+                                        : 'text-slate-400 hover:bg-sage-100 hover:text-sage-700'
+                                    }`}
+                                    aria-label={tr(
+                                      lang,
+                                      `${d}요일 ${periodNum}교시`,
+                                      `${translateDay(d, lang)} period ${periodNum}`,
+                                      `${translateDay(d, lang)}第${periodNum}节`
+                                    )}
+                                  >
+                                    {cell ? (
+                                      <span className="block truncate text-[11px]">
+                                        {cell.subject
+                                          ? translateSubject(cell.subject, lang)
+                                          : tr(lang, '(없음)', '(none)', '（无）')}
+                                      </span>
+                                    ) : (
+                                      <Plus className="w-3 h-3 mx-auto" />
+                                    )}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {schoolRows.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleAddSchoolRow}
+                    className="flex-1 h-8 rounded-full bg-sage-100 text-sage-900 text-[11px] font-bold inline-flex items-center justify-center gap-1 hover:bg-sage-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {tr(lang, `${maxSchoolPeriod + 1}교시 추가`, `Add P${maxSchoolPeriod + 1}`, `添加第${maxSchoolPeriod + 1}节`)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRemovePeriodConfirm(true)}
+                    aria-expanded={removePeriodConfirm}
+                    className="flex-1 h-8 rounded-full border border-divider text-ink text-[11px] font-semibold inline-flex items-center justify-center gap-1 hover:bg-slate-100"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                    {tr(lang, `${maxSchoolPeriod}교시 삭제`, `Remove P${maxSchoolPeriod}`, `删除第${maxSchoolPeriod}节`)}
+                  </button>
+                </div>
+              )}
+
+              {removePeriodConfirm && schoolRows.length > 0 && (
+                <div role="alert" className="rounded-xl bg-accent-100 px-3 py-2.5 space-y-2">
+                  <p className="text-[12px] font-semibold text-accent-900">
+                    {tr(
+                      lang,
+                      `모든 요일에서 ${maxSchoolPeriod}교시를 삭제할까요?`,
+                      `Remove period ${maxSchoolPeriod} from every day?`,
+                      `要从所有星期中删除第${maxSchoolPeriod}节吗？`
+                    )}
+                  </p>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setRemovePeriodConfirm(false)}
+                      className="flex-1 h-8 rounded-full border border-divider bg-paper text-ink text-[11px] font-semibold hover:bg-slate-100"
+                    >
+                      {tr(lang, '취소', 'Cancel', '取消')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveLastSchoolRow}
+                      className="flex-1 h-8 rounded-full bg-accent-800 text-paper text-[11px] font-bold hover:bg-accent-900"
+                    >
+                      {tr(lang, '삭제', 'Remove', '删除')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Copy whole day (school + academy) */}
+            <div className="space-y-1.5 pt-4 border-t border-divider">
+              <div className="flex items-center gap-1.5">
+                <Copy className="w-3.5 h-3.5 text-slate-600" />
+                <span className="text-xs font-bold text-ink">
+                  {tr(lang, '요일 통째로 복사', 'Copy a Whole Day', '整天复制')}
                 </span>
               </div>
               <p className="text-[11px] text-slate-600">
                 {tr(
                   lang,
-                  '원하는 주요 기능을 터치하면 구체적인 설정·사용 스텝(Step 1~3)을 안내합니다.',
-                  'Select any feature below to view detailed step-by-step instructions.',
-                  '点击下方任意核心功能，即可查看具体的设置与操作步骤（Step 1~3）。'
+                  '원본 요일의 학교 과목과 학원 일정을 모두 대상 요일에 덮어씁니다.',
+                  'Overwrites the target day with BOTH the school periods and academy classes of the source day.',
+                  '将源星期的学校课程和补习班安排全部覆盖到目标星期。'
                 )}
               </p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={copySourceDay}
+                  onChange={(e) => setCopySourceDay(e.target.value as DayOfWeek)}
+                  className="h-9 px-3 rounded-full border border-divider bg-paper text-xs font-semibold text-ink focus:outline-none focus:border-accent"
+                >
+                  {DAYS_OF_WEEK.map((d) => (
+                    <option key={d} value={d}>
+                      {translateDay(d, lang)} {tr(lang, '원본', 'From', '源')}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs font-bold text-slate-400">→</span>
+                <select
+                  value={copyTargetDay}
+                  onChange={(e) => setCopyTargetDay(e.target.value as DayOfWeek)}
+                  className="h-9 px-3 rounded-full border border-divider bg-paper text-xs font-semibold text-ink focus:outline-none focus:border-accent"
+                >
+                  {DAYS_OF_WEEK.map((d) => (
+                    <option key={d} value={d}>
+                      {translateDay(d, lang)} {tr(lang, '대상', 'To', '目标')}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleCopyDayTimetable}
+                  className="flex-1 h-9 px-3 rounded-full border border-divider bg-transparent text-ink text-xs font-semibold inline-flex items-center justify-center gap-1 hover:bg-slate-100 whitespace-nowrap"
+                >
+                  <Copy className="w-3.5 h-3.5" /> {tr(lang, '복사', 'Copy', '复制')}
+                </button>
+              </div>
             </div>
-          </div>
-          {isGuideExpanded ? (
-            <ChevronUp className="w-4 h-4 text-indigo-700 shrink-0" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-indigo-700 shrink-0" />
-          )}
-        </button>
 
-        {isGuideExpanded && (
-          <div className="p-4 space-y-3.5">
-            {/* 6 Major Feature Selector Grid */}
-            <div className="grid grid-cols-2 gap-1.5">
-              {USER_GUIDE_TOPICS.map((topic, idx) => {
-                const isSelected = topic.id === selectedGuideId;
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSchoolSection} />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="academy"
+          open={!!openCards.academy}
+          onToggle={toggleCard}
+          tone="accent"
+          icon={Building2}
+          title={tr(lang, '학원 시간표', 'Academy Timetable', '补习班课表')}
+          summary={academySummary}
+        >
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-7 gap-1">
+              {DAYS_OF_WEEK.map((d) => {
+                const count = state.masterTimetable[d]?.academy.length ?? 0;
+                const active = selectedMasterDay === d;
                 return (
                   <button
-                    key={topic.id}
+                    key={d}
                     type="button"
-                    onClick={() => setSelectedGuideId(topic.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-1.5 ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-slate-50 text-slate-800 border-slate-200/80 hover:border-indigo-300'
+                    onClick={() => setSelectedMasterDay(d)}
+                    className={`h-11 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                      active ? 'bg-accent-700 text-paper' : 'bg-paper text-ink hover:bg-accent-100'
                     }`}
                   >
-                    <div className="min-w-0">
-                      <div
-                        className={`text-[10px] font-mono font-bold ${
-                          isSelected ? 'text-indigo-200' : 'text-indigo-600'
-                        }`}
-                      >
-                        0{idx + 1}
-                      </div>
-                      <div className="text-xs font-bold truncate mt-0.5">
-                        {tr(lang, topic.badge.ko, topic.badge.en, topic.badge.zh)}
-                      </div>
-                    </div>
-                    <ChevronDown
-                      className={`w-3.5 h-3.5 shrink-0 transition-transform ${
-                        isSelected ? 'text-white -rotate-90' : 'text-slate-400'
+                    <span className="text-xs font-bold leading-none">{translateDay(d, lang)}</span>
+                    <span
+                      className={`text-[11px] font-mono leading-none tabular-nums ${
+                        active ? 'text-accent-100' : count > 0 ? 'text-accent-700' : 'text-slate-400'
                       }`}
-                    />
+                    >
+                      {count > 0 ? count : '·'}
+                    </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Selected Feature Step-by-Step Walkthrough Card */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-indigo-200/90 space-y-3">
-              <div className="space-y-1 border-b border-slate-200/80 pb-2.5">
-                <span className="inline-block px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold">
-                  {tr(
-                    lang,
-                    activeGuideTopic.badge.ko,
-                    activeGuideTopic.badge.en,
-                    activeGuideTopic.badge.zh
-                  )}
-                </span>
-                <h3 className="text-sm font-bold text-slate-900">
-                  {tr(
-                    lang,
-                    activeGuideTopic.title.ko,
-                    activeGuideTopic.title.en,
-                    activeGuideTopic.title.zh
-                  )}
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {tr(
-                    lang,
-                    activeGuideTopic.summary.ko,
-                    activeGuideTopic.summary.en,
-                    activeGuideTopic.summary.zh
-                  )}
-                </p>
-              </div>
-
-              {/* Concrete Steps */}
-              <div className="space-y-2">
-                {activeGuideTopic.steps.map((st, sIdx) => (
-                  <div
-                    key={sIdx}
-                    className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-1"
-                  >
-                    <div className="text-xs font-bold text-indigo-700">
-                      {tr(lang, st.stepTitle.ko, st.stepTitle.en, st.stepTitle.zh)}
-                    </div>
-                    <p className="text-xs text-slate-700 leading-relaxed">
-                      {tr(lang, st.stepDesc.ko, st.stepDesc.en, st.stepDesc.zh)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pro Tip Box */}
-              <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/90 flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] font-semibold text-amber-900 leading-relaxed">
-                  <strong className="font-bold mr-1">TIP:</strong>
-                  {tr(
-                    lang,
-                    activeGuideTopic.tip.ko,
-                    activeGuideTopic.tip.en,
-                    activeGuideTopic.tip.zh
-                  )}
-                </p>
-              </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-accent-800">
+                {tr(
+                  lang,
+                  `${selectedMasterDay}요일 학원 (${academyDayData.academy.length}건)`,
+                  `${translateDay(selectedMasterDay, lang)} academies (${academyDayData.academy.length})`,
+                  `${translateDay(selectedMasterDay, lang)}补习班 (${academyDayData.academy.length}项)`
+                )}
+              </span>
             </div>
-          </div>
-        )}
-      </section>
 
-      {/* SECTION 1: 과목 후보군(Subject Pool) 설정 */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <button
-          type="button"
-          onClick={() => toggleSection(1)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
-        >
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">
+            {academyDayData.academy.length === 0 ? (
+              <p className="text-[11px] text-slate-600 py-3 text-center rounded-xl bg-paper">
+                {tr(
+                  lang,
+                  '이 요일에 등록된 기본 학원 일정이 없습니다.',
+                  'No default academy classes on this day.',
+                  '当天没有登记固定补习班课程。'
+                )}
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {academyDayData.academy
+                  .slice()
+                  .sort((a, b) => timeStrToMinutes(a.startTime) - timeStrToMinutes(b.startTime))
+                  .map((ac) => (
+                    <div
+                      key={ac.id}
+                      className="px-2.5 py-2 rounded-xl bg-paper border-l-4 border-accent-300 space-y-1.5"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={ac.subject}
+                          onChange={(e) => handleUpdateMasterAcademyItem(ac.id, { subject: e.target.value })}
+                          className="flex-1 h-8 px-2.5 rounded-full border border-divider bg-surface text-xs font-semibold text-accent-900 min-w-0 focus:outline-none focus:border-accent"
+                        >
+                          {!state.subjectPool.academy.includes(ac.subject) && (
+                            <option value={ac.subject}>{translateSubject(ac.subject, lang)}</option>
+                          )}
+                          {state.subjectPool.academy.map((aName) => (
+                            <option key={aName} value={aName}>
+                              {translateSubject(aName, lang)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMasterAcademyItem(ac.id)}
+                          className="p-1.5 text-slate-600 hover:text-accent-800 shrink-0"
+                          aria-label={tr(lang, '삭제', 'Delete', '删除')}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="time"
+                          value={ac.startTime}
+                          aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
+                          onChange={(e) => handleUpdateMasterAcademyItem(ac.id, { startTime: e.target.value })}
+                          className="flex-1 min-w-0 h-8 px-2 rounded-full border border-divider bg-surface text-xs font-mono text-ink focus:outline-none focus:border-accent"
+                        />
+                        <span className="text-xs text-slate-400">~</span>
+                        <input
+                          type="time"
+                          value={ac.endTime}
+                          aria-label={tr(lang, '종료 시간', 'End time', '结束时间')}
+                          onChange={(e) => handleUpdateMasterAcademyItem(ac.id, { endTime: e.target.value })}
+                          className="flex-1 min-w-0 h-8 px-2 rounded-full border border-divider bg-surface text-xs font-mono text-ink focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleAddMasterAcademyItem}
+              className="w-full h-9 rounded-full border border-dashed border-accent-300 text-accent-800 text-[11px] font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-100"
+            >
+              <Plus className="w-3.5 h-3.5" />
               {tr(
                 lang,
-                '1. 과목 후보군 (Subject Pool) 설정',
-                '1. Subject & Academy Pool Setup',
-                '1. 候选科目库 (Subject Pool) 设置'
+                `${selectedMasterDay}요일에 학원 추가`,
+                `Add academy on ${translateDay(selectedMasterDay, lang)}`,
+                `在${translateDay(selectedMasterDay, lang)}添加补习班`
               )}
-            </h2>
-            <p className="text-[11px] text-slate-500">
+            </button>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetAcademySection} />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="pool"
+          open={!!openCards.pool}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={Tags}
+          title={tr(lang, '과목 후보군', 'Subject Pool', '候选科目库')}
+          summary={tr(
+            lang,
+            `학교 ${state.subjectPool.school.length}개 · 학원 ${state.subjectPool.academy.length}개`,
+            `${state.subjectPool.school.length} school · ${state.subjectPool.academy.length} academy`,
+            `学校 ${state.subjectPool.school.length} 个 · 补习班 ${state.subjectPool.academy.length} 个`
+          )}
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
               {tr(
                 lang,
-                '시간표 터치 수정 시 버튼으로 나타날 학교 과목 및 학원 후보군',
-                'School subjects and academies shown as quick-select buttons when editing timetables',
-                '点击课表修改时作为快捷按钮显示的学校科目与补习班候选列表'
+                '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요.',
+                'School subjects and academies offered as quick-select buttons when editing timetables.',
+                '修改课表时作为快捷按钮显示的学校科目与补习班列表。'
               )}
             </p>
-          </div>
-          {openSections[1] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
-          )}
-        </button>
-
-        {openSections[1] && (
-          <div className="p-4 space-y-5">
             {/* School Subject Pool */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-indigo-700">
+                <label className="text-xs font-bold text-sage-800">
                   {tr(
                     lang,
                     `학교 과목 후보군 (${state.subjectPool.school.length}종)`,
@@ -1045,16 +2612,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.school.map((subj) => (
                   <span
                     key={subj}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-bold"
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[11px] font-semibold"
                   >
                     {translateSubject(subj, lang)}
                     <button
                       type="button"
                       onClick={() => handleRemoveSchoolSubject(subj)}
-                      className="text-slate-400 hover:text-rose-600"
-                      aria-label={`${subj} delete`}
+                      className="text-sage-600 hover:text-accent-800"
+                      aria-label={tr(
+                        lang,
+                        `${subj} 삭제`,
+                        `Delete ${translateSubject(subj, lang)}`,
+                        `删除${translateSubject(subj, lang)}`
+                      )}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" strokeWidth={2.75} />
                     </button>
                   </span>
                 ))}
@@ -1070,11 +2642,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   )}
                   value={newSchoolSubject}
                   onChange={(e) => setNewSchoolSubject(e.target.value)}
-                  className="flex-1 h-10 px-3 rounded-xl border border-slate-300 text-xs font-medium text-slate-900"
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
                 />
                 <button
                   type="submit"
-                  className="h-10 px-3.5 rounded-xl bg-indigo-600 text-white text-xs font-bold inline-flex items-center gap-1 hover:bg-indigo-700 shrink-0"
+                  className="h-9 px-3 rounded-full bg-sage-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-sage-800 shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
                 </button>
@@ -1082,9 +2654,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {/* Academy Subject Pool */}
-            <div className="space-y-2.5 pt-3 border-t border-slate-100">
+            <div className="space-y-2.5 pt-3 border-t border-divider">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-violet-700">
+                <label className="text-xs font-bold text-accent-800">
                   {tr(
                     lang,
                     `학원 후보군 (${state.subjectPool.academy.length}종)`,
@@ -1097,16 +2669,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.academy.map((acName) => (
                   <span
                     key={acName}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-50 text-violet-900 border border-violet-200 text-xs font-bold"
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[11px] font-semibold"
                   >
                     {translateSubject(acName, lang)}
                     <button
                       type="button"
                       onClick={() => handleRemoveAcademySubject(acName)}
-                      className="text-violet-400 hover:text-rose-600"
-                      aria-label={`${acName} delete`}
+                      className="text-accent-600 hover:text-accent-900"
+                      aria-label={tr(
+                        lang,
+                        `${acName} 삭제`,
+                        `Delete ${translateSubject(acName, lang)}`,
+                        `删除${translateSubject(acName, lang)}`
+                      )}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" strokeWidth={2.75} />
                     </button>
                   </span>
                 ))}
@@ -1122,488 +2699,439 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   )}
                   value={newAcademySubject}
                   onChange={(e) => setNewAcademySubject(e.target.value)}
-                  className="flex-1 h-10 px-3 rounded-xl border border-slate-300 text-xs font-medium text-slate-900"
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
                 />
                 <button
                   type="submit"
-                  className="h-10 px-3.5 rounded-xl bg-violet-600 text-white text-xs font-bold inline-flex items-center gap-1 hover:bg-violet-700 shrink-0"
+                  className="h-9 px-3 rounded-full bg-accent-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-accent-800 shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
                 </button>
               </form>
             </div>
-          </div>
-        )}
-      </section>
 
-      {/* SECTION 2: 하루 시간표 표시 시간(시작~종료) 및 학교/학원 기본 시간표 설정 */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <button
-          type="button"
-          onClick={() => toggleSection(2)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSubjectPool} />
+          </div>
+        </SettingsCard>
+      </div>
+
+      {/* School table editor bottom sheet */}
+      {schoolSheet && (
+        <div
+          className="fixed inset-0 z-[70] bg-slate-900/50 flex items-end justify-center"
+          onClick={() => setSchoolSheet(null)}
         >
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">
-              {tr(
-                lang,
-                '2. 시간표 표시 시간 (시작~종료) 및 기본 시간표 설정',
-                '2. Timeline Display Hours & Master Timetable Setup',
-                '2. 时间轴起止时间与每周固定课表设置'
-              )}
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              {tr(
-                lang,
-                '일별 타임라인 시작·종료 시각 설정, 초·중·고 교시 프리셋 및 요일별 시간표 편집',
-                'Configure daily timeline start/end hours, school period presets, and weekly master schedules',
-                '设置每日时间轴开始与结束时间、标准课时预设及编辑各星期固定课表'
-              )}
-            </p>
-          </div>
-          {openSections[2] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
-          )}
-        </button>
+          <div
+            className="w-full max-w-md bg-paper rounded-t-[28px] px-4 pt-3 pb-6 max-h-[85vh] overflow-y-auto space-y-3"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto" />
 
-        {openSections[2] && (
-          <div className="p-4 space-y-4">
-            {masterFeedback && (
-              <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-900">
-                {masterFeedback}
-              </div>
-            )}
-
-            {/* Daily Timeline Start & End Hour Configuration */}
-            <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-900">
-                    {tr(
-                      lang,
-                      '시간표 하루 시작·종료 시간 설정',
-                      'Daily Timeline Start & End Hours',
-                      '课程表每日开始与结束时间设置'
-                    )}
-                  </span>
-                </div>
-                <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[11px] font-mono font-bold tabular-nums">
-                  {String(timelineStartHour).padStart(2, '0')}:00 ~{' '}
-                  {String(timelineEndHour).padStart(2, '0')}:00 ({timelineEndHour - timelineStartHour}h)
-                </span>
-              </div>
-
-              <p className="text-[11px] text-slate-600">
-                {tr(
-                  lang,
-                  '[시간표 > 일별 상세 보기]의 타임라인 표와 빈 시간 계산에 적용할 하루의 시작 시각과 종료 시각을 선택하세요.',
-                  'Choose the start and end hours displayed on the Daily Timeline and used for free-time calculation.',
-                  '选择应用于【课程表 > 每日详情】时间轴视图及空闲时间计算的每日起止时间。'
-                )}
-              </p>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    {tr(lang, '하루 시작 시간', 'Start Hour', '开始时间')}
-                  </label>
-                  <select
-                    value={timelineStartHour}
-                    onChange={(e) => {
-                      const nextStart = Number(e.target.value);
-                      const adjustedEnd =
-                        timelineEndHour <= nextStart + 1
-                          ? Math.min(24, nextStart + 2)
-                          : timelineEndHour;
-                      handleUpdateTimelineRange(nextStart, adjustedEnd);
-                    }}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-mono font-bold text-slate-900 tabular-nums"
-                  >
-                    {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
-                      <option key={h} value={h}>
-                        {String(h).padStart(2, '0')}:00
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
-                    {tr(lang, '하루 종료 시간', 'End Hour', '结束时间')}
-                  </label>
-                  <select
-                    value={timelineEndHour}
-                    onChange={(e) => {
-                      const nextEnd = Number(e.target.value);
-                      handleUpdateTimelineRange(timelineStartHour, nextEnd);
-                    }}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-mono font-bold text-slate-900 tabular-nums"
-                  >
-                    {[16, 17, 18, 19, 20, 21, 22, 23, 24]
-                      .filter((h) => h >= timelineStartHour + 2)
-                      .map((h) => (
-                        <option key={h} value={h}>
-                          {String(h).padStart(2, '0')}:00
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Quick Presets for Timeline Range */}
-              <div className="grid grid-cols-3 gap-1.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTimelineRange(6, 24)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
-                    timelineStartHour === 6 && timelineEndHour === 24
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  {tr(lang, '얼리버드 (06~24시)', 'Early (06-24h)', '早鸟 (06~24时)')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTimelineRange(8, 24)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
-                    timelineStartHour === 8 && timelineEndHour === 24
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  {tr(lang, '기본 (08~24시)', 'Default (08-24h)', '默认 (08~24时)')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTimelineRange(8, 22)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
-                    timelineStartHour === 8 && timelineEndHour === 22
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  {tr(lang, '표준 (08~22시)', 'Compact (08-22h)', '紧凑 (08~22时)')}
-                </button>
-              </div>
-            </div>
-
-            {/* School Duration Presets */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-              <span className="block text-xs font-bold text-slate-800">
-                {tr(
-                  lang,
-                  '교시 시간 자동 세팅 프리셋 (1교시 09:00 시작 기준)',
-                  'Auto Period Duration Presets (Starts at 09:00)',
-                  '课时长度自动预设（以第1节 09:00 开始为准）'
-                )}
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApplySchoolDurationPreset(40, tr(lang, '초등', 'Elementary', '小学'))
-                  }
-                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
-                >
-                  {tr(lang, '초등 (40분)', 'Elem (40m)', '小学 (40分)')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApplySchoolDurationPreset(45, tr(lang, '중등', 'Middle', '初中'))
-                  }
-                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
-                >
-                  {tr(lang, '중등 (45분)', 'Middle (45m)', '初中 (45分)')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleApplySchoolDurationPreset(50, tr(lang, '고등', 'High', '高中'))
-                  }
-                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
-                >
-                  {tr(lang, '고등 (50분)', 'High (50m)', '高中 (50分)')}
-                </button>
-              </div>
-            </div>
-
-            {/* Copy Day Timetable Control */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-              <span className="block text-xs font-bold text-slate-800">
-                {tr(lang, '다른 요일 시간표 복사하기', 'Copy Day Schedule', '复制星期课表')}
-              </span>
-              <div className="flex items-center gap-2">
-                <select
-                  value={copySourceDay}
-                  onChange={(e) => setCopySourceDay(e.target.value as DayOfWeek)}
-                  className="h-10 px-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800"
-                >
-                  {DAYS_OF_WEEK.map((d) => (
-                    <option key={d} value={d}>
-                      {translateDay(d, lang)} {tr(lang, '원본', 'From', '源')}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs font-bold text-slate-400">→</span>
-                <select
-                  value={copyTargetDay}
-                  onChange={(e) => setCopyTargetDay(e.target.value as DayOfWeek)}
-                  className="h-10 px-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800"
-                >
-                  {DAYS_OF_WEEK.map((d) => (
-                    <option key={d} value={d}>
-                      {translateDay(d, lang)} {tr(lang, '대상', 'To', '目标')}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleCopyDayTimetable}
-                  className="flex-1 h-10 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-slate-800 whitespace-nowrap"
-                >
-                  <Copy className="w-3.5 h-3.5" /> {tr(lang, '복사 실행', 'Copy', '执行复制')}
-                </button>
-              </div>
-            </div>
-
-            {/* Day Selector Tabs for Editing Master Timetable */}
-            <div className="grid grid-cols-7 gap-1">
-              {DAYS_OF_WEEK.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setSelectedMasterDay(d)}
-                  className={`py-2 rounded-xl text-xs font-bold transition-colors ${
-                    selectedMasterDay === d
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {translateDay(d, lang)}
-                </button>
-              ))}
-            </div>
-
-            {/* Master School Periods Editor */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-700">
-                  {translateDay(selectedMasterDay, lang)}{' '}
-                  {tr(
-                    lang,
-                    `기본 학교 시간표 (${currentMasterDayData.school.length}교시)`,
-                    `Master School Schedule (${currentMasterDayData.school.length} periods)`,
-                    `固定学校课表 (${currentMasterDayData.school.length}节课)`
-                  )}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleRemoveLastMasterSchoolPeriod}
-                    className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-bold hover:bg-slate-200"
-                  >
-                    {tr(lang, '- 교시 삭제', '- Remove', '- 删除末节')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddMasterSchoolPeriod}
-                    className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-bold hover:bg-indigo-100"
-                  >
-                    {tr(lang, '+ 교시 추가', '+ Period', '+ 添加课时')}
-                  </button>
-                </div>
-              </div>
-
-              {currentMasterDayData.school.length === 0 ? (
-                <p className="text-xs text-slate-400 py-2 text-center">
-                  {tr(
-                    lang,
-                    '등록된 정규 교시가 없습니다. [+ 교시 추가]를 눌러 추가하세요.',
-                    'No school periods configured for this day.',
-                    '当天未登记学校常规课时，请点击【+ 添加课时】。'
-                  )}
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {currentMasterDayData.school.map((p) => (
-                    <div
-                      key={p.period}
-                      className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80"
-                    >
-                      <span className="w-11 text-xs font-mono font-bold text-indigo-700 shrink-0 tabular-nums">
-                        {tr(lang, `${p.period}교시`, `P${p.period}`, `第${p.period}节`)}
-                      </span>
-                      <input
-                        type="time"
-                        value={p.startTime}
-                        onChange={(e) =>
-                          handleUpdateMasterSchoolPeriod(p.period, {
-                            startTime: e.target.value,
-                          })
-                        }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
-                      />
-                      <span className="text-xs text-slate-400">~</span>
-                      <input
-                        type="time"
-                        value={p.endTime}
-                        onChange={(e) =>
-                          handleUpdateMasterSchoolPeriod(p.period, {
-                            endTime: e.target.value,
-                          })
-                        }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
-                      />
-                      <select
-                        value={p.subject}
-                        onChange={(e) =>
-                          handleUpdateMasterSchoolPeriod(p.period, {
-                            subject: e.target.value,
-                          })
-                        }
-                        className="flex-1 h-8 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 min-w-0"
-                      >
-                        {state.subjectPool.school.map((s) => (
-                          <option key={s} value={s}>
-                            {translateSubject(s, lang)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Master Academy Editor */}
-            <div className="space-y-2 pt-3 border-t border-slate-100">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-violet-700">
-                  {translateDay(selectedMasterDay, lang)}{' '}
-                  {tr(
-                    lang,
-                    `기본 학원 시간표 (${currentMasterDayData.academy.length}건)`,
-                    `Master Academies (${currentMasterDayData.academy.length})`,
-                    `固定补习班课表 (${currentMasterDayData.academy.length}项)`
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleAddMasterAcademyItem}
-                  className="px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 text-[11px] font-bold hover:bg-violet-100"
-                >
-                  {tr(lang, '+ 학원 시간 추가', '+ Add Academy', '+ 添加补习班')}
-                </button>
-              </div>
-
-              {currentMasterDayData.academy.length === 0 ? (
-                <p className="text-xs text-slate-400 py-2 text-center">
-                  {tr(
-                    lang,
-                    '이 요일에 등록된 기본 학원 일정이 없습니다.',
-                    'No default academy classes on this day.',
-                    '当天没有登记固定补习班课程。'
-                  )}
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {currentMasterDayData.academy.map((ac) => (
-                    <div
-                      key={ac.id}
-                      className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80"
-                    >
-                      <input
-                        type="time"
-                        value={ac.startTime}
-                        onChange={(e) =>
-                          handleUpdateMasterAcademyItem(ac.id, {
-                            startTime: e.target.value,
-                          })
-                        }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
-                      />
-                      <span className="text-xs text-slate-400">~</span>
-                      <input
-                        type="time"
-                        value={ac.endTime}
-                        onChange={(e) =>
-                          handleUpdateMasterAcademyItem(ac.id, {
-                            endTime: e.target.value,
-                          })
-                        }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
-                      />
-                      <select
-                        value={ac.subject}
-                        onChange={(e) =>
-                          handleUpdateMasterAcademyItem(ac.id, {
-                            subject: e.target.value,
-                          })
-                        }
-                        className="flex-1 h-8 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 min-w-0"
-                      >
-                        {state.subjectPool.academy.map((aName) => (
-                          <option key={aName} value={aName}>
-                            {translateSubject(aName, lang)}
-                          </option>
-                        ))}
-                      </select>
+            {schoolSheet.kind === 'cell' ? (
+              (() => {
+                const { day, period } = schoolSheet;
+                const rowTimes = sheetCell
+                  ? { startTime: sheetCell.startTime, endTime: sheetCell.endTime }
+                  : isPresetMode
+                  ? resolveRowTimes(state.masterTimetable, schoolTimeConfig, period)
+                  : getRowInfo(period).times;
+                const pick = (subject: string) => {
+                  handleSetSchoolCell(day, period, subject);
+                  setSchoolSheet(null);
+                };
+                return (
+                  <>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-[13px] font-bold text-ink">
+                          {tr(
+                            lang,
+                            `${day}요일 ${period}교시`,
+                            `${translateDay(day, lang)} · Period ${period}`,
+                            `${translateDay(day, lang)} 第${period}节`
+                          )}
+                        </h3>
+                        <p className="text-[11px] font-mono text-slate-600 tabular-nums">
+                          {rowTimes.startTime}–{rowTimes.endTime}
+                          {!sheetCell && (
+                            <span className="ml-1.5 font-sans text-sage-700">
+                              {tr(lang, '(새로 추가)', '(new)', '（新增）')}
+                            </span>
+                          )}
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => handleDeleteMasterAcademyItem(ac.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600"
-                        aria-label="delete"
+                        onClick={() => setSchoolSheet(null)}
+                        className="w-8 h-8 rounded-full grid place-items-center text-slate-600 hover:bg-slate-200"
+                        aria-label={tr(lang, '닫기', 'Close', '关闭')}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
 
-      {/* SECTION 3: AI 비정형 시간표 이미지 자동 인식 */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <button
-          type="button"
-          onClick={() => toggleSection(3)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+                    <div className="space-y-1.5">
+                      <span className="block text-[11px] font-medium text-slate-600">
+                        {tr(lang, '과목 선택', 'Pick a subject', '选择科目')}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {state.subjectPool.school.map((s) => {
+                          const active = sheetCell?.subject === s;
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => pick(s)}
+                              className={`h-8 px-3 rounded-full text-xs font-semibold transition-colors ${
+                                active
+                                  ? 'bg-sage-700 text-paper'
+                                  : 'bg-sage-100 text-sage-900 hover:bg-sage-200'
+                              }`}
+                            >
+                              {translateSubject(s, lang)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <form
+                      className="flex gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (customSubjectDraft.trim()) pick(customSubjectDraft);
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={customSubjectDraft}
+                        onChange={(e) => setCustomSubjectDraft(e.target.value)}
+                        placeholder={tr(lang, '직접 입력 (예: 진로)', 'Type a subject (e.g. Career)', '自行输入（如：生涯规划）')}
+                        className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sage"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!customSubjectDraft.trim()}
+                        className="h-9 px-3 rounded-full bg-sage-700 text-paper text-xs font-bold hover:bg-sage-800 disabled:opacity-40 shrink-0"
+                      >
+                        {tr(lang, '적용', 'Set', '应用')}
+                      </button>
+                    </form>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => pick('자습')}
+                        className="flex-1 h-9 rounded-full bg-slate-200 text-ink text-xs font-semibold hover:bg-slate-300"
+                      >
+                        {tr(lang, '자습', 'Self-Study', '自习')}
+                      </button>
+                      {sheetCell && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleClearSchoolCell(day, period);
+                            setSchoolSheet(null);
+                          }}
+                          className="flex-1 h-9 rounded-full border border-divider text-accent-800 text-xs font-semibold inline-flex items-center justify-center gap-1 hover:bg-accent-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {tr(lang, '비우기 (이 교시 없음)', 'Clear (no class)', '清空（无此节）')}
+                        </button>
+                      )}
+                    </div>
+
+                    {sheetCell && !isPresetMode && (
+                      <div className="space-y-1.5 pt-3 border-t border-divider">
+                        <span className="block text-[11px] font-medium text-slate-600">
+                          {tr(
+                            lang,
+                            `${day}요일만 시간 바꾸기`,
+                            `Change time for ${translateDay(day, lang)} only`,
+                            `仅修改${translateDay(day, lang)}的时间`
+                          )}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="time"
+                            value={sheetCell.startTime}
+                            aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
+                            onChange={(e) =>
+                              e.target.value && handleUpdateDayPeriodTime(day, period, { startTime: e.target.value })
+                            }
+                            className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                          />
+                          <span className="text-xs text-slate-400">~</span>
+                          <input
+                            type="time"
+                            value={sheetCell.endTime}
+                            aria-label={tr(lang, '종료 시간', 'End time', '结束时间')}
+                            onChange={(e) =>
+                              e.target.value && handleUpdateDayPeriodTime(day, period, { endTime: e.target.value })
+                            }
+                            className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()
+            ) : (
+              (() => {
+                const { period } = schoolSheet;
+                const info = getRowInfo(period);
+                return (
+                  <>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-[13px] font-bold text-ink">
+                          {tr(lang, `${period}교시 시간`, `Period ${period} Time`, `第${period}节时间`)}
+                        </h3>
+                        <p className="text-[11px] text-slate-600">
+                          {tr(
+                            lang,
+                            `${info.entries.length}개 요일에 있는 교시`,
+                            `Used on ${info.entries.length} day(s)`,
+                            `${info.entries.length} 个星期有此节`
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSchoolSheet(null)}
+                        className="w-8 h-8 rounded-full grid place-items-center text-slate-600 hover:bg-slate-200"
+                        aria-label={tr(lang, '닫기', 'Close', '关闭')}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {isPresetMode ? (
+                      <div className="space-y-2.5">
+                        <div className="rounded-xl bg-sage-100 px-3 py-2.5 flex items-center justify-between">
+                          <span className="text-xs font-bold text-sage-900">{periodLabel(period)}</span>
+                          <span className="text-[13px] font-mono text-sage-900 tabular-nums">
+                            {info.times.startTime}–{info.times.endTime}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600">
+                          {tr(
+                            lang,
+                            '프리셋 모드에서는 시간이 자동 계산됩니다. 교시마다 직접 바꾸려면 직접 입력 모드로 전환하세요.',
+                            'In preset mode times are calculated automatically. Switch to custom mode to edit each period.',
+                            '预设模式下时间自动计算。如需逐节修改，请切换到自定义模式。'
+                          )}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => updateSchoolTimeConfig({ mode: 'custom' })}
+                          className="w-full h-9 rounded-full bg-sage-700 text-paper text-xs font-bold hover:bg-sage-800"
+                        >
+                          {tr(lang, '교시별 직접 입력으로 전환', 'Switch to custom times', '切换为逐节自定义')}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <span className="block text-[11px] font-medium text-slate-600">
+                            {tr(lang, '모든 요일 한 번에', 'All days at once', '所有星期统一')}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="time"
+                              value={info.times.startTime}
+                              aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
+                              onChange={(e) =>
+                                e.target.value && handleUpdateRowTimeAllDays(period, { startTime: e.target.value })
+                              }
+                              className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                            />
+                            <span className="text-xs text-slate-400">~</span>
+                            <input
+                              type="time"
+                              value={info.times.endTime}
+                              aria-label={tr(lang, '종료 시간', 'End time', '结束时间')}
+                              onChange={(e) =>
+                                e.target.value && handleUpdateRowTimeAllDays(period, { endTime: e.target.value })
+                              }
+                              className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                            />
+                          </div>
+                          {info.mismatch && (
+                            <p className="text-[11px] text-accent-800">
+                              {tr(
+                                lang,
+                                '요일마다 시간이 달라요. 여기서 바꾸면 모든 요일이 같은 시간으로 맞춰집니다.',
+                                'Times differ by day. Changing here aligns every day to the same time.',
+                                '各星期时间不同。在此修改将统一所有星期的时间。'
+                              )}
+                            </p>
+                          )}
+                        </div>
+
+                        {info.entries.length > 0 && (
+                          <details className="rounded-xl bg-surface px-3 py-2" open={info.mismatch}>
+                            <summary className="text-[11px] font-bold text-ink cursor-pointer">
+                              {tr(lang, '요일별 시간', 'Per-day times', '按星期设置时间')}
+                            </summary>
+                            <div className="space-y-1.5 pt-2">
+                              {info.entries.map(({ day, p }) => (
+                                <div key={day} className="flex items-center gap-1.5">
+                                  <span className="w-8 text-xs font-bold text-sage-800 shrink-0">
+                                    {translateDay(day, lang)}
+                                  </span>
+                                  <input
+                                    type="time"
+                                    value={p.startTime}
+                                    aria-label={tr(lang, `${day}요일 시작 시간`, `${translateDay(day, lang)} start`, `${translateDay(day, lang)}开始时间`)}
+                                    onChange={(e) =>
+                                      e.target.value && handleUpdateDayPeriodTime(day, period, { startTime: e.target.value })
+                                    }
+                                    className="flex-1 min-w-0 h-8 px-2 rounded-full bg-paper text-xs font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                                  />
+                                  <span className="text-xs text-slate-400">~</span>
+                                  <input
+                                    type="time"
+                                    value={p.endTime}
+                                    aria-label={tr(lang, `${day}요일 종료 시간`, `${translateDay(day, lang)} end`, `${translateDay(day, lang)}结束时间`)}
+                                    onChange={(e) =>
+                                      e.target.value && handleUpdateDayPeriodTime(day, period, { endTime: e.target.value })
+                                    }
+                                    className="flex-1 min-w-0 h-8 px-2 rounded-full bg-paper text-xs font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()
+            )}
+          </div>
+        </div>
+      )}
+
+      {masterFeedback && (
+        <div
+          role="status"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[80] w-[calc(100%-32px)] max-w-[420px] px-4 py-2.5 rounded-2xl bg-ink text-paper text-xs font-semibold shadow-lg"
         >
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">
+          {masterFeedback}
+        </div>
+      )}
+
+      {/* ===== GROUP: 데이터 ===== */}
+      <div className="space-y-2">
+        <GroupHeader label={tr(lang, '데이터', 'Data', '数据')} />
+
+        <SettingsCard
+          id="ai"
+          open={!!openCards.ai}
+          onToggle={toggleCard}
+          tone="other"
+          icon={ScanLine}
+          title={tr(lang, 'AI 시간표 이미지 인식', 'AI Timetable Recognition', 'AI 课表图片识别')}
+          summary={aiEnabled ? aiSummaryLine : tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · coming soon', '实验功能 · 即将推出')}
+        >
+          {!aiEnabled ? (
+            <div className="p-4 space-y-4">
+              <div className="rounded-xl bg-other-100 border border-other-300 p-3.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-other-800">
+                  <FlaskConical className="w-4 h-4" strokeWidth={2.75} />
+                  <span className="text-[13px] font-bold">
+                    {tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · Coming soon', '实验功能 · 即将推出')}
+                  </span>
+                </div>
+                <p className="text-[12px] text-other-800 leading-relaxed">
+                  {tr(
+                    lang,
+                    '시간표 사진 한 장으로 요일·교시·과목과 학원 일정을 자동으로 채워 주는 기능이에요. 지금은 비공개 테스트 중이라 정식 출시 후에 쓸 수 있어요.',
+                    'Fill in your days, periods, subjects and academy classes from a single timetable photo. It is in private testing and will open after the official release.',
+                    '只需一张课表照片，即可自动填入星期、节次、科目和补习班日程。目前处于内部测试中，正式发布后即可使用。'
+                  )}
+                </p>
+              </div>
+
+              <ol className="space-y-2">
+                {[
+                  {
+                    icon: Camera,
+                    title: tr(lang, '사진 찍기', 'Take a photo', '拍照'),
+                    body: tr(lang, '가정통신문·칠판·손글씨 시간표를 찍거나 올려요.', 'Snap or upload a printed, blackboard or handwritten timetable.', '拍摄或上传通知单、黑板或手写课表。'),
+                  },
+                  {
+                    icon: ScanLine,
+                    title: tr(lang, 'AI가 읽기', 'AI reads it', 'AI 识别'),
+                    body: tr(lang, '요일·교시·과목·학원 시간을 뽑아 표로 보여 줘요.', 'It extracts days, periods, subjects and academy times into a table.', '提取星期、节次、科目和补习班时间并以表格显示。'),
+                  },
+                  {
+                    icon: Check,
+                    title: tr(lang, '확인하고 합치기', 'Review and merge', '核对并合并'),
+                    body: tr(lang, '틀린 곳을 고친 뒤 기본 시간표에 합쳐요.', 'Fix anything it got wrong, then merge into your timetable.', '修改错误后合并到固定课表。'),
+                  },
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-3 rounded-xl bg-paper px-3 py-2.5">
+                    <span className="w-8 h-8 rounded-full bg-surface text-slate-700 grid place-items-center shrink-0">
+                      <step.icon className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-bold text-ink">
+                        <span className="font-mono text-slate-500 mr-1">{i + 1}</span>
+                        {step.title}
+                      </span>
+                      <span className="block text-[12px] text-slate-600 leading-relaxed">{step.body}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="grid grid-cols-1 gap-2" aria-disabled="true">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full min-h-[56px] px-4 rounded-xl border-[1.5px] border-dashed border-slate-300 bg-paper/60 text-slate-500 text-xs font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+                >
+                  <Lock className="w-4 h-4" />
+                  {tr(lang, '사진으로 시간표 인식 · 준비 중', 'Recognize from photo · In preparation', '照片识别课表 · 准备中')}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 text-center">
+                {tr(
+                  lang,
+                  '지금은 [학교 시간표] 표에서 칸을 눌러 직접 입력할 수 있어요.',
+                  'For now, tap the cells in the [School timetable] table to enter it yourself.',
+                  '目前可在【学校课表】表格中点击格子手动输入。'
+                )}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mx-4 mt-4 rounded-xl bg-other-100 border border-other-300 px-3 py-2 flex items-center gap-1.5 text-other-800">
+                <FlaskConical className="w-3.5 h-3.5 shrink-0" strokeWidth={2.75} />
+                <span className="text-[11px] font-semibold">
+                  {tr(
+                    lang,
+                    '실험 기능 · 테스트 모드로 켜져 있어요. 결과를 꼭 확인한 뒤 합쳐 주세요.',
+                    'Experimental · enabled in test mode. Please review results before merging.',
+                    '实验功能 · 已在测试模式下开启。合并前请仔细核对结果。'
+                  )}
+                </span>
+              </div>
+          <div className="p-4 space-y-4">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
               {tr(
                 lang,
-                '3. AI 비정형 시간표 이미지 자동 인식',
-                '3. AI Timetable Image Recognition',
-                '3. AI 非结构化课表图片自动识别'
-              )}
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              {tr(
-                lang,
-                '가정통신문·칠판·손글씨 시간표 사진 분석 후 미리보기 표에서 검수/병합',
-                'Analyze timetable photos with Gemini AI, edit in preview table, and merge',
-                '分析纸质通知单、黑板或手写课表照片，在预览表中核对后一键合并'
+                '가정통신문·칠판·손글씨 시간표 사진을 AI가 분석해요. 결과를 표에서 확인·수정한 뒤 기본 시간표에 합칠 수 있어요.',
+                'AI reads photos of printed, blackboard or handwritten timetables. Review and edit the result, then merge it into your timetable.',
+                'AI 会分析通知单、黑板或手写课表照片。可在表格中核对修改后合并到固定课表。'
               )}
             </p>
-          </div>
-          {openSections[3] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
-          )}
-        </button>
-
-        {openSections[3] && (
-          <div className="p-4 space-y-4">
             <input
               ref={imageInputRef}
               type="file"
@@ -1617,7 +3145,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 type="button"
                 disabled={aiLoading}
                 onClick={() => imageInputRef.current?.click()}
-                className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-60 active:scale-98 transition-all"
+                className="w-full min-h-[64px] px-4 py-5 rounded-xl border-[1.5px] border-dashed border-other-400 bg-other-100 text-other-800 text-xs font-bold flex items-center justify-center gap-2 hover:bg-other-200 disabled:opacity-60 active:scale-98 transition-all"
               >
                 {aiLoading ? (
                   <>
@@ -1646,7 +3174,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 type="button"
                 disabled={aiLoading}
                 onClick={handleRunSampleImageDemo}
-                className="w-full min-h-[40px] px-3 py-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-200 disabled:opacity-60"
+                className="w-full min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100 disabled:opacity-60"
               >
                 <Upload className="w-3.5 h-3.5" />
                 {tr(
@@ -1659,10 +3187,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {uploadedPreviewUrl && (
-              <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 p-2">
+              <div className="rounded-xl overflow-hidden bg-paper p-2">
                 <img
                   src={uploadedPreviewUrl}
-                  alt="Uploaded Timetable Preview"
+                  alt={tr(lang, '업로드한 시간표 미리보기', 'Uploaded timetable preview', '已上传的课表预览')}
                   referrerPolicy="no-referrer"
                   className="max-h-44 mx-auto object-contain rounded-lg"
                 />
@@ -1670,24 +3198,24 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             )}
 
             {aiError && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2 text-xs text-rose-800">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-xl bg-accent-100 border border-accent-300 flex items-start gap-2 text-xs text-accent-900">
+                <AlertCircle className="w-4 h-4 text-accent-800 shrink-0 mt-0.5" />
                 <span>{aiError}</span>
               </div>
             )}
 
             {aiMergeSuccess && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-xs font-bold text-emerald-900">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-xl bg-sage-100 border border-sage-300 flex items-start gap-2 text-xs font-bold text-sage-900">
+                <CheckCircle2 className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
                 <span>{aiMergeSuccess}</span>
               </div>
             )}
 
             {aiPreviewEntries.length > 0 && (
-              <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="space-y-3 pt-2 border-t border-divider">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900">
+                    <h3 className="text-xs font-bold text-ink">
                       {tr(
                         lang,
                         `AI 추출 결과 검수 표 (${aiPreviewEntries.length}건)`,
@@ -1696,16 +3224,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       )}
                     </h3>
                     {aiSummary && (
-                      <p className="text-[11px] text-slate-500 mt-0.5">{aiSummary}</p>
+                      <p className="text-[11px] text-slate-600 mt-0.5">{aiSummary}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                <div className="max-h-72 overflow-y-auto border border-divider rounded-xl divide-y divide-divider">
                   {aiPreviewEntries.map((entry) => (
                     <div
                       key={entry.id}
-                      className="p-2.5 bg-white flex items-center gap-1.5 flex-wrap text-xs"
+                      className="p-2.5 bg-paper flex items-center gap-1.5 flex-wrap text-xs"
                     >
                       <select
                         value={entry.day}
@@ -1714,7 +3242,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             day: e.target.value as DayOfWeek,
                           })
                         }
-                        className="h-8 px-1.5 rounded-lg border border-slate-300 font-bold text-slate-800"
+                        className="h-8 px-2 rounded-full border border-divider bg-surface font-bold text-ink"
                       >
                         {DAYS_OF_WEEK.map((d) => (
                           <option key={d} value={d}>
@@ -1731,10 +3259,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             period: e.target.value === 'academy' ? 0 : 1,
                           })
                         }
-                        className={`h-8 px-2 rounded-lg border font-bold ${
+                        className={`h-8 px-2.5 rounded-full border font-bold ${
                           entry.type === 'school'
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
-                            : 'bg-violet-50 border-violet-200 text-violet-800'
+                            ? 'bg-sage-100 border-sage-300 text-sage-800'
+                            : 'bg-accent-100 border-accent-300 text-accent-800'
                         }`}
                       >
                         <option value="school">{tr(lang, '학교', 'School', '学校')}</option>
@@ -1752,8 +3280,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                               period: Number(e.target.value) || 1,
                             })
                           }
-                          className="w-12 h-8 px-1.5 rounded-lg border border-slate-300 text-center font-mono font-bold"
-                          title="교시"
+                          className="w-12 h-8 px-1.5 rounded-full border border-divider bg-surface text-center font-mono"
+                          title={tr(lang, '교시', 'Period', '节次')}
+                          aria-label={tr(lang, '교시', 'Period', '节次')}
                         />
                       )}
 
@@ -1765,7 +3294,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             startTime: e.target.value,
                           })
                         }
-                        className="w-22 h-8 px-1 rounded-lg border border-slate-300 font-mono"
+                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
                       />
                       <span className="text-slate-400">~</span>
                       <input
@@ -1776,7 +3305,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             endTime: e.target.value,
                           })
                         }
-                        className="w-22 h-8 px-1 rounded-lg border border-slate-300 font-mono"
+                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
                       />
 
                       <input
@@ -1787,13 +3316,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             subject: e.target.value,
                           })
                         }
-                        className="flex-1 min-w-[90px] h-8 px-2 rounded-lg border border-slate-300 font-bold text-slate-900"
+                        className="flex-1 min-w-[90px] h-8 px-2.5 rounded-full border border-divider bg-surface font-bold text-ink focus:outline-none focus:border-accent"
                       />
 
                       <button
                         type="button"
                         onClick={() => handleDeletePreviewEntry(entry.id)}
-                        className="p-1 text-slate-400 hover:text-rose-600"
+                        className="p-1 text-slate-600 hover:text-accent-800"
+                        aria-label={tr(lang, '삭제', 'Delete', '删除')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1804,7 +3334,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <button
                   type="button"
                   onClick={handleMergeAiPreviewToMaster}
-                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-700"
+                  className="w-full min-h-[40px] py-2 px-4 rounded-full bg-accent-700 text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-800"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   {tr(
@@ -1817,48 +3347,33 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
             )}
           </div>
-        )}
-      </section>
+            </>
+          )}
+        </SettingsCard>
 
-      {/* SECTION 4: 데이터 백업(내보내기) 및 복원(불러오기) */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <button
-          type="button"
-          onClick={() => toggleSection(4)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+        <SettingsCard
+          id="backup"
+          open={!!openCards.backup}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={DatabaseBackup}
+          title={tr(lang, '백업 · 복원', 'Backup & Restore', '备份与恢复')}
+          summary={backupSummary}
         >
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">
+          <div className="p-4 space-y-4">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
               {tr(
                 lang,
-                '4. 데이터 백업(내보내기) 및 복원(불러오기)',
-                '4. Data Backup (Export) & Restore (Import)',
-                '4. 数据备份（导出）与恢复（导入）'
-              )}
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              {tr(
-                lang,
-                '스마트폰 교체나 브라우저 초기화에 대비해 전체 플래너 상태를 파일로 보관',
-                'Save or restore your entire planner state as a JSON file across devices',
-                '将全部规划器数据保存为 JSON 文件，更换手机或重置浏览器后可一键恢复'
+                '휴대폰 교체나 브라우저 초기화에 대비해 플래너 전체를 JSON 파일로 보관하고 언제든 복원하세요.',
+                'Keep your whole planner as a JSON file and restore it anytime — handy when switching phones or clearing the browser.',
+                '将整个规划器保存为 JSON 文件，更换手机或重置浏览器后可随时恢复。'
               )}
             </p>
-          </div>
-          {openSections[4] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
-          )}
-        </button>
-
-        {openSections[4] && (
-          <div className="p-4 space-y-4">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">
+            <div className="px-3.5 py-2.5 rounded-xl bg-paper flex items-center justify-between gap-2">
+              <span className="text-[12px] font-semibold text-slate-600">
                 {tr(lang, '마지막 백업 일시', 'Last Backup Date', '上次备份时间')}
               </span>
-              <span className="text-xs font-mono font-bold text-indigo-700 tabular-nums">
+              <span className="text-[13px] font-mono text-ink tabular-nums">
                 {state.backupMeta.lastBackupDate ||
                   tr(lang, '백업 기록 없음', 'Never backed up', '暂无备份记录')}
               </span>
@@ -1868,14 +3383,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div
                 className={`p-3 rounded-xl border text-xs font-bold flex items-start gap-2 ${
                   backupFeedback.type === 'success'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                    ? 'bg-sage-100 border-sage-300 text-sage-900'
+                    : 'bg-accent-100 border-accent-300 text-accent-900'
                 }`}
               >
                 {backupFeedback.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-accent-800 shrink-0 mt-0.5" />
                 )}
                 <span>{backupFeedback.message}</span>
               </div>
@@ -1893,7 +3408,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <button
                 type="button"
                 onClick={handleExportBackupJson}
-                className="min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-800"
+                className="min-h-[40px] px-3 py-2 rounded-full bg-accent-700 text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-800"
               >
                 <Download className="w-4 h-4" />
                 {tr(lang, '데이터 내보내기 (저장)', 'Export Backup (.json)', '导出备份文件')}
@@ -1902,350 +3417,436 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <button
                 type="button"
                 onClick={() => restoreFileInputRef.current?.click()}
-                className="min-h-[46px] px-3 py-2.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100"
+                className="min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100"
               >
                 <FileUp className="w-4 h-4" />
                 {tr(lang, '데이터 불러오기 (복원)', 'Import Backup (.json)', '导入恢复数据')}
               </button>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  onResetSampleData();
-                  setBackupFeedback({
-                    type: 'success',
-                    message: tr(
+            <div className="pt-4 border-t border-divider space-y-2">
+              <div className="flex items-center gap-1.5">
+                <ShieldAlert strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-800" />
+                <span className="text-[12px] font-bold text-accent-800">
+                  {tr(lang, '초기화', 'Danger zone', '重置')}
+                </span>
+              </div>
+              {!resetConfirmOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setResetConfirmOpen(true)}
+                  className="w-full h-10 rounded-full border-[1.5px] border-accent-800 bg-transparent text-accent-800 inline-flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-accent-100"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {tr(
+                    lang,
+                    '초기 샘플 데이터로 전체 리셋',
+                    'Reset All to Initial Sample Data',
+                    '全部重置为初始示例数据'
+                  )}
+                </button>
+              ) : (
+                <div role="alert" className="rounded-xl bg-accent-100 border border-accent-300 p-3 space-y-2.5">
+                  <p className="text-[12px] font-semibold text-accent-900 leading-snug">
+                    {tr(
                       lang,
-                      '초기 샘플 데이터 상태로 초기화되었습니다.',
-                      'Reset to initial sample data.',
-                      '已重置为初始示例数据状态。'
-                    ),
-                  });
-                }}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-700"
+                      '모든 시간표·일정·출석·메모가 샘플 데이터로 바뀌어요. 되돌릴 수 없으니 먼저 백업을 권장합니다.',
+                      'All timetables, schedules, attendance and memos will be replaced with sample data. This cannot be undone — back up first.',
+                      '所有课表、日程、出勤和备忘都将被示例数据替换，且无法撤销，建议先备份。'
+                    )}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setResetConfirmOpen(false)}
+                      className="flex-1 h-9 rounded-full border border-divider bg-paper text-ink text-xs font-semibold hover:bg-slate-100"
+                    >
+                      {tr(lang, '취소', 'Cancel', '取消')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onResetSampleData();
+                        setResetConfirmOpen(false);
+                        setBackupFeedback({
+                          type: 'success',
+                          message: tr(
+                            lang,
+                            '초기 샘플 데이터 상태로 초기화되었습니다.',
+                            'Reset to initial sample data.',
+                            '已重置为初始示例数据状态。'
+                          ),
+                        });
+                      }}
+                      className="flex-1 h-9 rounded-full bg-accent-800 text-paper text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-900"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      {tr(lang, '리셋하기', 'Reset', '确认重置')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </SettingsCard>
+      </div>
+
+      {/* ===== GROUP: 앱 ===== */}
+      <div className="space-y-2">
+        <GroupHeader label={tr(lang, '앱', 'App', '应用')} />
+
+        <SettingsCard
+          id="widgets"
+          open={!!openCards.widgets}
+          onToggle={toggleCard}
+          tone="other"
+          icon={Smartphone}
+          title={tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
+          summary={
+            widgetConfig.enabled.length > 0
+              ? tr(
+                  lang,
+                  `위젯 ${widgetConfig.enabled.length}개 추가됨 · 총 ${HOME_WIDGET_IDS.length}종`,
+                  `${widgetConfig.enabled.length} of ${HOME_WIDGET_IDS.length} widgets added`,
+                  `已添加 ${widgetConfig.enabled.length} 个 · 共 ${HOME_WIDGET_IDS.length} 种`
+                )
+              : tr(
+                  lang,
+                  `추가된 위젯 없음 · 총 ${HOME_WIDGET_IDS.length}종`,
+                  `No widgets yet · ${HOME_WIDGET_IDS.length} available`,
+                  `尚未添加 · 共 ${HOME_WIDGET_IDS.length} 种`
+                )
+          }
+        >
+          <div className="p-4 space-y-3">
+        {widgetConfig.enabled.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {widgetConfig.enabled.map((id) => (
+              <span
+                key={id}
+                className="inline-flex items-center gap-1 pl-3 pr-1 h-8 rounded-full bg-paper border border-divider text-xs font-semibold text-ink"
               >
-                <RotateCcw className="w-3 h-3" />
+                {HOME_WIDGET_META[id].name(lang)}
+                <button
+                  type="button"
+                  onClick={() => toggleWidget(id)}
+                  aria-label={tr(lang, `${HOME_WIDGET_META[id].name(lang)} 위젯 빼기`, `Remove ${HOME_WIDGET_META[id].name(lang)}`, `移除 ${HOME_WIDGET_META[id].name(lang)}`)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setIsWidgetSheetOpen(true)}
+          className="w-full h-12 rounded-full bg-accent-700 text-paper text-[14px] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
+        >
+          <Smartphone className="w-4 h-4" strokeWidth={2.75} />
+          {tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')}
+        </button>
+
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="guide"
+          open={!!openCards.guide}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={BookOpen}
+          title={tr(lang, '사용 가이드', 'User Guide', '使用指南')}
+          summary={tr(
+            lang,
+            `핵심 기능 ${USER_GUIDE_TOPICS.length}가지 · 단계별 안내`,
+            `${USER_GUIDE_TOPICS.length} key features · step by step`,
+            `${USER_GUIDE_TOPICS.length} 项核心功能 · 分步说明`
+          )}
+        >
+          <div className="p-4 space-y-3">
+            {/* 6 Major Feature Selector Grid */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {USER_GUIDE_TOPICS.map((topic, idx) => {
+                const isSelected = topic.id === selectedGuideId;
+                return (
+                  <button
+                    key={topic.id}
+                    type="button"
+                    onClick={() => setSelectedGuideId(topic.id)}
+                    className={`h-[34px] px-2 rounded-full text-center transition-colors flex items-center justify-center gap-1 min-w-0 ${
+                      isSelected
+                        ? 'bg-accent-700 text-paper'
+                        : 'bg-paper text-ink hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="min-w-0 flex items-baseline gap-1">
+                      <div
+                        className={`hidden sm:block text-[11px] font-mono ${
+                          isSelected ? 'text-accent-100' : 'text-accent-700'
+                        }`}
+                      >
+                        0{idx + 1}
+                      </div>
+                      <div className="text-xs font-semibold truncate">
+                        {tr(lang, topic.badge.ko, topic.badge.en, topic.badge.zh)}
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={`hidden ${
+                        isSelected ? 'text-paper -rotate-90' : 'text-slate-400'
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Feature Step-by-Step Walkthrough Card */}
+            <div className="p-3 rounded-xl bg-paper space-y-2.5">
+              <div className="space-y-1 border-b border-divider pb-2.5">
+                <span className="inline-block px-2 py-0.5 rounded-full bg-accent-100 text-accent-800 text-[11px] font-bold">
+                  {tr(
+                    lang,
+                    activeGuideTopic.badge.ko,
+                    activeGuideTopic.badge.en,
+                    activeGuideTopic.badge.zh
+                  )}
+                </span>
+                <h3 className="text-xs font-bold text-ink">
+                  {tr(
+                    lang,
+                    activeGuideTopic.title.ko,
+                    activeGuideTopic.title.en,
+                    activeGuideTopic.title.zh
+                  )}
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {tr(
+                    lang,
+                    activeGuideTopic.summary.ko,
+                    activeGuideTopic.summary.en,
+                    activeGuideTopic.summary.zh
+                  )}
+                </p>
+              </div>
+
+              {/* Concrete Steps */}
+              <div className="space-y-1.5">
+                {activeGuideTopic.steps.map((st, sIdx) => (
+                  <div key={sIdx} className="flex items-start gap-2">
+                    <span className="flex-none w-[18px] h-[18px] mt-px rounded-full bg-accent-700 text-paper font-mono text-[11px] grid place-items-center">
+                      {sIdx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="text-xs font-bold text-ink">
+                        {tr(lang, st.stepTitle.ko, st.stepTitle.en, st.stepTitle.zh)}
+                      </div>
+                      <p className="text-xs text-slate-700 leading-[1.45] break-keep">
+                        {tr(lang, st.stepDesc.ko, st.stepDesc.en, st.stepDesc.zh)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pro Tip Box */}
+              <div className="px-2.5 py-2 rounded bg-sage-100 flex items-start gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-sage-700 shrink-0 mt-0.5" />
+                <p className="text-[11px] font-medium text-sage-900 leading-relaxed">
+                  <strong className="font-bold mr-1">{tr(lang, '팁:', 'TIP:', '提示：')}</strong>
+                  {tr(
+                    lang,
+                    activeGuideTopic.tip.ko,
+                    activeGuideTopic.tip.en,
+                    activeGuideTopic.tip.zh
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </SettingsCard>
+      </div>
+
+      {/* 위젯 선택 시트 (전체 화면) */}
+      {isWidgetSheetOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
+          onClick={() => setIsWidgetSheetOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr(lang, '홈 화면 위젯 고르기', 'Choose home screen widgets', '选择主屏幕小组件')}
+        >
+          <div
+            className="w-full max-w-md max-h-[92vh] bg-paper rounded-t-[28px] shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 pt-2.5 pb-3 border-b border-divider space-y-2.5 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-[16px] font-bold text-ink">
+                    {tr(lang, '홈 화면 위젯 고르기', 'Choose widgets', '选择小组件')}
+                  </h3>
+                  <p className="text-[11px] text-slate-600">
+                    {tr(
+                      lang,
+                      `원하는 위젯의 "홈 화면에 추가"를 누르세요 · ${widgetConfig.enabled.length}개 추가됨`,
+                      `Tap "Add to Home" on the widgets you want · ${widgetConfig.enabled.length} added`,
+                      `点击想要的小组件的"添加到主屏幕" · 已添加 ${widgetConfig.enabled.length} 个`
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsWidgetSheetOpen(false)}
+                  aria-label={tr(lang, '닫기', 'Close', '关闭')}
+                  className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink hover:bg-slate-200 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-slate-600">
+                  {tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
+                </span>
+              {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) — widgetConfig.theme */}
+              <div
+                className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+                role="group"
+                aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
+              >
+                {(['light', 'dark'] as const).map((th) => (
+                  <button
+                    key={th}
+                    type="button"
+                    aria-pressed={widgetTheme === th}
+                    onClick={() => updateWidgetConfig({ theme: th })}
+                    className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
+                      widgetTheme === th ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                    }`}
+                  >
+                    {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+                    {th === 'light'
+                      ? tr(lang, '밝은 테마', 'Light', '浅色')
+                      : tr(lang, '어두운 테마', 'Dark', '深色')}
+                  </button>
+                ))}
+              </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              {/* 위젯 갤러리 */}
+              <div className="space-y-3">
+                {HOME_WIDGET_IDS.map((id) => {
+                  const meta = HOME_WIDGET_META[id];
+                  const isOn = widgetConfig.enabled.includes(id);
+                  return (
+                    <div
+                      key={id}
+                      className={`rounded-2xl p-3 space-y-3 transition-colors ${
+                        isOn ? 'bg-paper ring-2 ring-accent' : 'bg-paper/60'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[13px] font-bold text-ink">{meta.name(lang)}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-surface text-[11px] font-mono text-slate-700">
+                              {meta.sizeLabel(lang)}
+                            </span>
+                            <span className="text-[11px] text-slate-600">
+                              {tr(lang, `${meta.source(lang)} 메뉴`, `from ${meta.source(lang)}`, `来自${meta.source(lang)}`)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-slate-600">{meta.description(lang)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          aria-pressed={isOn}
+                          onClick={() => toggleWidget(id)}
+                          className={`h-8 px-3 rounded-full text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
+                            isOn
+                              ? 'bg-sage-100 text-sage-800 hover:bg-sage-200'
+                              : 'bg-accent-700 text-paper hover:bg-accent-800'
+                          }`}
+                        >
+                          {isOn ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                          {isOn
+                            ? tr(lang, '추가됨', 'Added', '已添加')
+                            : tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
+                        </button>
+                      </div>
+
+                      {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
+                      <div
+                        className={`p-3 rounded-2xl transition-colors ${
+                          widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'
+                        } ${isOn ? '' : 'opacity-80'}`}
+                      >
+                        <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-[11px] text-slate-600 leading-relaxed px-1">
                 {tr(
                   lang,
-                  '초기 샘플 데이터로 전체 리셋',
-                  'Reset All to Initial Sample Data',
-                  '全部重置为初始示例数据'
+                  '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
+                  'In the Android/iOS app, the selected widgets appear as real home-screen widgets. The web app shows a preview and syncs the widget data.',
+                  '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
+                )}
+              </p>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] text-slate-600">
+                  {widgetSyncToast ||
+                    tr(
+                      lang,
+                      '시간표·일정·출석이 바뀌면 위젯 데이터도 자동으로 동기화돼요.',
+                      'Widget data syncs automatically whenever your plans change.',
+                      '课表、日程或考勤变化时，小组件数据会自动同步。'
+                    )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    syncWidgetData(state);
+                    setWidgetSyncToast(
+                      tr(lang, '✓ 방금 위젯 데이터가 동기화되었습니다.', '✓ Widget data synced just now.', '✓ 小组件数据刚刚已同步。')
+                    );
+                    setTimeout(() => setWidgetSyncToast(null), 2500);
+                  }}
+                  className="h-9 px-3 rounded-full border border-divider bg-transparent hover:bg-slate-100 text-ink text-xs font-semibold shrink-0 transition-colors"
+                >
+                  {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
+                </button>
+              </div>
+            </div>
+
+            <div className="px-4 pt-3 pb-5 border-t border-divider shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsWidgetSheetOpen(false)}
+                className="w-full h-12 rounded-full bg-ink text-paper text-[14px] font-bold hover:bg-slate-800"
+              >
+                {tr(
+                  lang,
+                  `완료 · ${widgetConfig.enabled.length}개 추가됨`,
+                  `Done · ${widgetConfig.enabled.length} added`,
+                  `完成 · 已添加 ${widgetConfig.enabled.length} 个`
                 )}
               </button>
             </div>
           </div>
-        )}
-      </section>
-
-      {/* SECTION 5: 홈 화면 위젯 미리보기 (Android Home Screen Widget Preview) */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-              <Smartphone className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                {tr(
-                  lang,
-                  '홈 화면 위젯 미리보기',
-                  'Home Screen Widget Preview',
-                  '主屏幕小组件预览'
-                )}
-              </h2>
-              <p className="text-[11px] text-slate-500">
-                {tr(
-                  lang,
-                  '오늘의 학교·학원 시간표 및 일정 요약 위젯 (자동 동기화됨)',
-                  "Today's school, academy & schedule summary widget (Auto-synced)",
-                  '今日学校·补习班课表及日程摘要小组件（自动同步）'
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) */}
-          <div className="inline-flex rounded-xl bg-slate-200/80 p-0.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setWidgetTheme('light')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
-                widgetTheme === 'light'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Sun className="w-3 h-3 text-amber-500" />
-              {tr(lang, '밝은 테마', 'Light', '浅色')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWidgetTheme('dark')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
-                widgetTheme === 'dark'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Moon className="w-3 h-3 text-indigo-400" />
-              {tr(lang, '어두운 테마', 'Dark', '深色')}
-            </button>
-          </div>
         </div>
-
-        <div className="p-4 space-y-3">
-          {/* 스마트폰 홈 화면 배경 프레임 */}
-          <div
-            className={`p-3.5 rounded-2xl border transition-colors ${
-              widgetTheme === 'dark'
-                ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 border-slate-700'
-                : 'bg-gradient-to-br from-indigo-50/70 via-slate-100 to-violet-50/70 border-slate-200/90'
-            }`}
-          >
-            {/* 실제 안드로이드 위젯 카드 UI */}
-            <div
-              className={`rounded-2xl p-3.5 shadow-md border transition-all ${
-                widgetTheme === 'dark'
-                  ? 'bg-slate-900/90 border-slate-700/90 text-slate-100'
-                  : 'bg-white/95 border-white text-slate-900'
-              }`}
-            >
-              {/* 위젯 상단 헤더 */}
-              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200/20">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                  <span className="text-xs font-extrabold tracking-tight">
-                    {tr(
-                      lang,
-                      '오늘의 스마트 플래너',
-                      "Today's Smart Planner",
-                      '今日智能规划'
-                    )}
-                  </span>
-                </div>
-                <span
-                  className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ${
-                    widgetTheme === 'dark'
-                      ? 'bg-slate-800 text-indigo-300'
-                      : 'bg-indigo-50 text-indigo-700'
-                  }`}
-                >
-                  {widgetPayload.date} ({translateDay(widgetPayload.dayOfWeek, lang)})
-                </span>
-              </div>
-
-              {/* 위젯 본문: 학교 시간표 & 학원 시간표 2열 요약 */}
-              <div className="grid grid-cols-2 gap-2.5">
-                {/* 오늘의 학교 시간표 */}
-                <div
-                  className={`p-2.5 rounded-xl border ${
-                    widgetTheme === 'dark'
-                      ? 'bg-slate-800/70 border-slate-700/80'
-                      : 'bg-indigo-50/50 border-indigo-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span
-                      className={`text-[11px] font-extrabold ${
-                        widgetTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-800'
-                      }`}
-                    >
-                      {tr(lang, '학교 수업', 'School', '学校课程')}
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold ${
-                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-indigo-600'
-                      }`}
-                    >
-                      {activeSchoolClasses.length}
-                      {tr(lang, '교시', 'p', '节')}
-                    </span>
-                  </div>
-
-                  {activeSchoolClasses.length === 0 ? (
-                    <p
-                      className={`text-[11px] py-2 text-center ${
-                        widgetTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
-                      }`}
-                    >
-                      {tr(lang, '오늘 학교 수업 없음', 'No classes today', '今日无学校课程')}
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      {activeSchoolClasses.slice(0, 4).map((item) => (
-                        <div
-                          key={item.period}
-                          className="flex items-center justify-between text-[11px] gap-1"
-                        >
-                          <span
-                            className={`font-mono text-[10px] shrink-0 ${
-                              widgetTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                            }`}
-                          >
-                            {item.period}
-                            {tr(lang, '교시', 'P', '节')}
-                          </span>
-                          <span className="font-bold truncate">
-                            {translateSubject(item.subject, lang)}
-                          </span>
-                        </div>
-                      ))}
-                      {activeSchoolClasses.length > 4 && (
-                        <div
-                          className={`text-[10px] font-semibold text-right pt-0.5 ${
-                            widgetTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'
-                          }`}
-                        >
-                          +{activeSchoolClasses.length - 4}
-                          {tr(lang, '개 더보기', ' more', '节更多')}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 오늘의 학원 시간표 */}
-                <div
-                  className={`p-2.5 rounded-xl border ${
-                    widgetTheme === 'dark'
-                      ? 'bg-slate-800/70 border-slate-700/80'
-                      : 'bg-violet-50/50 border-violet-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span
-                      className={`text-[11px] font-extrabold ${
-                        widgetTheme === 'dark' ? 'text-violet-300' : 'text-violet-800'
-                      }`}
-                    >
-                      {tr(lang, '학원 일정', 'Academy', '补习班')}
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold ${
-                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-violet-600'
-                      }`}
-                    >
-                      {activeAcademyClasses.length}
-                      {tr(lang, '건', '', '项')}
-                    </span>
-                  </div>
-
-                  {activeAcademyClasses.length === 0 ? (
-                    <p
-                      className={`text-[11px] py-2 text-center ${
-                        widgetTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
-                      }`}
-                    >
-                      {tr(lang, '오늘 학원 일정 없음', 'No academies today', '今日无补习班')}
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      {activeAcademyClasses.slice(0, 3).map((ac) => (
-                        <div key={ac.id} className="text-[11px] leading-tight">
-                          <div className="font-bold truncate">
-                            {translateSubject(ac.subject, lang)}
-                          </div>
-                          <div
-                            className={`font-mono text-[10px] ${
-                              widgetTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                            }`}
-                          >
-                            {ac.startTime}~{ac.endTime}
-                          </div>
-                        </div>
-                      ))}
-                      {activeAcademyClasses.length > 3 && (
-                        <div
-                          className={`text-[10px] font-semibold text-right pt-0.5 ${
-                            widgetTheme === 'dark' ? 'text-violet-300' : 'text-violet-600'
-                          }`}
-                        >
-                          +{activeAcademyClasses.length - 3}
-                          {tr(lang, '건 더보기', ' more', '项更多')}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 오늘의 주요 일정 요약 바 */}
-              <div
-                className={`mt-2.5 pt-2 border-t flex items-center justify-between gap-2 text-[11px] ${
-                  widgetTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span
-                    className={`px-1.5 py-0.5 rounded font-bold text-[10px] shrink-0 ${
-                      widgetTheme === 'dark'
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {tr(lang, '오늘 일정', 'Events', '今日日程')}
-                  </span>
-                  <span className="truncate font-semibold">
-                    {widgetPayload.todaySchedules.length > 0
-                      ? widgetPayload.todaySchedules
-                          .map((s) => translateSampleText(s.title, lang))
-                          .join(', ')
-                      : tr(
-                          lang,
-                          '등록된 특별 일정이 없습니다',
-                          'No special schedules today',
-                          '今日无特别日程'
-                        )}
-                  </span>
-                </div>
-                {widgetPayload.attendanceSummary.pendingMakeupCount > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 font-bold text-[10px] shrink-0">
-                    {tr(
-                      lang,
-                      `보강 ${widgetPayload.attendanceSummary.pendingMakeupCount}건`,
-                      `Makeup ${widgetPayload.attendanceSummary.pendingMakeupCount}`,
-                      `待补课 ${widgetPayload.attendanceSummary.pendingMakeupCount}`
-                    )}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 위젯 브릿지 동기화 상태 및 수동 새로고침 버튼 */}
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <span className="text-[11px] text-slate-500">
-              {widgetSyncToast ||
-                tr(
-                  lang,
-                  '시간표·일정·출석 변경 시 WIDGET_SYNC_DATA 및 안드로이드 위젯에 즉시 반영됩니다.',
-                  'Automatically syncs to WIDGET_SYNC_DATA & AndroidWidgetBridge on any change.',
-                  '修改课表、日程或考勤时会自动同步至 WIDGET_SYNC_DATA 与安卓桌面小组件。'
-                )}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                syncWidgetData(state);
-                setWidgetSyncToast(
-                  tr(
-                    lang,
-                    '✓ 방금 위젯 데이터가 동기화되었습니다.',
-                    '✓ Widget data synced just now.',
-                    '✓ 小组件数据刚刚已同步。'
-                  )
-                );
-                setTimeout(() => setWidgetSyncToast(null), 2500);
-              }}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold shrink-0 transition-colors"
-            >
-              {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
-            </button>
-          </div>
-        </div>
-      </section>
+      )}
     </div>
   );
 };

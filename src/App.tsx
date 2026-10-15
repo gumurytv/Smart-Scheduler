@@ -14,9 +14,10 @@ import {
   AttendanceMap,
   MemoMap,
   AppLanguage,
+  DEFAULT_SCHOOL_TIME_CONFIG,
 } from './types';
-import { createInitialPlannerState, getDayOfWeekKor } from './data/initialData';
-import { tr, translateDay } from './i18n/translations';
+import { createInitialPlannerState } from './data/initialData';
+import { tr, formatDateLabel } from './i18n/translations';
 import { TimetableTab } from './components/TimetableTab';
 import { ScheduleTab } from './components/ScheduleTab';
 import { AttendanceTab } from './components/AttendanceTab';
@@ -45,6 +46,7 @@ function loadInitialState(): PlannerState {
           ...(parsed as PlannerState),
           language: parsed.language || 'ko',
           timelineConfig: parsed.timelineConfig || { startHour: 8, endHour: 24 },
+          schoolTimeConfig: parsed.schoolTimeConfig || { ...DEFAULT_SCHOOL_TIME_CONFIG },
         };
       }
     }
@@ -54,11 +56,14 @@ function loadInitialState(): PlannerState {
   return {
     ...createInitialPlannerState(new Date()),
     language: 'ko',
+    schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
   };
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('timetable');
+  // Settings section to open when arriving from another tab (e.g. "내 정보" from the 지금 card)
+  const [settingsFocus, setSettingsFocus] = useState<'profile' | null>(null);
   const [state, setState] = useState<PlannerState>(() => loadInitialState());
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
@@ -121,17 +126,13 @@ export default function App() {
     setState((prev) => ({
       ...fresh,
       language: prev.language || 'ko',
+      schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
+      profile: prev.profile,
     }));
   };
 
   const today = new Date();
-  const dayKor = getDayOfWeekKor(today);
-  const todayFormatted =
-    lang === 'en'
-      ? `${today.getMonth() + 1}/${today.getDate()} (${translateDay(dayKor, lang)})`
-      : lang === 'zh'
-      ? `${today.getMonth() + 1}月${today.getDate()}日 (${translateDay(dayKor, lang)})`
-      : `${today.getMonth() + 1}월 ${today.getDate()}일 (${dayKor})`;
+  const todayFormatted = formatDateLabel(today, lang);
 
   // Count pending makeups for header quick badge
   const pendingMakeupCount = Object.values(state.attendance).reduce((acc, dayAtt) => {
@@ -175,11 +176,11 @@ export default function App() {
   ];
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl relative">
+    <div className="max-w-md mx-auto min-h-screen bg-paper text-ink flex flex-col shadow-xl relative">
       {/* Sticky Top Header */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 h-14 flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
         <div className="min-w-0 flex items-center gap-2">
-          <h1 className="text-base font-bold tracking-tight text-slate-900 truncate">
+          <h1 className="text-base font-bold tracking-tight text-ink truncate">
             {tr(
               lang,
               '스마트 스쿨 & 아카데미',
@@ -188,7 +189,7 @@ export default function App() {
             )}
           </h1>
           {isOffline && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold shrink-0">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-100 text-accent-900 text-[10px] font-bold shrink-0">
               <WifiOff className="w-3 h-3" />{' '}
               {tr(lang, '오프라인 작동중', 'Offline Mode', '离线运行中')}
             </span>
@@ -200,7 +201,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab('attendance')}
-              className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-bold tabular-nums hover:bg-amber-100 transition-colors"
+              className="h-7 px-2.5 rounded-full bg-accent-100 border border-accent-300 text-accent-900 text-[11px] font-bold tabular-nums hover:bg-accent-200 transition-colors"
             >
               {tr(
                 lang,
@@ -210,7 +211,7 @@ export default function App() {
               )}
             </button>
           )}
-          <span className="text-xs font-mono font-semibold text-slate-500 tabular-nums">
+          <span className="text-[13px] font-mono text-slate-500 tabular-nums">
             {todayFormatted}
           </span>
         </div>
@@ -226,6 +227,15 @@ export default function App() {
             dailyOverrides={state.dailyOverrides}
             timelineConfig={state.timelineConfig}
             onUpdateDailyOverrides={handleUpdateDailyOverrides}
+            schedules={state.schedules}
+            onUpdateSchedules={handleUpdateSchedules}
+            attendance={state.attendance}
+            onUpdateAttendance={handleUpdateAttendance}
+            profile={state.profile}
+            onEditProfile={() => {
+              setSettingsFocus('profile');
+              setActiveTab('settings');
+            }}
           />
         )}
 
@@ -234,6 +244,8 @@ export default function App() {
             language={lang}
             schedules={state.schedules}
             onUpdateSchedules={handleUpdateSchedules}
+            masterTimetable={state.masterTimetable}
+            dailyOverrides={state.dailyOverrides}
           />
         )}
 
@@ -261,14 +273,16 @@ export default function App() {
             state={state}
             onUpdateState={setState}
             onResetSampleData={handleResetSampleData}
+            focusSection={settingsFocus}
+            onFocusHandled={() => setSettingsFocus(null)}
           />
         )}
       </main>
 
       {/* Fixed Bottom 5-Tab Navigation Bar */}
       <nav
-        aria-label="Main Navigation"
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-1.5 h-16 grid grid-cols-5 items-center"
+        aria-label={tr(lang, '메인 메뉴', 'Main Navigation', '主导航')}
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-surface/95 backdrop-blur-md border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
       >
         {navTabs.map((tab) => {
           const IconComponent = tab.icon;
@@ -280,24 +294,24 @@ export default function App() {
               onClick={() => setActiveTab(tab.id)}
               className={`min-h-[48px] flex flex-col items-center justify-center rounded-xl transition-colors relative ${
                 isActive
-                  ? 'text-indigo-600'
+                  ? 'text-accent-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <IconComponent
                 className={`w-5 h-5 transition-transform ${
-                  isActive ? 'scale-105 stroke-[2.4]' : 'stroke-[1.9]'
+                  isActive ? 'scale-105 stroke-[2.75]' : 'stroke-2'
                 }`}
               />
               <span
                 className={`text-[11px] mt-1 tracking-tight whitespace-nowrap ${
-                  isActive ? 'font-bold text-indigo-600' : 'font-medium text-slate-500'
+                  isActive ? 'font-bold text-accent-700' : 'font-medium text-slate-500'
                 }`}
               >
                 {tab.label}
               </span>
               {tab.id === 'attendance' && pendingMakeupCount > 0 && (
-                <span className="absolute top-1 right-3.5 w-2 h-2 rounded-full bg-amber-500" />
+                <span className="absolute top-1.5 right-3.5 w-2 h-2 rounded-full bg-accent" />
               )}
             </button>
           );

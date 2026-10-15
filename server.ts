@@ -18,6 +18,14 @@ async function startServer() {
   app.use(express.json({ limit: '15mb' }));
 
   app.post('/api/parse-timetable', async (req, res) => {
+    // Experimental feature: off unless the operator explicitly enables it, so a
+    // public deployment cannot spend Gemini quota before the feature is released.
+    if (process.env.AI_TIMETABLE_ENABLED !== 'true') {
+      return res.status(403).json({
+        error: 'AI 시간표 이미지 인식은 아직 실험 기능이라 비활성화되어 있습니다.',
+      });
+    }
+
     try {
       const { imageBase64, mimeType, defaultPeriods } = req.body;
 

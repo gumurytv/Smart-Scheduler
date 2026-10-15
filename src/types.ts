@@ -28,9 +28,14 @@ export interface DayMasterTimetable {
 
 export type MasterTimetable = Record<DayOfWeek, DayMasterTimetable>;
 
+// Per-slot quick status chosen from the timeline item sheet (휴강 / 결석 / 자습)
+export type SlotStatus = 'cancelled' | 'absent' | 'selfStudy';
+
 export interface SchoolPeriodOverride {
   subject: string;
   isCancelled?: boolean;
+  status?: SlotStatus; // 'cancelled' mirrors isCancelled; 'absent' / 'selfStudy' keep the slot but mark it
+  note?: string; // Free-text note the user typed for this slot on this date
 }
 
 export interface AcademyOverrideItem {
@@ -41,6 +46,8 @@ export interface AcademyOverrideItem {
   subject: string;
   isCancelled?: boolean;
   isAdded?: boolean; // True if added as a one-day makeup/special class
+  status?: SlotStatus;
+  note?: string;
   originalSubject?: string;
   originalStartTime?: string;
   originalEndTime?: string;
@@ -99,6 +106,53 @@ export interface TimelineConfig {
   endHour: number;   // e.g. 24 (24:00)
 }
 
+// School period timing (Settings → 시간표 수업시간 설정)
+// 'preset': periods are generated from first start + class/break/lunch lengths.
+// 'custom': each period's start/end is edited individually in the master timetable.
+export interface SchoolTimeConfig {
+  mode: 'preset' | 'custom';
+  firstStart: string; // HH:MM, e.g. '09:00'
+  classMinutes: number; // e.g. 45
+  breakMinutes: number; // e.g. 10
+  lunchAfterPeriod: number; // lunch break comes after this period, e.g. 4
+  lunchMinutes: number; // e.g. 60
+  periodCount: number; // e.g. 7
+}
+
+export const DEFAULT_SCHOOL_TIME_CONFIG: SchoolTimeConfig = {
+  mode: 'preset',
+  firstStart: '09:00',
+  classMinutes: 45,
+  breakMinutes: 10,
+  lunchAfterPeriod: 4,
+  lunchMinutes: 55,
+  periodCount: 7,
+};
+
+// Home-screen widgets the user can pick from (Settings → 홈 화면 위젯)
+export type HomeWidgetId =
+  | 'weeklySchool' // 주간 학교 시간표 (월~금)
+  | 'weeklyAcademy' // 주간 학원 시간표 (월~일)
+  | 'now' // "지금" 카드
+  | 'timeline' // 오늘 타임라인
+  | 'monthCalendar'; // 일정표 월간 캘린더
+
+export const HOME_WIDGET_IDS: HomeWidgetId[] = ['weeklySchool', 'weeklyAcademy', 'now', 'timeline', 'monthCalendar'];
+
+export interface WidgetConfig {
+  enabled: HomeWidgetId[]; // widgets the user chose to add to the home screen (order = display order)
+  theme: 'light' | 'dark';
+}
+
+export const DEFAULT_WIDGET_CONFIG: WidgetConfig = { enabled: ['now'], theme: 'light' };
+
+// The student's own profile, shown on the timetable's "지금" card (Settings → 내 정보)
+export interface UserProfile {
+  name: string; // e.g. '김민준'
+  school: string; // e.g. '한빛중학교'
+  grade: string; // free text so any school system fits, e.g. '2학년 3반'
+}
+
 export interface PlannerState {
   language?: AppLanguage;
   subjectPool: SubjectPool;
@@ -109,6 +163,9 @@ export interface PlannerState {
   memos: MemoMap;
   backupMeta: BackupMeta;
   timelineConfig: TimelineConfig;
+  schoolTimeConfig?: SchoolTimeConfig;
+  widgetConfig?: WidgetConfig;
+  profile?: UserProfile;
 }
 
 export interface AIExtractedEntry {

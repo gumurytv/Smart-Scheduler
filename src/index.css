@@ -1,14 +1,227 @@
 @import "tailwindcss";
 
+/*
+ * Organic skin — warm cream/sand ground, terracotta accent, sage second accent.
+ * The original layout and class names are kept; the Tailwind palette is remapped
+ * onto the Organic tonal ramps so every screen picks up the new look:
+ *   indigo / violet  → terracotta (primary · 학원)
+ *   emerald / blue   → sage (학교 · 출석)
+ *   amber / yellow   → terracotta light (보강 · 지각)
+ *   orange / rose    → terracotta deep (겹침 경고 · 결석 · 삭제)
+ *   slate            → sand neutral
+ * Numbers & dates (`font-mono`) use Caprasimo, body text Figtree + system Korean gothic.
+ */
+@theme {
+  /* Organic roles */
+  --color-paper: #f5ead8;
+  --color-surface: #ebddc5;
+  --color-ink: #201e1d;
+  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
+
+  --color-accent: #c67139;
+  --color-accent-100: #fff2eb;
+  --color-accent-200: #ffe1d0;
+  --color-accent-300: #ffc6a5;
+  --color-accent-400: #f6a06b;
+  --color-accent-500: #d67f48;
+  --color-accent-600: #b2622d;
+  --color-accent-700: #8c491a;
+  --color-accent-800: #643312;
+  --color-accent-900: #402310;
+
+  --color-sage: #7a8a5e;
+  --color-sage-100: #f0fae1;
+  --color-sage-200: #e1eecc;
+  --color-sage-300: #ccdbb2;
+  --color-sage-400: #aebf92;
+  --color-sage-500: #8fa073;
+  --color-sage-600: #728157;
+  --color-sage-700: #56633f;
+  --color-sage-800: #3d472b;
+  --color-sage-900: #272e1b;
+
+  /* other → dusty indigo-slate (기타 일정) — third category hue, distinct from sage & terracotta.
+     Text on solid: paper on other-600 = 5.1:1, on other-700 = 6.7:1; other-800 on other-100 = 10:1. */
+  --color-other: #5b7393;
+  --color-other-100: #eaf0f7;
+  --color-other-200: #d5e0ee;
+  --color-other-300: #b5c6dc;
+  --color-other-400: #8ea4c0;
+  --color-other-500: #6f87a7;
+  --color-other-600: #4d6483;
+  --color-other-700: #3e526d;
+  --color-other-800: #2c3a4f;
+  --color-other-900: #1d2635;
+
+  /* slate → sand neutral */
+  --color-slate-50: #f5ead8;
+  --color-slate-100: #eee7db;
+  --color-slate-200: #dcd3c4;
+  --color-slate-300: #c0b6a5;
+  --color-slate-400: #a19786;
+  --color-slate-500: #82796a;
+  --color-slate-600: #645c50;
+  --color-slate-700: #474238;
+  --color-slate-800: #2e2b25;
+  --color-slate-900: #201e1d;
+  --color-slate-950: #151312;
+
+  /* indigo → terracotta (primary) */
+  --color-indigo-50: #fff2eb;
+  --color-indigo-100: #ffe1d0;
+  --color-indigo-200: #ffc6a5;
+  --color-indigo-300: #f6a06b;
+  --color-indigo-400: #d67f48;
+  --color-indigo-500: #c67139;
+  --color-indigo-600: #c67139;
+  --color-indigo-700: #b2622d;
+  --color-indigo-800: #8c491a;
+  --color-indigo-900: #643312;
+  --color-indigo-950: #402310;
+
+  /* violet → terracotta (학원) */
+  --color-violet-50: #fff2eb;
+  --color-violet-100: #ffe1d0;
+  --color-violet-200: #ffc6a5;
+  --color-violet-300: #f6a06b;
+  --color-violet-400: #d67f48;
+  --color-violet-500: #c67139;
+  --color-violet-600: #c67139;
+  --color-violet-700: #8c491a;
+  --color-violet-800: #643312;
+  --color-violet-900: #643312;
+  --color-violet-950: #402310;
+
+  /* emerald → sage */
+  --color-emerald-50: #f0fae1;
+  --color-emerald-100: #e1eecc;
+  --color-emerald-200: #ccdbb2;
+  --color-emerald-300: #aebf92;
+  --color-emerald-400: #8fa073;
+  --color-emerald-500: #7a8a5e;
+  --color-emerald-600: #7a8a5e;
+  --color-emerald-700: #56633f;
+  --color-emerald-800: #3d472b;
+  --color-emerald-900: #272e1b;
+  --color-emerald-950: #1b2013;
+
+  /* blue → sage (학교 일정 · 토요일) */
+  --color-blue-50: #f0fae1;
+  --color-blue-100: #e1eecc;
+  --color-blue-200: #ccdbb2;
+  --color-blue-300: #aebf92;
+  --color-blue-400: #8fa073;
+  --color-blue-500: #7a8a5e;
+  --color-blue-600: #56633f;
+  --color-blue-700: #56633f;
+  --color-blue-800: #3d472b;
+  --color-blue-900: #272e1b;
+  --color-blue-950: #1b2013;
+
+  /* amber → terracotta light (보강 · 지각) */
+  --color-amber-50: #fff2eb;
+  --color-amber-100: #ffe1d0;
+  --color-amber-200: #ffc6a5;
+  --color-amber-300: #ffc6a5;
+  --color-amber-400: #f6a06b;
+  --color-amber-500: #d67f48;
+  --color-amber-600: #b2622d;
+  --color-amber-700: #8c491a;
+  --color-amber-800: #643312;
+  --color-amber-900: #402310;
+  --color-amber-950: #2b170a;
+
+  /* yellow → terracotta light */
+  --color-yellow-50: #fff2eb;
+  --color-yellow-100: #ffe1d0;
+  --color-yellow-200: #ffc6a5;
+  --color-yellow-300: #ffc6a5;
+  --color-yellow-400: #f6a06b;
+  --color-yellow-500: #d67f48;
+  --color-yellow-600: #b2622d;
+  --color-yellow-700: #8c491a;
+  --color-yellow-800: #643312;
+  --color-yellow-900: #402310;
+
+  /* orange → terracotta, deep end (시간 겹침 경고) */
+  --color-orange-50: #fff2eb;
+  --color-orange-100: #ffe1d0;
+  --color-orange-200: #ffc6a5;
+  --color-orange-300: #f6a06b;
+  --color-orange-400: #d67f48;
+  --color-orange-500: #8c491a;
+  --color-orange-600: #643312;
+  --color-orange-700: #643312;
+  --color-orange-800: #402310;
+  --color-orange-900: #402310;
+  --color-orange-950: #2b170a;
+
+  /* rose → terracotta deep (결석 · 삭제 · 일요일 · 현재 시각) */
+  --color-rose-50: #fff2eb;
+  --color-rose-100: #ffe1d0;
+  --color-rose-200: #ffc6a5;
+  --color-rose-300: #f6a06b;
+  --color-rose-400: #b2622d;
+  --color-rose-500: #8c491a;
+  --color-rose-600: #643312;
+  --color-rose-700: #643312;
+  --color-rose-800: #402310;
+  --color-rose-900: #2b170a;
+  --color-rose-950: #1d0f06;
+
+  /* Type */
+  --font-sans: "Figtree", system-ui, -apple-system, "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: "Caprasimo", "Figtree", system-ui, "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-heading: "Caprasimo", system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+
+  /* Radii — over-rounded: cards 28px, tiles 16px, small 8px */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+
+  /* Elevation — soft ink-tinted shadows tuned to the ground */
+  --shadow-2xs: 0 1px 1px color-mix(in srgb, #2e2b25 10%, transparent);
+  --shadow-xs: 0 1px 2px color-mix(in srgb, #2e2b25 14%, transparent);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2e2b25 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2e2b25 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
+  --shadow-xl: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
+  --shadow-2xl: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
+}
+
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, Roboto, "Noto Sans KR", "Segoe UI", "Malgun Gothic", sans-serif;
+    font-family: var(--font-sans);
+    background: var(--color-paper);
+    color: var(--color-ink);
   }
 
+  /* Numbers, dates & times speak in Caprasimo (single weight — no faux bold). */
   .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-family: var(--font-mono);
+    font-weight: 400 !important;
     font-variant-numeric: tabular-nums;
   }
+
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+  font-weight: 400;
 }
 
 .tabular-nums {
