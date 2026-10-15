@@ -791,17 +791,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   return (
     <div className="space-y-4">
       {/* TOP BAR 1: LANGUAGE SWITCHER (한국어 / English / 中文) */}
-      <section className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+      <section className="bg-surface rounded-2xl px-3.5 py-3 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+            <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center text-accent shrink-0">
               <Globe className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900">
+              <h2 className="text-[13px] font-bold text-ink">
                 {tr(lang, '앱 표시 언어 설정 (Language)', 'App Language Settings', '应用显示语言设置 (Language)')}
               </h2>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-600">
                 {tr(
                   lang,
                   '선택 즉시 앱의 모든 메뉴·과목·가이드가 해당 언어로 전환됩니다.',
@@ -813,7 +813,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="inline-flex rounded-full border border-divider overflow-hidden">
           {(
             [
               { code: 'ko', label: '한국어', sub: 'Korean' },
@@ -827,21 +827,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 key={item.code}
                 type="button"
                 onClick={() => handleSetLanguage(item.code)}
-                className={`min-h-[46px] px-3 py-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
+                className={`h-[30px] px-3 text-[11px] font-semibold transition-colors flex items-center justify-center ${
                   isSelected
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200/90 hover:border-indigo-300 hover:bg-indigo-50/30'
+                    ? 'bg-accent text-paper'
+                    : 'bg-transparent text-ink hover:bg-slate-100'
                 }`}
               >
-                <div className="flex items-center gap-1 text-xs font-bold">
-                  {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                <div className="flex items-center gap-1 text-[11px] font-semibold">
+                  {isSelected && <Check className="w-3 h-3 stroke-[2.75]" />}
                   <span>{item.label}</span>
                 </div>
-                <span
-                  className={`text-[10px] ${
-                    isSelected ? 'text-indigo-100' : 'text-slate-400'
-                  }`}
-                >
+                <span className="sr-only">
                   {item.sub}
                 </span>
               </button>
@@ -851,19 +847,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </section>
 
       {/* TOP BAR 2: INTERACTIVE STEP-BY-STEP APP USER GUIDE */}
-      <section className="bg-white rounded-2xl border-2 border-indigo-500/80 shadow-xs overflow-hidden">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
         <button
           type="button"
           onClick={() => setIsGuideExpanded((prev) => !prev)}
-          className="w-full px-4 py-3.5 bg-indigo-50/70 border-b border-indigo-100 flex items-center justify-between text-left"
+          className="w-full px-3.5 py-3 border-b border-divider flex items-center justify-between text-left"
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-full bg-accent text-paper flex items-center justify-center shrink-0">
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-bold text-slate-900">
+                <h2 className="text-[13px] font-bold text-ink">
                   {tr(
                     lang,
                     '스마트 플래너 핵심 기능 & 단계별 사용 가이드',
@@ -871,7 +867,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     '智能规划器核心功能与分步使用指南'
                   )}
                 </h2>
-                <span className="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                <span className="px-1.5 py-0.5 rounded-full bg-accent text-paper text-[9px] font-bold">
                   GUIDE
                 </span>
               </div>
@@ -886,16 +882,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
           </div>
           {isGuideExpanded ? (
-            <ChevronUp className="w-4 h-4 text-indigo-700 shrink-0" />
+            <ChevronUp className="w-4 h-4 text-accent-700 shrink-0" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-indigo-700 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-accent-700 shrink-0" />
           )}
         </button>
 
         {isGuideExpanded && (
-          <div className="p-4 space-y-3.5">
+          <div className="p-3.5 space-y-2.5">
             {/* 6 Major Feature Selector Grid */}
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {USER_GUIDE_TOPICS.map((topic, idx) => {
                 const isSelected = topic.id === selectedGuideId;
                 return (
@@ -903,27 +899,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     key={topic.id}
                     type="button"
                     onClick={() => setSelectedGuideId(topic.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-1.5 ${
+                    className={`h-[34px] px-2 rounded-full text-center transition-colors flex items-center justify-center gap-1 min-w-0 ${
                       isSelected
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-slate-50 text-slate-800 border-slate-200/80 hover:border-indigo-300'
+                        ? 'bg-accent text-paper'
+                        : 'bg-paper text-ink hover:bg-slate-100'
                     }`}
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex items-baseline gap-1">
                       <div
-                        className={`text-[10px] font-mono font-bold ${
-                          isSelected ? 'text-indigo-200' : 'text-indigo-600'
+                        className={`hidden sm:block text-[10px] font-mono ${
+                          isSelected ? 'text-accent-200' : 'text-accent'
                         }`}
                       >
                         0{idx + 1}
                       </div>
-                      <div className="text-xs font-bold truncate mt-0.5">
+                      <div className="text-xs font-semibold truncate">
                         {tr(lang, topic.badge.ko, topic.badge.en, topic.badge.zh)}
                       </div>
                     </div>
                     <ChevronDown
-                      className={`w-3.5 h-3.5 shrink-0 transition-transform ${
-                        isSelected ? 'text-white -rotate-90' : 'text-slate-400'
+                      className={`hidden ${
+                        isSelected ? 'text-paper -rotate-90' : 'text-slate-400'
                       }`}
                     />
                   </button>
@@ -932,9 +928,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {/* Selected Feature Step-by-Step Walkthrough Card */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-indigo-200/90 space-y-3">
-              <div className="space-y-1 border-b border-slate-200/80 pb-2.5">
-                <span className="inline-block px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+            <div className="p-3 rounded-xl bg-paper space-y-2.5">
+              <div className="space-y-1 border-b border-divider pb-2.5">
+                <span className="inline-block px-2 py-0.5 rounded-full bg-accent-100 text-accent-800 text-[10px] font-bold">
                   {tr(
                     lang,
                     activeGuideTopic.badge.ko,
@@ -942,7 +938,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     activeGuideTopic.badge.zh
                   )}
                 </span>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-xs font-bold text-ink">
                   {tr(
                     lang,
                     activeGuideTopic.title.ko,
@@ -961,26 +957,28 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
 
               {/* Concrete Steps */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {activeGuideTopic.steps.map((st, sIdx) => (
-                  <div
-                    key={sIdx}
-                    className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-1"
-                  >
-                    <div className="text-xs font-bold text-indigo-700">
-                      {tr(lang, st.stepTitle.ko, st.stepTitle.en, st.stepTitle.zh)}
+                  <div key={sIdx} className="flex items-start gap-2">
+                    <span className="flex-none w-[18px] h-[18px] mt-px rounded-full bg-accent text-paper font-mono text-[10px] grid place-items-center">
+                      {sIdx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="text-xs font-bold text-ink">
+                        {tr(lang, st.stepTitle.ko, st.stepTitle.en, st.stepTitle.zh)}
+                      </div>
+                      <p className="text-xs text-slate-700 leading-[1.45] break-keep">
+                        {tr(lang, st.stepDesc.ko, st.stepDesc.en, st.stepDesc.zh)}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-700 leading-relaxed">
-                      {tr(lang, st.stepDesc.ko, st.stepDesc.en, st.stepDesc.zh)}
-                    </p>
                   </div>
                 ))}
               </div>
 
               {/* Pro Tip Box */}
-              <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/90 flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] font-semibold text-amber-900 leading-relaxed">
+              <div className="px-2.5 py-2 rounded bg-sage-100 flex items-start gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-sage-700 shrink-0 mt-0.5" />
+                <p className="text-[11px] font-medium text-sage-900 leading-relaxed">
                   <strong className="font-bold mr-1">TIP:</strong>
                   {tr(
                     lang,
@@ -996,14 +994,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </section>
 
       {/* SECTION 1: 과목 후보군(Subject Pool) 설정 */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
         <button
           type="button"
           onClick={() => toggleSection(1)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+          className="w-full px-3.5 py-3 border-b border-divider flex items-center justify-between text-left"
         >
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 className="text-[13px] font-bold text-ink">
               {tr(
                 lang,
                 '1. 과목 후보군 (Subject Pool) 설정',
@@ -1011,7 +1009,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 '1. 候选科目库 (Subject Pool) 设置'
               )}
             </h2>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-600">
               {tr(
                 lang,
                 '시간표 터치 수정 시 버튼으로 나타날 학교 과목 및 학원 후보군',
@@ -1021,9 +1019,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </p>
           </div>
           {openSections[1] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronUp className="w-4 h-4 text-slate-600 shrink-0" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
           )}
         </button>
 
@@ -1032,7 +1030,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             {/* School Subject Pool */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-indigo-700">
+                <label className="text-xs font-bold text-sage-800">
                   {tr(
                     lang,
                     `학교 과목 후보군 (${state.subjectPool.school.length}종)`,
@@ -1045,16 +1043,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.school.map((subj) => (
                   <span
                     key={subj}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-bold"
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[11px] font-semibold"
                   >
                     {translateSubject(subj, lang)}
                     <button
                       type="button"
                       onClick={() => handleRemoveSchoolSubject(subj)}
-                      className="text-slate-400 hover:text-rose-600"
+                      className="text-sage-600 hover:text-accent-800"
                       aria-label={`${subj} delete`}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" strokeWidth={2.75} />
                     </button>
                   </span>
                 ))}
@@ -1070,11 +1068,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   )}
                   value={newSchoolSubject}
                   onChange={(e) => setNewSchoolSubject(e.target.value)}
-                  className="flex-1 h-10 px-3 rounded-xl border border-slate-300 text-xs font-medium text-slate-900"
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-500 focus:outline-none focus:border-accent"
                 />
                 <button
                   type="submit"
-                  className="h-10 px-3.5 rounded-xl bg-indigo-600 text-white text-xs font-bold inline-flex items-center gap-1 hover:bg-indigo-700 shrink-0"
+                  className="h-9 px-3 rounded-full bg-sage text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-sage-700 shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
                 </button>
@@ -1082,9 +1080,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {/* Academy Subject Pool */}
-            <div className="space-y-2.5 pt-3 border-t border-slate-100">
+            <div className="space-y-2.5 pt-3 border-t border-divider">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-violet-700">
+                <label className="text-xs font-bold text-accent-800">
                   {tr(
                     lang,
                     `학원 후보군 (${state.subjectPool.academy.length}종)`,
@@ -1097,16 +1095,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.academy.map((acName) => (
                   <span
                     key={acName}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-50 text-violet-900 border border-violet-200 text-xs font-bold"
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[11px] font-semibold"
                   >
                     {translateSubject(acName, lang)}
                     <button
                       type="button"
                       onClick={() => handleRemoveAcademySubject(acName)}
-                      className="text-violet-400 hover:text-rose-600"
+                      className="text-accent-600 hover:text-accent-900"
                       aria-label={`${acName} delete`}
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" strokeWidth={2.75} />
                     </button>
                   </span>
                 ))}
@@ -1122,11 +1120,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   )}
                   value={newAcademySubject}
                   onChange={(e) => setNewAcademySubject(e.target.value)}
-                  className="flex-1 h-10 px-3 rounded-xl border border-slate-300 text-xs font-medium text-slate-900"
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-500 focus:outline-none focus:border-accent"
                 />
                 <button
                   type="submit"
-                  className="h-10 px-3.5 rounded-xl bg-violet-600 text-white text-xs font-bold inline-flex items-center gap-1 hover:bg-violet-700 shrink-0"
+                  className="h-9 px-3 rounded-full bg-accent text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-accent-600 shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
                 </button>
@@ -1137,14 +1135,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </section>
 
       {/* SECTION 2: 하루 시간표 표시 시간(시작~종료) 및 학교/학원 기본 시간표 설정 */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
         <button
           type="button"
           onClick={() => toggleSection(2)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+          className="w-full px-3.5 py-3 border-b border-divider flex items-center justify-between text-left"
         >
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 className="text-[13px] font-bold text-ink">
               {tr(
                 lang,
                 '2. 시간표 표시 시간 (시작~종료) 및 기본 시간표 설정',
@@ -1152,7 +1150,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 '2. 时间轴起止时间与每周固定课表设置'
               )}
             </h2>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-600">
               {tr(
                 lang,
                 '일별 타임라인 시작·종료 시각 설정, 초·중·고 교시 프리셋 및 요일별 시간표 편집',
@@ -1162,26 +1160,26 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </p>
           </div>
           {openSections[2] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronUp className="w-4 h-4 text-slate-600 shrink-0" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
           )}
         </button>
 
         {openSections[2] && (
           <div className="p-4 space-y-4">
             {masterFeedback && (
-              <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-900">
+              <div className="p-3 rounded-xl bg-accent-100 border border-accent-300 text-xs font-bold text-accent-900">
                 {masterFeedback}
               </div>
             )}
 
             {/* Daily Timeline Start & End Hour Configuration */}
-            <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 space-y-3">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" />
-                  <span className="text-xs font-bold text-slate-900">
+                  <Clock className="w-4 h-4 text-accent" />
+                  <span className="text-xs font-bold text-ink">
                     {tr(
                       lang,
                       '시간표 하루 시작·종료 시간 설정',
@@ -1190,7 +1188,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     )}
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[11px] font-mono font-bold tabular-nums">
+                <span className="px-2 py-0.5 rounded-full bg-accent text-paper text-[11px] font-mono tabular-nums">
                   {String(timelineStartHour).padStart(2, '0')}:00 ~{' '}
                   {String(timelineEndHour).padStart(2, '0')}:00 ({timelineEndHour - timelineStartHour}h)
                 </span>
@@ -1207,7 +1205,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
+                  <label className="block text-[11px] font-medium text-slate-600">
                     {tr(lang, '하루 시작 시간', 'Start Hour', '开始时间')}
                   </label>
                   <select
@@ -1220,7 +1218,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           : timelineEndHour;
                       handleUpdateTimelineRange(nextStart, adjustedEnd);
                     }}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-mono font-bold text-slate-900 tabular-nums"
+                    className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
                   >
                     {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
                       <option key={h} value={h}>
@@ -1231,7 +1229,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-slate-700">
+                  <label className="block text-[11px] font-medium text-slate-600">
                     {tr(lang, '하루 종료 시간', 'End Hour', '结束时间')}
                   </label>
                   <select
@@ -1240,7 +1238,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       const nextEnd = Number(e.target.value);
                       handleUpdateTimelineRange(timelineStartHour, nextEnd);
                     }}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-mono font-bold text-slate-900 tabular-nums"
+                    className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
                   >
                     {[16, 17, 18, 19, 20, 21, 22, 23, 24]
                       .filter((h) => h >= timelineStartHour + 2)
@@ -1254,14 +1252,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
 
               {/* Quick Presets for Timeline Range */}
-              <div className="grid grid-cols-3 gap-1.5 pt-1">
+              <div className="flex flex-wrap gap-1.5 pt-1">
                 <button
                   type="button"
                   onClick={() => handleUpdateTimelineRange(6, 24)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
+                  className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
                     timelineStartHour === 6 && timelineEndHour === 24
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-ink text-paper border-transparent'
+                      : 'bg-transparent text-ink border-divider hover:bg-slate-100'
                   }`}
                 >
                   {tr(lang, '얼리버드 (06~24시)', 'Early (06-24h)', '早鸟 (06~24时)')}
@@ -1269,10 +1267,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <button
                   type="button"
                   onClick={() => handleUpdateTimelineRange(8, 24)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
+                  className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
                     timelineStartHour === 8 && timelineEndHour === 24
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-ink text-paper border-transparent'
+                      : 'bg-transparent text-ink border-divider hover:bg-slate-100'
                   }`}
                 >
                   {tr(lang, '기본 (08~24시)', 'Default (08-24h)', '默认 (08~24时)')}
@@ -1280,10 +1278,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <button
                   type="button"
                   onClick={() => handleUpdateTimelineRange(8, 22)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
+                  className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
                     timelineStartHour === 8 && timelineEndHour === 22
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-ink text-paper border-transparent'
+                      : 'bg-transparent text-ink border-divider hover:bg-slate-100'
                   }`}
                 >
                   {tr(lang, '표준 (08~22시)', 'Compact (08-22h)', '紧凑 (08~22时)')}
@@ -1292,8 +1290,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {/* School Duration Presets */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-              <span className="block text-xs font-bold text-slate-800">
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-medium text-slate-600">
                 {tr(
                   lang,
                   '교시 시간 자동 세팅 프리셋 (1교시 09:00 시작 기준)',
@@ -1301,13 +1299,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   '课时长度自动预设（以第1节 09:00 开始为准）'
                 )}
               </span>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() =>
                     handleApplySchoolDurationPreset(40, tr(lang, '초등', 'Elementary', '小学'))
                   }
-                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
+                  className="h-[30px] px-3 rounded-full border border-divider text-[11px] font-semibold text-ink hover:bg-sage-100 hover:border-sage-300"
                 >
                   {tr(lang, '초등 (40분)', 'Elem (40m)', '小学 (40分)')}
                 </button>
@@ -1316,7 +1314,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   onClick={() =>
                     handleApplySchoolDurationPreset(45, tr(lang, '중등', 'Middle', '初中'))
                   }
-                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
+                  className="h-[30px] px-3 rounded-full border border-divider text-[11px] font-semibold text-ink hover:bg-sage-100 hover:border-sage-300"
                 >
                   {tr(lang, '중등 (45분)', 'Middle (45m)', '初中 (45分)')}
                 </button>
@@ -1325,7 +1323,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   onClick={() =>
                     handleApplySchoolDurationPreset(50, tr(lang, '고등', 'High', '高中'))
                   }
-                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
+                  className="h-[30px] px-3 rounded-full border border-divider text-[11px] font-semibold text-ink hover:bg-sage-100 hover:border-sage-300"
                 >
                   {tr(lang, '고등 (50분)', 'High (50m)', '高中 (50分)')}
                 </button>
@@ -1333,15 +1331,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {/* Copy Day Timetable Control */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-              <span className="block text-xs font-bold text-slate-800">
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-medium text-slate-600">
                 {tr(lang, '다른 요일 시간표 복사하기', 'Copy Day Schedule', '复制星期课表')}
               </span>
               <div className="flex items-center gap-2">
                 <select
                   value={copySourceDay}
                   onChange={(e) => setCopySourceDay(e.target.value as DayOfWeek)}
-                  className="h-10 px-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800"
+                  className="h-9 px-3 rounded-full border border-divider bg-paper text-xs font-semibold text-ink focus:outline-none focus:border-accent"
                 >
                   {DAYS_OF_WEEK.map((d) => (
                     <option key={d} value={d}>
@@ -1353,7 +1351,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <select
                   value={copyTargetDay}
                   onChange={(e) => setCopyTargetDay(e.target.value as DayOfWeek)}
-                  className="h-10 px-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800"
+                  className="h-9 px-3 rounded-full border border-divider bg-paper text-xs font-semibold text-ink focus:outline-none focus:border-accent"
                 >
                   {DAYS_OF_WEEK.map((d) => (
                     <option key={d} value={d}>
@@ -1364,7 +1362,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <button
                   type="button"
                   onClick={handleCopyDayTimetable}
-                  className="flex-1 h-10 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-slate-800 whitespace-nowrap"
+                  className="flex-1 h-9 px-3 rounded-full border border-divider bg-transparent text-ink text-xs font-semibold inline-flex items-center justify-center gap-1 hover:bg-slate-100 whitespace-nowrap"
                 >
                   <Copy className="w-3.5 h-3.5" /> {tr(lang, '복사 실행', 'Copy', '执行复制')}
                 </button>
@@ -1378,10 +1376,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   key={d}
                   type="button"
                   onClick={() => setSelectedMasterDay(d)}
-                  className={`py-2 rounded-xl text-xs font-bold transition-colors ${
+                  className={`h-[30px] rounded-full text-xs font-bold transition-colors ${
                     selectedMasterDay === d
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-ink text-paper'
+                      : 'bg-paper text-ink hover:bg-slate-200'
                   }`}
                 >
                   {translateDay(d, lang)}
@@ -1392,7 +1390,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             {/* Master School Periods Editor */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-700">
+                <span className="text-xs font-bold text-sage-800">
                   {translateDay(selectedMasterDay, lang)}{' '}
                   {tr(
                     lang,
@@ -1405,14 +1403,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <button
                     type="button"
                     onClick={handleRemoveLastMasterSchoolPeriod}
-                    className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-bold hover:bg-slate-200"
+                    className="h-7 px-2.5 rounded-full border border-divider text-ink text-[11px] font-semibold hover:bg-slate-100"
                   >
                     {tr(lang, '- 교시 삭제', '- Remove', '- 删除末节')}
                   </button>
                   <button
                     type="button"
                     onClick={handleAddMasterSchoolPeriod}
-                    className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-bold hover:bg-indigo-100"
+                    className="h-7 px-2.5 rounded-full bg-sage-100 text-sage-800 text-[11px] font-bold hover:bg-sage-200"
                   >
                     {tr(lang, '+ 교시 추가', '+ Period', '+ 添加课时')}
                   </button>
@@ -1420,7 +1418,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
 
               {currentMasterDayData.school.length === 0 ? (
-                <p className="text-xs text-slate-400 py-2 text-center">
+                <p className="text-[11px] text-slate-500 py-1.5 text-center">
                   {tr(
                     lang,
                     '등록된 정규 교시가 없습니다. [+ 교시 추가]를 눌러 추가하세요.',
@@ -1433,9 +1431,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {currentMasterDayData.school.map((p) => (
                     <div
                       key={p.period}
-                      className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-paper"
                     >
-                      <span className="w-11 text-xs font-mono font-bold text-indigo-700 shrink-0 tabular-nums">
+                      <span className="w-11 text-xs font-mono text-sage-800 shrink-0 tabular-nums">
                         {tr(lang, `${p.period}교시`, `P${p.period}`, `第${p.period}节`)}
                       </span>
                       <input
@@ -1446,7 +1444,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             startTime: e.target.value,
                           })
                         }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                        className="w-24 h-8 px-2 rounded-full border border-divider bg-surface text-xs font-mono text-slate-700 focus:outline-none focus:border-accent"
                       />
                       <span className="text-xs text-slate-400">~</span>
                       <input
@@ -1457,7 +1455,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             endTime: e.target.value,
                           })
                         }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                        className="w-24 h-8 px-2 rounded-full border border-divider bg-surface text-xs font-mono text-slate-700 focus:outline-none focus:border-accent"
                       />
                       <select
                         value={p.subject}
@@ -1466,7 +1464,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             subject: e.target.value,
                           })
                         }
-                        className="flex-1 h-8 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 min-w-0"
+                        className="flex-1 h-8 px-2.5 rounded-full border border-divider bg-surface text-xs font-semibold text-ink min-w-0 focus:outline-none focus:border-accent"
                       >
                         {state.subjectPool.school.map((s) => (
                           <option key={s} value={s}>
@@ -1481,9 +1479,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {/* Master Academy Editor */}
-            <div className="space-y-2 pt-3 border-t border-slate-100">
+            <div className="space-y-2 pt-3 border-t border-divider">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-violet-700">
+                <span className="text-xs font-bold text-accent-800">
                   {translateDay(selectedMasterDay, lang)}{' '}
                   {tr(
                     lang,
@@ -1495,14 +1493,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <button
                   type="button"
                   onClick={handleAddMasterAcademyItem}
-                  className="px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 text-[11px] font-bold hover:bg-violet-100"
+                  className="h-7 px-2.5 rounded-full bg-accent-100 text-accent-800 text-[11px] font-bold hover:bg-accent-200"
                 >
                   {tr(lang, '+ 학원 시간 추가', '+ Add Academy', '+ 添加补习班')}
                 </button>
               </div>
 
               {currentMasterDayData.academy.length === 0 ? (
-                <p className="text-xs text-slate-400 py-2 text-center">
+                <p className="text-[11px] text-slate-500 py-1.5 text-center">
                   {tr(
                     lang,
                     '이 요일에 등록된 기본 학원 일정이 없습니다.',
@@ -1515,7 +1513,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {currentMasterDayData.academy.map((ac) => (
                     <div
                       key={ac.id}
-                      className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-paper"
                     >
                       <input
                         type="time"
@@ -1525,7 +1523,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             startTime: e.target.value,
                           })
                         }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                        className="w-24 h-8 px-2 rounded-full border border-divider bg-surface text-xs font-mono text-slate-700 focus:outline-none focus:border-accent"
                       />
                       <span className="text-xs text-slate-400">~</span>
                       <input
@@ -1536,7 +1534,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             endTime: e.target.value,
                           })
                         }
-                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                        className="w-24 h-8 px-2 rounded-full border border-divider bg-surface text-xs font-mono text-slate-700 focus:outline-none focus:border-accent"
                       />
                       <select
                         value={ac.subject}
@@ -1545,7 +1543,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             subject: e.target.value,
                           })
                         }
-                        className="flex-1 h-8 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 min-w-0"
+                        className="flex-1 h-8 px-2.5 rounded-full border border-divider bg-surface text-xs font-semibold text-ink min-w-0 focus:outline-none focus:border-accent"
                       >
                         {state.subjectPool.academy.map((aName) => (
                           <option key={aName} value={aName}>
@@ -1556,7 +1554,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       <button
                         type="button"
                         onClick={() => handleDeleteMasterAcademyItem(ac.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600"
+                        className="p-1.5 text-slate-500 hover:text-accent-800"
                         aria-label="delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1571,14 +1569,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </section>
 
       {/* SECTION 3: AI 비정형 시간표 이미지 자동 인식 */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
         <button
           type="button"
           onClick={() => toggleSection(3)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+          className="w-full px-3.5 py-3 border-b border-divider flex items-center justify-between text-left"
         >
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 className="text-[13px] font-bold text-ink">
               {tr(
                 lang,
                 '3. AI 비정형 시간표 이미지 자동 인식',
@@ -1586,7 +1584,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 '3. AI 非结构化课表图片自动识别'
               )}
             </h2>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-600">
               {tr(
                 lang,
                 '가정통신문·칠판·손글씨 시간표 사진 분석 후 미리보기 표에서 검수/병합',
@@ -1596,9 +1594,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </p>
           </div>
           {openSections[3] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronUp className="w-4 h-4 text-slate-600 shrink-0" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
           )}
         </button>
 
@@ -1617,7 +1615,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 type="button"
                 disabled={aiLoading}
                 onClick={() => imageInputRef.current?.click()}
-                className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-60 active:scale-98 transition-all"
+                className="w-full min-h-[64px] px-4 py-5 rounded-xl border border-dashed border-accent bg-accent-100 text-accent-900 text-xs font-bold flex items-center justify-center gap-2 hover:bg-accent-200 disabled:opacity-60 active:scale-98 transition-all"
               >
                 {aiLoading ? (
                   <>
@@ -1646,7 +1644,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 type="button"
                 disabled={aiLoading}
                 onClick={handleRunSampleImageDemo}
-                className="w-full min-h-[40px] px-3 py-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-200 disabled:opacity-60"
+                className="w-full min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100 disabled:opacity-60"
               >
                 <Upload className="w-3.5 h-3.5" />
                 {tr(
@@ -1659,7 +1657,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {uploadedPreviewUrl && (
-              <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 p-2">
+              <div className="rounded-xl overflow-hidden bg-paper p-2">
                 <img
                   src={uploadedPreviewUrl}
                   alt="Uploaded Timetable Preview"
@@ -1670,24 +1668,24 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             )}
 
             {aiError && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2 text-xs text-rose-800">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-xl bg-accent-100 border border-accent-300 flex items-start gap-2 text-xs text-accent-900">
+                <AlertCircle className="w-4 h-4 text-accent-800 shrink-0 mt-0.5" />
                 <span>{aiError}</span>
               </div>
             )}
 
             {aiMergeSuccess && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-xs font-bold text-emerald-900">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-xl bg-sage-100 border border-sage-300 flex items-start gap-2 text-xs font-bold text-sage-900">
+                <CheckCircle2 className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
                 <span>{aiMergeSuccess}</span>
               </div>
             )}
 
             {aiPreviewEntries.length > 0 && (
-              <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="space-y-3 pt-2 border-t border-divider">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900">
+                    <h3 className="text-xs font-bold text-ink">
                       {tr(
                         lang,
                         `AI 추출 결과 검수 표 (${aiPreviewEntries.length}건)`,
@@ -1701,11 +1699,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </div>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                <div className="max-h-72 overflow-y-auto border border-divider rounded-xl divide-y divide-divider">
                   {aiPreviewEntries.map((entry) => (
                     <div
                       key={entry.id}
-                      className="p-2.5 bg-white flex items-center gap-1.5 flex-wrap text-xs"
+                      className="p-2.5 bg-paper flex items-center gap-1.5 flex-wrap text-xs"
                     >
                       <select
                         value={entry.day}
@@ -1714,7 +1712,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             day: e.target.value as DayOfWeek,
                           })
                         }
-                        className="h-8 px-1.5 rounded-lg border border-slate-300 font-bold text-slate-800"
+                        className="h-8 px-2 rounded-full border border-divider bg-surface font-bold text-ink"
                       >
                         {DAYS_OF_WEEK.map((d) => (
                           <option key={d} value={d}>
@@ -1731,10 +1729,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             period: e.target.value === 'academy' ? 0 : 1,
                           })
                         }
-                        className={`h-8 px-2 rounded-lg border font-bold ${
+                        className={`h-8 px-2.5 rounded-full border font-bold ${
                           entry.type === 'school'
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
-                            : 'bg-violet-50 border-violet-200 text-violet-800'
+                            ? 'bg-sage-100 border-sage-300 text-sage-800'
+                            : 'bg-accent-100 border-accent-300 text-accent-800'
                         }`}
                       >
                         <option value="school">{tr(lang, '학교', 'School', '学校')}</option>
@@ -1752,7 +1750,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                               period: Number(e.target.value) || 1,
                             })
                           }
-                          className="w-12 h-8 px-1.5 rounded-lg border border-slate-300 text-center font-mono font-bold"
+                          className="w-12 h-8 px-1.5 rounded-full border border-divider bg-surface text-center font-mono"
                           title="교시"
                         />
                       )}
@@ -1765,7 +1763,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             startTime: e.target.value,
                           })
                         }
-                        className="w-22 h-8 px-1 rounded-lg border border-slate-300 font-mono"
+                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
                       />
                       <span className="text-slate-400">~</span>
                       <input
@@ -1776,7 +1774,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             endTime: e.target.value,
                           })
                         }
-                        className="w-22 h-8 px-1 rounded-lg border border-slate-300 font-mono"
+                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
                       />
 
                       <input
@@ -1787,13 +1785,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             subject: e.target.value,
                           })
                         }
-                        className="flex-1 min-w-[90px] h-8 px-2 rounded-lg border border-slate-300 font-bold text-slate-900"
+                        className="flex-1 min-w-[90px] h-8 px-2.5 rounded-full border border-divider bg-surface font-bold text-ink focus:outline-none focus:border-accent"
                       />
 
                       <button
                         type="button"
                         onClick={() => handleDeletePreviewEntry(entry.id)}
-                        className="p-1 text-slate-400 hover:text-rose-600"
+                        className="p-1 text-slate-500 hover:text-accent-800"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1804,7 +1802,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <button
                   type="button"
                   onClick={handleMergeAiPreviewToMaster}
-                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-700"
+                  className="w-full min-h-[40px] py-2 px-4 rounded-full bg-accent text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-600"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   {tr(
@@ -1821,14 +1819,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </section>
 
       {/* SECTION 4: 데이터 백업(내보내기) 및 복원(불러오기) */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
         <button
           type="button"
           onClick={() => toggleSection(4)}
-          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+          className="w-full px-3.5 py-3 border-b border-divider flex items-center justify-between text-left"
         >
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 className="text-[13px] font-bold text-ink">
               {tr(
                 lang,
                 '4. 데이터 백업(내보내기) 및 복원(불러오기)',
@@ -1836,7 +1834,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 '4. 数据备份（导出）与恢复（导入）'
               )}
             </h2>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-600">
               {tr(
                 lang,
                 '스마트폰 교체나 브라우저 초기화에 대비해 전체 플래너 상태를 파일로 보관',
@@ -1846,19 +1844,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </p>
           </div>
           {openSections[4] ? (
-            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronUp className="w-4 h-4 text-slate-600 shrink-0" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
           )}
         </button>
 
         {openSections[4] && (
           <div className="p-4 space-y-4">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">
+            <div className="px-0.5 flex items-center justify-between">
+              <span className="text-xs text-slate-600">
                 {tr(lang, '마지막 백업 일시', 'Last Backup Date', '上次备份时间')}
               </span>
-              <span className="text-xs font-mono font-bold text-indigo-700 tabular-nums">
+              <span className="text-xs font-mono text-ink tabular-nums">
                 {state.backupMeta.lastBackupDate ||
                   tr(lang, '백업 기록 없음', 'Never backed up', '暂无备份记录')}
               </span>
@@ -1868,14 +1866,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div
                 className={`p-3 rounded-xl border text-xs font-bold flex items-start gap-2 ${
                   backupFeedback.type === 'success'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                    ? 'bg-sage-100 border-sage-300 text-sage-900'
+                    : 'bg-accent-100 border-accent-300 text-accent-900'
                 }`}
               >
                 {backupFeedback.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-accent-800 shrink-0 mt-0.5" />
                 )}
                 <span>{backupFeedback.message}</span>
               </div>
@@ -1893,7 +1891,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <button
                 type="button"
                 onClick={handleExportBackupJson}
-                className="min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-800"
+                className="min-h-[40px] px-3 py-2 rounded-full bg-accent text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-600"
               >
                 <Download className="w-4 h-4" />
                 {tr(lang, '데이터 내보내기 (저장)', 'Export Backup (.json)', '导出备份文件')}
@@ -1902,14 +1900,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <button
                 type="button"
                 onClick={() => restoreFileInputRef.current?.click()}
-                className="min-h-[46px] px-3 py-2.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100"
+                className="min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100"
               >
                 <FileUp className="w-4 h-4" />
                 {tr(lang, '데이터 불러오기 (복원)', 'Import Backup (.json)', '导入恢复数据')}
               </button>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 flex justify-end">
+            <div className="flex">
               <button
                 type="button"
                 onClick={() => {
@@ -1924,7 +1922,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     ),
                   });
                 }}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-700"
+                className="w-full h-10 rounded-full border border-accent-300 bg-accent-100 text-accent-900 inline-flex items-center justify-center gap-1 text-xs font-semibold hover:bg-accent-200"
               >
                 <RotateCcw className="w-3 h-3" />
                 {tr(
@@ -1940,14 +1938,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </section>
 
       {/* SECTION 5: 홈 화면 위젯 미리보기 (Android Home Screen Widget Preview) */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-2">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+        <div className="px-3.5 py-3 border-b border-divider flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-full bg-accent-100 text-accent-700 flex items-center justify-center shrink-0">
               <Smartphone className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900">
+              <h2 className="text-[13px] font-bold text-ink">
                 {tr(
                   lang,
                   '홈 화면 위젯 미리보기',
@@ -1955,7 +1953,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   '主屏幕小组件预览'
                 )}
               </h2>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-600">
                 {tr(
                   lang,
                   '오늘의 학교·학원 시간표 및 일정 요약 위젯 (자동 동기화됨)',
@@ -1967,29 +1965,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
 
           {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) */}
-          <div className="inline-flex rounded-xl bg-slate-200/80 p-0.5 shrink-0">
+          <div className="inline-flex rounded-full border border-divider overflow-hidden shrink-0">
             <button
               type="button"
               onClick={() => setWidgetTheme('light')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
+              className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
                 widgetTheme === 'light'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-accent text-paper'
+                  : 'text-ink hover:bg-slate-100'
               }`}
             >
-              <Sun className="w-3 h-3 text-amber-500" />
+              <Sun className="w-3 h-3" />
               {tr(lang, '밝은 테마', 'Light', '浅色')}
             </button>
             <button
               type="button"
               onClick={() => setWidgetTheme('dark')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
+              className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
                 widgetTheme === 'dark'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-accent text-paper'
+                  : 'text-ink hover:bg-slate-100'
               }`}
             >
-              <Moon className="w-3 h-3 text-indigo-400" />
+              <Moon className="w-3 h-3" />
               {tr(lang, '어두운 테마', 'Dark', '深色')}
             </button>
           </div>
@@ -2000,22 +1998,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <div
             className={`p-3.5 rounded-2xl border transition-colors ${
               widgetTheme === 'dark'
-                ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 border-slate-700'
-                : 'bg-gradient-to-br from-indigo-50/70 via-slate-100 to-violet-50/70 border-slate-200/90'
+                ? 'bg-slate-800 border-transparent'
+                : 'bg-slate-200/60 border-transparent'
             }`}
           >
             {/* 실제 안드로이드 위젯 카드 UI */}
             <div
               className={`rounded-2xl p-3.5 shadow-md border transition-all ${
                 widgetTheme === 'dark'
-                  ? 'bg-slate-900/90 border-slate-700/90 text-slate-100'
-                  : 'bg-white/95 border-white text-slate-900'
+                  ? 'bg-slate-900 border-transparent text-slate-100'
+                  : 'bg-paper border-divider text-ink'
               }`}
             >
               {/* 위젯 상단 헤더 */}
               <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200/20">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                   <span className="text-xs font-extrabold tracking-tight">
                     {tr(
                       lang,
@@ -2026,10 +2024,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </span>
                 </div>
                 <span
-                  className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
                     widgetTheme === 'dark'
-                      ? 'bg-slate-800 text-indigo-300'
-                      : 'bg-indigo-50 text-indigo-700'
+                      ? 'bg-slate-800 text-slate-200'
+                      : 'bg-surface text-slate-700'
                   }`}
                 >
                   {widgetPayload.date} ({translateDay(widgetPayload.dayOfWeek, lang)})
@@ -2042,21 +2040,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <div
                   className={`p-2.5 rounded-xl border ${
                     widgetTheme === 'dark'
-                      ? 'bg-slate-800/70 border-slate-700/80'
-                      : 'bg-indigo-50/50 border-indigo-100'
+                      ? 'bg-slate-800 border-transparent'
+                      : 'bg-sage-100 border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span
                       className={`text-[11px] font-extrabold ${
-                        widgetTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-800'
+                        widgetTheme === 'dark' ? 'text-sage-300' : 'text-sage-800'
                       }`}
                     >
                       {tr(lang, '학교 수업', 'School', '学校课程')}
                     </span>
                     <span
                       className={`text-[10px] font-mono font-bold ${
-                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-indigo-600'
+                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-sage-700'
                       }`}
                     >
                       {activeSchoolClasses.length}
@@ -2095,7 +2093,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       {activeSchoolClasses.length > 4 && (
                         <div
                           className={`text-[10px] font-semibold text-right pt-0.5 ${
-                            widgetTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'
+                            widgetTheme === 'dark' ? 'text-sage-300' : 'text-sage-700'
                           }`}
                         >
                           +{activeSchoolClasses.length - 4}
@@ -2110,21 +2108,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <div
                   className={`p-2.5 rounded-xl border ${
                     widgetTheme === 'dark'
-                      ? 'bg-slate-800/70 border-slate-700/80'
-                      : 'bg-violet-50/50 border-violet-100'
+                      ? 'bg-slate-800 border-transparent'
+                      : 'bg-accent-100 border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span
                       className={`text-[11px] font-extrabold ${
-                        widgetTheme === 'dark' ? 'text-violet-300' : 'text-violet-800'
+                        widgetTheme === 'dark' ? 'text-accent-300' : 'text-accent-800'
                       }`}
                     >
                       {tr(lang, '학원 일정', 'Academy', '补习班')}
                     </span>
                     <span
                       className={`text-[10px] font-mono font-bold ${
-                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-violet-600'
+                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-accent-700'
                       }`}
                     >
                       {activeAcademyClasses.length}
@@ -2159,7 +2157,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       {activeAcademyClasses.length > 3 && (
                         <div
                           className={`text-[10px] font-semibold text-right pt-0.5 ${
-                            widgetTheme === 'dark' ? 'text-violet-300' : 'text-violet-600'
+                            widgetTheme === 'dark' ? 'text-accent-300' : 'text-accent-700'
                           }`}
                         >
                           +{activeAcademyClasses.length - 3}
@@ -2174,15 +2172,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               {/* 오늘의 주요 일정 요약 바 */}
               <div
                 className={`mt-2.5 pt-2 border-t flex items-center justify-between gap-2 text-[11px] ${
-                  widgetTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
+                  widgetTheme === 'dark' ? 'border-slate-700' : 'border-divider'
                 }`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span
-                    className={`px-1.5 py-0.5 rounded font-bold text-[10px] shrink-0 ${
+                    className={`px-1.5 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${
                       widgetTheme === 'dark'
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : 'bg-amber-100 text-amber-800'
+                        ? 'bg-accent/20 text-accent-300'
+                        : 'bg-accent-100 text-accent-800'
                     }`}
                   >
                     {tr(lang, '오늘 일정', 'Events', '今日日程')}
@@ -2201,7 +2199,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </span>
                 </div>
                 {widgetPayload.attendanceSummary.pendingMakeupCount > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 font-bold text-[10px] shrink-0">
+                  <span className="px-1.5 py-0.5 rounded-full bg-accent-100 text-accent-900 font-bold text-[10px] shrink-0">
                     {tr(
                       lang,
                       `보강 ${widgetPayload.attendanceSummary.pendingMakeupCount}건`,
@@ -2216,7 +2214,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
           {/* 위젯 브릿지 동기화 상태 및 수동 새로고침 버튼 */}
           <div className="flex items-center justify-between gap-2 pt-1">
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] text-slate-600">
               {widgetSyncToast ||
                 tr(
                   lang,
@@ -2239,7 +2237,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 );
                 setTimeout(() => setWidgetSyncToast(null), 2500);
               }}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold shrink-0 transition-colors"
+              className="h-9 px-3 rounded-full border border-divider bg-transparent hover:bg-slate-100 text-ink text-xs font-semibold shrink-0 transition-colors"
             >
               {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
             </button>

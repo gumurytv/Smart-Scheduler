@@ -29,7 +29,7 @@ function renderHighlightedText(text: string, keyword: string): React.ReactNode {
     part.toLowerCase() === keyword.toLowerCase() ? (
       <mark
         key={idx}
-        className="bg-yellow-200 text-slate-950 font-semibold px-0.5 rounded-xs"
+        className="bg-accent-200 text-accent-900 font-semibold px-0.5 rounded-xs"
       >
         {part}
       </mark>
@@ -133,9 +133,9 @@ export const MemoTab: React.FC<MemoTabProps> = ({
   return (
     <div className="space-y-4">
       {/* 1. TOP REAL-TIME KEYWORD SEARCH BAR */}
-      <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs">
+      <div className="bg-surface rounded-2xl p-2.5 shadow-xs">
         <div className="relative flex items-center">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+          <Search strokeWidth={2.75} className="w-4 h-4 text-slate-600 absolute left-3.5 pointer-events-none" />
           <input
             type="text"
             placeholder={tr(
@@ -146,16 +146,16 @@ export const MemoTab: React.FC<MemoTabProps> = ({
             )}
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            className="w-full h-11 pl-10 pr-9 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500"
+            className="w-full h-[42px] pl-10 pr-10 rounded-full bg-paper border border-divider text-[13px] text-ink placeholder:text-slate-500 focus:outline-none focus:border-accent"
           />
           {searchKeyword && (
             <button
               type="button"
               onClick={() => setSearchKeyword('')}
-              className="w-7 h-7 rounded-full bg-slate-200/80 text-slate-600 flex items-center justify-center absolute right-2 hover:bg-slate-300"
+              className="w-[26px] h-[26px] rounded-full bg-slate-300 text-ink flex items-center justify-center absolute right-2 hover:bg-slate-400"
               aria-label="Clear search"
             >
-              <X className="w-3.5 h-3.5" />
+              <X strokeWidth={3} className="w-3 h-3" />
             </button>
           )}
         </div>
@@ -163,9 +163,9 @@ export const MemoTab: React.FC<MemoTabProps> = ({
 
       {/* IF SEARCHING: SHOW FILTERED HIGHLIGHTED CARDS */}
       {searchKeyword.trim().length > 0 && (
-        <section className="bg-amber-50/60 rounded-2xl p-4 border border-amber-200 space-y-3">
+        <section className="bg-accent-100 rounded-2xl p-3.5 border border-accent-300 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-950">
+            <span className="text-xs font-bold text-accent-900">
               &lsquo;{searchKeyword}&rsquo;{' '}
               {tr(
                 lang,
@@ -177,14 +177,14 @@ export const MemoTab: React.FC<MemoTabProps> = ({
             <button
               type="button"
               onClick={() => setSearchKeyword('')}
-              className="text-xs font-semibold text-amber-800 underline"
+              className="text-[11px] font-semibold text-accent-800 underline"
             >
               {tr(lang, '검색 닫기', 'Close', '关闭搜索')}
             </button>
           </div>
 
           {searchResults.length === 0 ? (
-            <div className="p-6 bg-white rounded-xl border border-amber-100 text-center text-xs text-slate-500">
+            <div className="p-5 bg-paper rounded-xl text-center text-xs text-slate-600">
               {tr(
                 lang,
                 '일치하는 키워드가 포함된 메모가 없습니다.',
@@ -193,7 +193,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
               )}
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {searchResults.map((item) => (
                 <button
                   key={item.dateStr}
@@ -202,17 +202,17 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                     setSelectedDateStr(item.dateStr);
                     setSearchKeyword('');
                   }}
-                  className="w-full p-3.5 rounded-xl bg-white border border-amber-200/90 text-left hover:border-amber-400 transition-colors space-y-1.5 shadow-2xs"
+                  className="w-full p-3 rounded-xl bg-paper border border-accent-200 text-left hover:border-accent-400 transition-colors space-y-1"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-700 font-mono tabular-nums">
+                    <span className="text-xs text-accent-700 font-mono tabular-nums">
                       {item.dateStr} ({translateDay(item.dayLabel, lang)})
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                    <span className="text-[11px] font-mono text-slate-500 tabular-nums">
                       {item.updatedAt}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-xs text-ink whitespace-pre-wrap leading-normal">
                     {renderHighlightedText(item.content, searchKeyword)}
                   </p>
                 </button>
@@ -223,17 +223,17 @@ export const MemoTab: React.FC<MemoTabProps> = ({
       )}
 
       {/* 2. DATE NAVIGATION + IMMEDIATE DAILY MEMO EDITOR */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="p-3.5 bg-slate-50/70 border-b border-slate-100 space-y-2.5">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+        <div className="px-3.5 py-3 border-b border-divider space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => handleStepDate(-1)}
-                className="w-9 h-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-transform"
+                className="w-[34px] h-[34px] rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100 active:scale-95 transition-transform"
                 aria-label="Prev Day"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft strokeWidth={2.75} className="w-3.5 h-3.5" />
               </button>
 
               <input
@@ -242,26 +242,26 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                 onChange={(e) => {
                   if (e.target.value) setSelectedDateStr(e.target.value);
                 }}
-                className="h-9 px-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono font-bold text-slate-900 tabular-nums"
+                className="h-[34px] px-3 rounded-full border border-divider bg-paper text-xs font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
               />
 
               <button
                 type="button"
                 onClick={() => handleStepDate(1)}
-                className="w-9 h-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-transform"
+                className="w-[34px] h-[34px] rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100 active:scale-95 transition-transform"
                 aria-label="Next Day"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight strokeWidth={2.75} className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <button
               type="button"
               onClick={handleGoToday}
-              className={`px-3 h-9 rounded-xl text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-3 h-[34px] rounded-full text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                 selectedDateStr === todayStr
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                  ? 'bg-accent text-paper'
+                  : 'bg-accent-100 text-accent-800 hover:bg-accent-200'
               }`}
             >
               {tr(lang, '오늘로 이동', 'Go Today', '回到今天')}
@@ -270,28 +270,28 @@ export const MemoTab: React.FC<MemoTabProps> = ({
 
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
-              <StickyNote className="w-4 h-4 text-indigo-600" />
-              <span className="text-xs font-bold text-slate-900 tabular-nums">
+              <StickyNote strokeWidth={2.75} className="w-4 h-4 text-accent" />
+              <span className="text-xs font-bold text-ink tabular-nums">
                 {selectedDateStr} ({translateDay(getDayOfWeekKor(selectedDateObj), lang)}){' '}
                 {tr(lang, '일일 메모', 'Daily Memo', '每日备忘')}
               </span>
               {selectedDateStr === todayStr && (
-                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-800 rounded">
+                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-accent-200 text-accent-900 rounded-full">
                   TODAY
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
+            <div className="flex items-center gap-1 text-[11px] text-sage-700 font-medium">
               {currentUpdatedAt ? (
-                <span className="inline-flex items-center gap-1 font-mono tabular-nums text-slate-500">
-                  <Check className="w-3 h-3 text-emerald-600" />
+                <span className="inline-flex items-center gap-1 font-mono tabular-nums text-sage-700">
+                  <Check strokeWidth={2.75} className="w-3 h-3 text-sage" />
                   {saveFeedback
                     ? tr(lang, '자동 저장됨', 'Auto-saved', '已自动保存')
                     : `${currentUpdatedAt.slice(5)}`}
                 </span>
               ) : (
-                <span className="text-slate-400">
+                <span className="text-slate-500">
                   {tr(lang, '타이핑 즉시 자동 저장', 'Instant auto-save', '输入实时自动保存')}
                 </span>
               )}
@@ -300,7 +300,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
         </div>
 
         {/* Immediate Textarea Editor */}
-        <div className="p-4 space-y-3">
+        <div className="p-3.5 space-y-2">
           <textarea
             rows={8}
             value={displayedCurrentMemo}
@@ -311,10 +311,10 @@ export const MemoTab: React.FC<MemoTabProps> = ({
               `Write homework, reminders, or class notes for ${selectedDateStr}. Saved automatically to your device.`,
               `在此输入 ${selectedDateStr} 的作业、待办事项或课堂重点，输入后立即自动保存至本地设备。`
             )}
-            className="w-full p-3.5 rounded-2xl bg-amber-50/30 border border-slate-200 text-sm text-slate-900 leading-relaxed placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 resize-y"
+            className="w-full p-3 rounded-xl bg-paper border border-divider text-[13px] text-ink leading-relaxed placeholder:text-slate-500 focus:outline-none focus:border-accent resize-y"
           />
 
-          <div className="flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center justify-between text-[11px] text-slate-600">
             <span className="font-mono tabular-nums">
               {displayedCurrentMemo.length}{' '}
               {tr(lang, '자 작성됨', 'chars', '字')}
@@ -323,7 +323,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
               <button
                 type="button"
                 onClick={handleClearCurrentMemo}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent-800 hover:text-accent-900"
               >
                 <Trash2 className="w-3.5 h-3.5" />{' '}
                 {tr(lang, '이 날짜 메모 비우기', 'Clear Memo', '清空该日备忘')}
@@ -334,11 +334,11 @@ export const MemoTab: React.FC<MemoTabProps> = ({
       </section>
 
       {/* 3. RECENT MEMO TIMELINE LIST */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+        <div className="px-3.5 py-3 border-b border-divider flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-indigo-600" />
-            <h3 className="text-sm font-bold text-slate-900">
+            <Clock strokeWidth={2.75} className="w-4 h-4 text-accent" />
+            <h3 className="text-[13px] font-bold text-ink">
               {tr(
                 lang,
                 `최근 작성된 메모 타임라인 (${memoTimeline.length}건)`,
@@ -347,13 +347,13 @@ export const MemoTab: React.FC<MemoTabProps> = ({
               )}
             </h3>
           </div>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-slate-600">
             {tr(lang, '터치 시 해당 날짜로 이동', 'Tap to open date', '点击跳转至该日期')}
           </span>
         </div>
 
         {memoTimeline.length === 0 ? (
-          <div className="p-7 text-center text-xs text-slate-400">
+          <div className="p-7 text-center text-xs text-slate-500">
             {tr(
               lang,
               '작성된 메모가 없습니다. 위 메모장에 오늘의 할 일을 적어보세요.',
@@ -362,7 +362,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
             )}
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-divider">
             {memoTimeline.map((item) => {
               const isSelected = item.dateStr === selectedDateStr;
               return (
@@ -370,31 +370,31 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                   key={item.dateStr}
                   type="button"
                   onClick={() => setSelectedDateStr(item.dateStr)}
-                  className={`w-full p-4 text-left transition-colors space-y-1.5 ${
-                    isSelected ? 'bg-indigo-50/60' : 'hover:bg-slate-50'
+                  className={`w-full px-3.5 py-3 text-left transition-colors space-y-1 ${
+                    isSelected ? 'bg-accent-100' : 'hover:bg-slate-100/60'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-900 font-mono tabular-nums">
+                      <span className="text-xs text-ink font-mono tabular-nums">
                         {item.dateStr} ({translateDay(item.dayLabel, lang)})
                       </span>
                       {item.isToday && (
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-600 text-white">
+                        <span className="px-1.5 py-px rounded-full text-[9px] font-bold bg-accent text-paper">
                           {tr(lang, '오늘', 'TODAY', '今天')}
                         </span>
                       )}
                       {isSelected && (
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-200 text-slate-700">
+                        <span className="px-1.5 py-px rounded-full text-[9px] font-semibold bg-slate-300 text-slate-800">
                           {tr(lang, '열람 중', 'Viewing', '当前查看')}
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                    <span className="text-[11px] font-mono text-slate-500 tabular-nums">
                       {item.updatedAt}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 line-clamp-2 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-xs text-slate-700 line-clamp-2 whitespace-pre-wrap leading-normal">
                     {renderHighlightedText(item.content, searchKeyword)}
                   </p>
                 </button>

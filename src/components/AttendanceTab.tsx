@@ -56,32 +56,32 @@ const STATUS_META: Record<
     ko: '출석',
     en: 'Present',
     zh: '出勤',
-    barColor: 'bg-emerald-500',
-    btnActive: 'bg-emerald-600 text-white border-emerald-600',
-    badgeClass: 'bg-emerald-100 text-emerald-800',
+    barColor: 'bg-sage',
+    btnActive: 'bg-sage text-paper border-transparent',
+    badgeClass: 'bg-sage-100 text-sage-800',
   },
   late: {
     ko: '지각',
     en: 'Late',
     zh: '迟到',
-    barColor: 'bg-amber-400',
-    btnActive: 'bg-amber-500 text-white border-amber-500',
-    badgeClass: 'bg-amber-100 text-amber-900',
+    barColor: 'bg-accent-300',
+    btnActive: 'bg-accent-300 text-accent-900 border-transparent',
+    badgeClass: 'bg-accent-300 text-accent-900',
   },
   absent: {
     ko: '결석',
     en: 'Absent',
     zh: '缺席',
-    barColor: 'bg-rose-500',
-    btnActive: 'bg-rose-600 text-white border-rose-600',
-    badgeClass: 'bg-rose-100 text-rose-800',
+    barColor: 'bg-accent-800',
+    btnActive: 'bg-accent-800 text-paper border-transparent',
+    badgeClass: 'bg-accent-800 text-accent-100',
   },
   cancelled: {
     ko: '공식휴강',
     en: 'Official Off',
     zh: '官方停课',
     barColor: 'bg-slate-400',
-    btnActive: 'bg-slate-600 text-white border-slate-600',
+    btnActive: 'bg-slate-400 text-ink border-transparent',
     badgeClass: 'bg-slate-200 text-slate-700',
   },
 };
@@ -498,10 +498,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   return (
     <div className="space-y-3.5">
       {/* 1. TOP ATTENDANCE RATE DASHBOARD */}
-      <section className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs space-y-3">
+      <section className="bg-surface rounded-2xl p-3.5 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">{monthHeaderTitle}</h2>
+            <h2 className="text-[13px] font-bold text-slate-900">{monthHeaderTitle}</h2>
             <p className="text-[11px] text-slate-500">
               {tr(
                 lang,
@@ -520,7 +520,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   new Date(cursorMonth.getFullYear(), cursorMonth.getMonth() - 1, 1)
                 )
               }
-              className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+              className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100"
               aria-label="Prev Month"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -532,7 +532,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 setCursorMonth(new Date(now.getFullYear(), now.getMonth(), 1));
                 setSelectedDateStr(formatDateKey(now));
               }}
-              className="px-2 h-7 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold hover:bg-slate-200"
+              className="px-2.5 h-8 rounded-full bg-accent-100 text-accent-800 text-[11px] font-semibold whitespace-nowrap shrink-0 hover:bg-accent-300/60"
             >
               {tr(lang, '이번달', 'This Mo', '本月')}
             </button>
@@ -543,7 +543,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   new Date(cursorMonth.getFullYear(), cursorMonth.getMonth() + 1, 1)
                 )
               }
-              className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+              className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100"
               aria-label="Next Month"
             >
               <ChevronRight className="w-4 h-4" />
@@ -552,25 +552,25 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         </div>
 
         {/* School Attendance Rate Compact Card */}
-        <div className="p-3 rounded-xl bg-indigo-50/40 border border-indigo-200/70 space-y-1.5">
+        <div className="px-3.5 py-3 rounded-xl bg-sage-100 space-y-1.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <GraduationCap className="w-4 h-4 text-indigo-600" />
-              <span className="text-xs font-bold text-slate-900">
+              <GraduationCap className="w-4 h-4 text-sage-800" />
+              <span className="text-xs font-bold text-sage-900">
                 {tr(lang, '학교 실질 출석률', 'School Real Attendance', '学校实际出勤率')}
               </span>
             </div>
-            <span className="text-base font-bold text-indigo-600 font-mono tabular-nums">
+            <span className="text-[34px] leading-none text-sage-800 font-mono tabular-nums">
               {monthlyStats.school.rate}%
             </span>
           </div>
-          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-paper/70 rounded-full overflow-hidden">
             <div
-              className="h-full bg-indigo-600 rounded-full transition-all duration-300"
+              className="h-full bg-sage rounded-full transition-all duration-300"
               style={{ width: `${Math.min(100, monthlyStats.school.rate)}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-600 font-mono tabular-nums">
+          <div className="flex items-center justify-between text-[11px] text-sage-800 font-mono tabular-nums">
             <span>
               {tr(
                 lang,
@@ -598,7 +598,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               )}
             </span>
             <span>·</span>
-            <span className="text-slate-400">
+            <span className="text-sage-800/70">
               {tr(
                 lang,
                 `휴강 ${monthlyStats.school.cancelled}회(제외)`,
@@ -626,7 +626,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 {tr(lang, '(터치하여 상세 보기)', '(Tap for details)', '(点击查看详情)')}
               </span>
             </div>
-            <span className="px-2 py-0.5 rounded-md bg-violet-100 text-violet-800 text-[11px] font-mono font-bold tabular-nums">
+            <span className="px-2.5 py-0.5 rounded-full bg-accent-100 text-accent-800 text-[11px] font-mono font-bold tabular-nums">
               {tr(
                 lang,
                 `전체 평균 ${monthlyStats.academyTotal.rate}%`,
@@ -637,7 +637,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           </div>
 
           {monthlyStats.perAcademyStats.length === 0 ? (
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-center text-xs text-slate-500">
+            <div className="p-3 rounded-xl bg-paper text-center text-xs text-slate-500">
               {tr(
                 lang,
                 '등록된 학원이 없습니다. [설정]에서 학원 후보군을 추가하세요.',
@@ -658,10 +658,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     stats.totalRecorded === 0
                       ? 'text-slate-400'
                       : stats.rate < 75
-                      ? 'text-rose-600'
+                      ? 'text-accent-800'
                       : stats.rate < 90
-                      ? 'text-amber-600'
-                      : 'text-violet-700';
+                      ? 'text-accent-600'
+                      : 'text-slate-900';
 
                   return (
                     <button
@@ -674,18 +674,18 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       }
                       className={`px-3 py-2 rounded-xl border flex items-center justify-between gap-1.5 text-left transition-all ${
                         isSelected
-                          ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
+                          ? 'bg-accent-100 text-accent-900 border-accent'
                           : isLowRate
-                          ? 'bg-rose-50/60 border-rose-200/90 hover:border-rose-300'
+                          ? 'bg-paper border-accent-800/40 hover:border-accent-800'
                           : isWarningRate
-                          ? 'bg-amber-50/40 border-amber-200/80 hover:border-amber-300'
-                          : 'bg-slate-50 border-slate-200/80 hover:border-violet-300'
+                          ? 'bg-paper border-accent-300 hover:border-accent'
+                          : 'bg-paper border-transparent hover:border-divider'
                       }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span
                           className={`text-xs font-bold truncate ${
-                            isSelected ? 'text-white' : 'text-slate-900'
+                            isSelected ? 'text-accent-900' : 'text-slate-900'
                           }`}
                         >
                           {translateSubject(academyName, lang)}
@@ -693,7 +693,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         {pendingMakeupCount > 0 && (
                           <span
                             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                              isSelected ? 'bg-amber-300' : 'bg-amber-500'
+                              isSelected ? 'bg-accent-800' : 'bg-accent'
                             }`}
                             title={`Pending Makeup: ${pendingMakeupCount}`}
                           />
@@ -703,13 +703,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       <div className="flex items-center gap-1 shrink-0">
                         <span
                           className={`text-xs font-mono font-bold tabular-nums ${
-                            isSelected ? 'text-white' : rateColorClass
+                            isSelected ? 'text-accent-900' : rateColorClass
                           }`}
                         >
                           {stats.totalRecorded === 0 ? '-' : `${stats.rate}%`}
                         </span>
                         {isSelected ? (
-                          <ChevronUp className="w-3.5 h-3.5 text-violet-200" />
+                          <ChevronUp className="w-3.5 h-3.5 text-accent-700" />
                         ) : (
                           <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                         )}
@@ -723,7 +723,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
           {/* EXPANDED DETAIL PANEL WHEN AN ACADEMY IS CLICKED */}
           {activeAcademyDetailObj && (
-            <div className="mt-2 p-3.5 rounded-2xl bg-slate-50 border-2 border-violet-500/80 space-y-3 animate-in fade-in duration-150">
+            <div className="mt-2 p-3 rounded-xl bg-paper space-y-3 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-slate-900">
@@ -731,12 +731,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     {tr(lang, '상세 출결 리포트', 'Attendance Report', '详细出勤报告')}
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold tabular-nums ${
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold tabular-nums ${
                       activeAcademyDetailObj.stats.rate < 75
-                        ? 'bg-rose-100 text-rose-700'
+                        ? 'bg-accent-800 text-accent-100'
                         : activeAcademyDetailObj.stats.rate < 90
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-violet-100 text-violet-800'
+                        ? 'bg-accent-300 text-accent-900'
+                        : 'bg-accent-100 text-accent-800'
                     }`}
                   >
                     {tr(lang, '출석률', 'Rate', '出勤率')} {activeAcademyDetailObj.stats.rate}%
@@ -745,7 +745,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedAcademyDetail(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60"
+                  className="p-1 rounded-full text-slate-500 hover:text-ink hover:bg-slate-200/60"
                   aria-label="Close"
                 >
                   <X className="w-4 h-4" />
@@ -754,11 +754,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
               {/* 1) Concrete Counts Grid: 출석횟수 / 지각횟수 / 결석횟수 (+ 공식휴강) */}
               <div className="grid grid-cols-4 gap-1.5 text-center">
-                <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                <div className="p-2 rounded bg-surface">
                   <div className="text-[10px] font-semibold text-slate-500">
                     {tr(lang, '출석 횟수', 'Present', '出勤次数')}
                   </div>
-                  <div className="text-sm font-bold font-mono text-emerald-600 tabular-nums mt-0.5">
+                  <div className="text-base font-mono text-sage-800 tabular-nums mt-0.5">
                     {tr(
                       lang,
                       `${activeAcademyDetailObj.stats.present}회`,
@@ -767,11 +767,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     )}
                   </div>
                 </div>
-                <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                <div className="p-2 rounded bg-surface">
                   <div className="text-[10px] font-semibold text-slate-500">
                     {tr(lang, '지각 횟수', 'Late', '迟到次数')}
                   </div>
-                  <div className="text-sm font-bold font-mono text-amber-600 tabular-nums mt-0.5">
+                  <div className="text-base font-mono text-accent-700 tabular-nums mt-0.5">
                     {tr(
                       lang,
                       `${activeAcademyDetailObj.stats.late}회`,
@@ -780,11 +780,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     )}
                   </div>
                 </div>
-                <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                <div className="p-2 rounded bg-surface">
                   <div className="text-[10px] font-semibold text-slate-500">
                     {tr(lang, '결석 횟수', 'Absent', '缺席次数')}
                   </div>
-                  <div className="text-sm font-bold font-mono text-rose-600 tabular-nums mt-0.5">
+                  <div className="text-base font-mono text-accent-800 tabular-nums mt-0.5">
                     {tr(
                       lang,
                       `${activeAcademyDetailObj.stats.absent}회`,
@@ -793,11 +793,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     )}
                   </div>
                 </div>
-                <div className="p-2 rounded-xl bg-white border border-slate-200/80">
+                <div className="p-2 rounded bg-surface">
                   <div className="text-[10px] font-semibold text-slate-400">
                     {tr(lang, '휴강(제외)', 'Off (Excl)', '停课(扣除)')}
                   </div>
-                  <div className="text-sm font-bold font-mono text-slate-500 tabular-nums mt-0.5">
+                  <div className="text-base font-mono text-slate-500 tabular-nums mt-0.5">
                     {tr(
                       lang,
                       `${activeAcademyDetailObj.stats.cancelled}회`,
@@ -811,8 +811,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               {/* 2) Specific Late Days (지각한 날) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-accent-300" />
                     {tr(
                       lang,
                       `지각한 날 (${activeAcademyDetailObj.stats.lateDays.length}일)`,
@@ -822,7 +822,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   </span>
                 </div>
                 {activeAcademyDetailObj.stats.lateDays.length === 0 ? (
-                  <div className="px-3 py-2 rounded-xl bg-white border border-slate-200/70 text-[11px] text-slate-400">
+                  <div className="px-3 py-2 rounded-xl bg-surface text-[11px] text-slate-500">
                     {tr(
                       lang,
                       '이번 달 지각한 날이 없습니다.',
@@ -836,15 +836,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       <div
                         key={item.dateStr}
                         onClick={() => setSelectedDateStr(item.dateStr)}
-                        className="px-3 py-2 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between gap-2 cursor-pointer hover:bg-amber-100/60 transition-colors"
+                        className="px-3 py-2 rounded-xl bg-surface flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-100 transition-colors"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                            <Calendar className="w-3.5 h-3.5 text-accent-700 shrink-0" />
                             <span className="text-xs font-bold font-mono text-slate-900 tabular-nums">
                               {item.shortDateLabel}
                             </span>
-                            <span className="px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-accent-300 text-accent-900 text-[10px] font-bold">
                               {tr(lang, '지각', 'Late', '迟到')}
                             </span>
                           </div>
@@ -855,7 +855,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                             </p>
                           )}
                         </div>
-                        <span className="text-[10px] font-semibold text-amber-800 shrink-0">
+                        <span className="text-[10px] font-semibold text-accent-700 shrink-0">
                           {tr(lang, '날짜 이동 →', 'Jump →', '跳转 →')}
                         </span>
                       </div>
@@ -867,8 +867,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               {/* 3) Specific Absent Days (결석한 날) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-accent-800" />
                     {tr(
                       lang,
                       `결석한 날 (${activeAcademyDetailObj.stats.absentDays.length}일)`,
@@ -878,7 +878,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   </span>
                 </div>
                 {activeAcademyDetailObj.stats.absentDays.length === 0 ? (
-                  <div className="px-3 py-2 rounded-xl bg-white border border-slate-200/70 text-[11px] text-slate-400">
+                  <div className="px-3 py-2 rounded-xl bg-surface text-[11px] text-slate-500">
                     {tr(
                       lang,
                       '이번 달 결석한 날이 없습니다.',
@@ -891,26 +891,26 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     {activeAcademyDetailObj.stats.absentDays.map((item) => (
                       <div
                         key={item.dateStr}
-                        className="px-3 py-2 rounded-xl bg-rose-50/70 border border-rose-200/80 flex items-center justify-between gap-2"
+                        className="px-3 py-2 rounded-xl bg-surface flex items-center justify-between gap-2"
                       >
                         <div
                           onClick={() => setSelectedDateStr(item.dateStr)}
                           className="min-w-0 flex-1 cursor-pointer"
                         >
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <Calendar className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <Calendar className="w-3.5 h-3.5 text-accent-800 shrink-0" />
                             <span className="text-xs font-bold font-mono text-slate-900 tabular-nums">
                               {item.shortDateLabel}
                             </span>
-                            <span className="px-1.5 py-0.5 rounded bg-rose-200/80 text-rose-900 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded-full bg-accent-800 text-accent-100 text-[10px] font-bold">
                               {tr(lang, '결석', 'Absent', '缺席')}
                             </span>
                             {item.record.needsMakeup && (
                               <span
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                   item.record.makeupCompleted
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-amber-100 text-amber-900'
+                                    ? 'bg-sage-100 text-sage-800'
+                                    : 'bg-accent-100 text-accent-800'
                                 }`}
                               >
                                 {item.record.makeupCompleted
@@ -937,7 +937,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                 { makeupCompleted: true }
                               )
                             }
-                            className="px-2 py-1 rounded-lg bg-amber-600 text-white text-[10px] font-bold hover:bg-amber-700 shrink-0 whitespace-nowrap"
+                            className="px-2.5 py-1 rounded-full bg-accent text-paper text-[10px] font-bold hover:bg-accent-600 shrink-0 whitespace-nowrap"
                           >
                             {tr(lang, '보강 완료 체크', 'Mark Done', '完成补课')}
                           </button>
@@ -945,7 +945,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                           <button
                             type="button"
                             onClick={() => setSelectedDateStr(item.dateStr)}
-                            className="text-[10px] font-semibold text-rose-700 shrink-0"
+                            className="text-[10px] font-semibold text-accent-700 shrink-0"
                           >
                             {tr(lang, '날짜 이동 →', 'Jump →', '跳转 →')}
                           </button>
@@ -961,20 +961,20 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
         {/* Pending Makeup Alert Card */}
         <div
-          className={`p-3 rounded-xl border ${
+          className={`p-3 rounded-xl ${
             monthlyStats.pendingMakeups.length > 0
-              ? 'bg-amber-50/90 border-amber-300'
-              : 'bg-emerald-50/70 border-emerald-200'
+              ? 'bg-accent-100 text-accent-900'
+              : 'bg-sage-100 text-sage-900'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {monthlyStats.pendingMakeups.length > 0 ? (
-                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-accent-800 shrink-0" />
               ) : (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-sage-800 shrink-0" />
               )}
-              <span className="text-xs font-bold text-slate-900 tabular-nums">
+              <span className="text-xs font-bold tabular-nums">
                 {tr(
                   lang,
                   `미완료 보강 건수: ${monthlyStats.pendingMakeups.length}건`,
@@ -983,7 +983,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 )}
               </span>
             </div>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] opacity-80 text-right">
               {monthlyStats.pendingMakeups.length > 0
                 ? tr(lang, '보강 완료 시 체크하세요', 'Check off when completed', '补课后请点击完成')
                 : tr(lang, '모든 보강을 완료했습니다', 'All makeups completed!', '已完成所有补课')}
@@ -995,7 +995,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               {monthlyStats.pendingMakeups.map((mk) => (
                 <div
                   key={`${mk.dateStr}-${mk.academyName}`}
-                  className="px-3 py-2 rounded-xl bg-white border border-amber-200 flex items-center justify-between gap-2"
+                  className="px-3 py-2 rounded-xl bg-paper text-ink flex items-center justify-between gap-2"
                 >
                   <div
                     onClick={() => {
@@ -1026,7 +1026,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         makeupCompleted: true,
                       })
                     }
-                    className="px-2.5 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] font-bold hover:bg-amber-700 shrink-0 whitespace-nowrap"
+                    className="h-[30px] px-2.5 rounded-full bg-accent text-paper text-[11px] font-bold hover:bg-accent-600 shrink-0 whitespace-nowrap"
                   >
                     {tr(lang, '보강 완료 체크', 'Complete', '完成补课')}
                   </button>
@@ -1038,8 +1038,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       </section>
 
       {/* 2. MONTHLY INTUITIVE ATTENDANCE CALENDAR */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-divider flex items-center justify-between flex-wrap gap-2">
           <div className="text-xs font-bold text-slate-700">
             {tr(lang, '상단 바: 학교 · 하단 점: ', 'Bar: School · Dots: ', '顶部条：学校 · 底部点：')}
             {selectedAcademyDetail
@@ -1048,15 +1048,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           </div>
           <div className="flex items-center gap-2.5 text-[11px] font-semibold text-slate-600">
             <span className="inline-flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />{' '}
+              <span className="w-2.5 h-2.5 rounded-full bg-sage" />{' '}
               {tr(lang, '출석', 'Pres', '出勤')}
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />{' '}
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-300" />{' '}
               {tr(lang, '지각', 'Late', '迟到')}
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />{' '}
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-800" />{' '}
               {tr(lang, '결석', 'Abs', '缺席')}
             </span>
             <span className="inline-flex items-center gap-1">
@@ -1067,12 +1067,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         </div>
 
         {/* Day of Week Header */}
-        <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/40 text-center">
+        <div className="grid grid-cols-7 border-b border-divider text-center">
           {calendarWeekHeader.map((d, idx) => (
             <div
               key={d}
               className={`py-2 text-[11px] font-bold ${
-                idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-blue-600' : 'text-slate-500'
+                idx === 0 ? 'text-accent-700' : idx === 6 ? 'text-sage-700' : 'text-slate-500'
               }`}
             >
               {d}
@@ -1081,7 +1081,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         </div>
 
         {/* Calendar Cells */}
-        <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
+        <div className="grid grid-cols-7 divide-x divide-y divide-divider">
           {calendarCells.map((cell) => {
             const schoolMeta = cell.schoolRecord
               ? STATUS_META[cell.schoolRecord.status]
@@ -1094,18 +1094,18 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 onClick={() => setSelectedDateStr(cell.dateStr)}
                 className={`min-h-[64px] p-1.5 flex flex-col justify-between text-left transition-colors ${
                   cell.isSelected
-                    ? 'bg-indigo-50/80 ring-2 ring-inset ring-indigo-600'
+                    ? 'bg-accent-100 ring-2 ring-inset ring-accent'
                     : cell.isCurrentMonth
-                    ? 'bg-white hover:bg-slate-50'
-                    : 'bg-slate-50/40 opacity-50'
+                    ? 'bg-surface hover:bg-slate-50'
+                    : 'bg-surface opacity-50'
                 }`}
               >
                 <div className="w-full flex items-center justify-between">
                   <span
-                    className={`text-xs font-mono tabular-nums font-bold px-1.5 py-0.5 rounded-full ${
+                    className={`text-xs font-mono tabular-nums px-1.5 py-0.5 rounded-full ${
                       cell.isToday
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-slate-700'
+                        ? 'bg-accent text-paper'
+                        : 'text-ink'
                     }`}
                   >
                     {cell.dayNum}
@@ -1147,10 +1147,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       </section>
 
       {/* 3. DAY-LINKED 1-TOUCH ATTENDANCE RECORDER & MAKEUP CHECK */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+        <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 tabular-nums">
+            <h3 className="text-[13px] font-bold text-slate-900 tabular-nums">
               {selectedDateStr} ({translateDay(selectedDayResolved.dayOfWeek, lang)}){' '}
               {tr(lang, '원터치 출석 체크', '1-Touch Attendance Check', '一键出勤登记')}
             </h3>
@@ -1167,10 +1167,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
         <div className="p-4 space-y-4">
           {/* School Attendance Block */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+          <div className="p-3.5 rounded-xl bg-paper space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-indigo-600" />
+                <GraduationCap className="w-4 h-4 text-sage" />
                 <span className="text-sm font-bold text-slate-900">
                   {tr(lang, '학교 출석', 'School Attendance', '学校出勤')}
                 </span>
@@ -1205,10 +1205,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     key={st}
                     type="button"
                     onClick={() => handleSetSchoolStatus(st)}
-                    className={`min-h-[42px] py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                    className={`min-h-[36px] py-2 px-2 rounded-full text-xs font-bold border transition-all ${
                       isSelected
                         ? meta.btnActive
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        : 'bg-transparent text-ink border-divider hover:bg-slate-100'
                     }`}
                   >
                     {tr(lang, meta.ko, meta.en, meta.zh)}
@@ -1232,7 +1232,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     )}
                     value={selectedDayResolved.schoolRecord.reason || ''}
                     onChange={(e) => handleSetSchoolReason(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs text-slate-800"
+                    className="w-full h-10 px-4 rounded-full border border-divider bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                   />
                 </div>
               )}
@@ -1253,7 +1253,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             </div>
 
             {selectedDayResolved.academyList.length === 0 ? (
-              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/70 text-center text-xs text-slate-500">
+              <div className="p-5 rounded-xl bg-paper text-center text-xs text-slate-500">
                 {tr(
                   lang,
                   '이 요일에 배정된 학원 수업이 없습니다.',
@@ -1267,7 +1267,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 return (
                   <div
                     key={ac.name}
-                    className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3"
+                    className="p-3.5 rounded-xl bg-paper space-y-3"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -1300,10 +1300,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               key={st}
                               type="button"
                               onClick={() => handleSetAcademyStatus(ac.name, st)}
-                              className={`min-h-[42px] py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
+                              className={`min-h-[36px] py-2 px-2 rounded-full text-xs font-bold border transition-all ${
                                 isSelected
                                   ? meta.btnActive
-                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                  : 'bg-transparent text-ink border-divider hover:bg-slate-100'
                               }`}
                             >
                               {tr(lang, meta.ko, meta.en, meta.zh)}
@@ -1332,7 +1332,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                 reason: e.target.value,
                               })
                             }
-                            className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs text-slate-800"
+                            className="w-full h-10 px-4 rounded-full border border-divider bg-surface text-xs text-ink focus:outline-none focus:border-accent"
                           />
 
                           {(rec.status === 'absent' || rec.status === 'late') && (
@@ -1349,13 +1349,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                         : false,
                                     })
                                   }
-                                  className="w-4 h-4 rounded accent-amber-600"
+                                  className="w-4 h-4 rounded accent-accent"
                                 />
                                 {tr(lang, '보강 필요', 'Needs Makeup', '需要补课')}
                               </label>
 
                               {rec.needsMakeup && (
-                                <label className="inline-flex items-center gap-2 text-xs font-bold text-emerald-700 cursor-pointer select-none">
+                                <label className="inline-flex items-center gap-2 text-xs font-bold text-sage-800 cursor-pointer select-none">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(rec.makeupCompleted)}
@@ -1364,7 +1364,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                         makeupCompleted: e.target.checked,
                                       })
                                     }
-                                    className="w-4 h-4 rounded accent-emerald-600"
+                                    className="w-4 h-4 rounded accent-sage"
                                   />
                                   {tr(lang, '보강 완료됨', 'Makeup Completed', '已完成补课')}
                                 </label>

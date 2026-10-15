@@ -48,10 +48,10 @@ const CATEGORY_META: Record<
     ko: '학교 일정',
     en: 'School',
     zh: '学校日程',
-    badgeBg: 'bg-blue-100',
-    badgeText: 'text-blue-800',
-    barBg: 'bg-blue-500',
-    dotBg: 'bg-blue-600',
+    badgeBg: 'bg-sage-100',
+    badgeText: 'text-sage-800',
+    barBg: 'bg-sage',
+    dotBg: 'bg-sage',
     exampleKo: '중간고사, 수행평가, 방학식',
     exampleEn: 'Midterm exams, school assessment, ceremony',
     exampleZh: '期中考试、随堂测评、放假仪式',
@@ -60,10 +60,10 @@ const CATEGORY_META: Record<
     ko: '학원 일정',
     en: 'Academy',
     zh: '补习班日程',
-    badgeBg: 'bg-violet-100',
-    badgeText: 'text-violet-800',
-    barBg: 'bg-violet-500',
-    dotBg: 'bg-violet-600',
+    badgeBg: 'bg-accent-100',
+    badgeText: 'text-accent-800',
+    barBg: 'bg-accent',
+    dotBg: 'bg-accent',
     exampleKo: '학원 레벨테스트, 보강 수업, 단어 시험',
     exampleEn: 'Academy level test, makeup class, vocab quiz',
     exampleZh: '补习班水平测试、补课、单词测验',
@@ -72,10 +72,10 @@ const CATEGORY_META: Record<
     ko: '기타 일정',
     en: 'Other',
     zh: '其他日程',
-    badgeBg: 'bg-orange-100',
-    badgeText: 'text-orange-800',
-    barBg: 'bg-orange-500',
-    dotBg: 'bg-orange-500',
+    badgeBg: 'bg-slate-100',
+    badgeText: 'text-slate-800',
+    barBg: 'bg-slate-500',
+    dotBg: 'bg-slate-500',
     exampleKo: '병원 진료, 가족 행사, 동아리 모임',
     exampleEn: 'Clinic visit, family event, club gathering',
     exampleZh: '医院就诊、家庭聚会、社团活动',
@@ -312,9 +312,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Control Card: Month/Week/Day Toggle + Category Filter */}
-      <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs space-y-3">
+      <div className="bg-surface rounded-2xl p-3 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+          <div className="inline-flex rounded-full border border-divider overflow-hidden">
             {(
               [
                 { id: 'month', label: tr(lang, '월간', 'Month', '月历') },
@@ -326,10 +326,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setViewMode(tab.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 min-h-[34px] ${
+                className={`h-[30px] px-2.5 text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 ${
                   viewMode === tab.id
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-accent text-paper'
+                    : 'bg-transparent text-ink hover:bg-slate-100'
                 }`}
               >
                 {tab.label}
@@ -337,22 +337,22 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => handleNavigate(-1)}
-              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+              className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100"
               aria-label="Prev"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-bold text-slate-900 font-mono tabular-nums px-1 whitespace-nowrap">
+            <span className="text-xs text-ink font-mono tabular-nums px-1 whitespace-nowrap">
               {cursorDate.getFullYear()}.{String(cursorDate.getMonth() + 1).padStart(2, '0')}
             </span>
             <button
               type="button"
               onClick={() => handleNavigate(1)}
-              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+              className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100"
               aria-label="Next"
             >
               <ChevronRight className="w-4 h-4" />
@@ -360,7 +360,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             <button
               type="button"
               onClick={handleGoToday}
-              className="px-2.5 h-8 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 whitespace-nowrap"
+              className="px-2.5 h-8 rounded-full bg-accent text-paper text-xs font-bold hover:bg-accent-600 whitespace-nowrap"
             >
               {tr(lang, '오늘', 'Today', '今天')}
             </button>
@@ -372,10 +372,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           <button
             type="button"
             onClick={() => setCategoryFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[36px] ${
+            className={`h-[30px] px-3 rounded-full border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
               categoryFilter === 'all'
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-ink text-paper border-transparent'
+                : 'bg-transparent text-ink border-divider hover:bg-slate-100'
             }`}
           >
             {tr(lang, '전체', 'All', '全部')}
@@ -388,13 +388,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 key={cat}
                 type="button"
                 onClick={() => setCategoryFilter(cat)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap shrink-0 min-h-[36px] ${
+                className={`inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                   isActive
-                    ? 'bg-slate-900 text-white'
-                    : `${meta.badgeBg} ${meta.badgeText} hover:opacity-90`
+                    ? `${meta.barBg} text-paper border-transparent`
+                    : 'bg-transparent text-ink border-divider hover:bg-slate-100'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${meta.dotBg}`} />
+                <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-paper' : meta.dotBg}`} />
                 {tr(lang, meta.ko, meta.en, meta.zh)}
               </button>
             );
@@ -404,13 +404,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
       {/* VIEW 1: MONTH VIEW */}
       {viewMode === 'month' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/70 text-center">
+        <div className="bg-surface rounded-2xl shadow-xs overflow-hidden p-3">
+          <div className="grid grid-cols-7 gap-0.5 text-center">
             {calendarWeekHeader.map((d, idx) => (
               <div
                 key={d}
-                className={`py-2 text-[11px] font-bold ${
-                  idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-blue-600' : 'text-slate-500'
+                className={`py-1 text-[10px] font-semibold ${
+                  idx === 0 ? 'text-accent-700' : idx === 6 ? 'text-sage-700' : 'text-slate-600'
                 }`}
               >
                 {d}
@@ -418,7 +418,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             ))}
           </div>
 
-          <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
+          <div className="grid grid-cols-7 gap-0.5">
             {monthCalendarCells.map((cell) => {
               return (
                 <button
@@ -429,28 +429,36 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                     const [y, m, d] = cell.dateStr.split('-').map(Number);
                     setCursorDate(new Date(y, m - 1, d));
                   }}
-                  className={`min-h-[72px] p-1 flex flex-col items-start justify-start text-left transition-colors ${
+                  className={`min-h-[72px] p-1 rounded flex flex-col items-start justify-start text-left transition-colors ${
                     cell.isSelected
-                      ? 'bg-indigo-50/70 ring-2 ring-inset ring-indigo-600'
+                      ? 'bg-accent text-paper'
+                      : cell.isToday
+                      ? 'bg-accent-100 text-ink'
                       : cell.isCurrentMonth
-                      ? 'bg-white hover:bg-slate-50'
-                      : 'bg-slate-50/50 text-slate-300'
+                      ? 'bg-transparent text-ink hover:bg-slate-100'
+                      : 'bg-transparent text-slate-400'
                   }`}
                 >
                   <div className="w-full flex items-center justify-between px-0.5">
                     <span
-                      className={`text-xs font-mono tabular-nums font-bold px-1.5 py-0.5 rounded-full ${
-                        cell.isToday
-                          ? 'bg-indigo-600 text-white'
+                      className={`text-xs font-mono tabular-nums px-1 py-0.5 ${
+                        cell.isSelected
+                          ? 'text-paper'
                           : !cell.isCurrentMonth
-                          ? 'text-slate-300'
-                          : 'text-slate-700'
+                          ? 'text-slate-400'
+                          : cell.isToday
+                          ? 'text-accent-800'
+                          : 'text-ink'
                       }`}
                     >
                       {cell.dayNum}
                     </span>
                     {cell.events.length > 0 && (
-                      <span className="text-[10px] font-mono text-slate-400 tabular-nums">
+                      <span
+                        className={`text-[10px] font-mono tabular-nums ${
+                          cell.isSelected ? 'text-paper/80' : 'text-slate-500'
+                        }`}
+                      >
                         {cell.events.length}
                       </span>
                     )}
@@ -469,7 +477,11 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                       );
                     })}
                     {cell.events.length > 2 && (
-                      <div className="text-[9px] font-semibold text-slate-400 pl-1">
+                      <div
+                        className={`text-[9px] font-semibold pl-1 ${
+                          cell.isSelected ? 'text-paper/80' : 'text-slate-500'
+                        }`}
+                      >
                         +{cell.events.length - 2}
                       </div>
                     )}
@@ -483,38 +495,36 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
       {/* VIEW 2: WEEK VIEW */}
       {viewMode === 'week' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100 overflow-hidden">
+        <div className="bg-surface rounded-2xl shadow-xs divide-y divide-divider overflow-hidden">
           {weekDaysList.map((wd) => (
             <div
               key={wd.dateStr}
               onClick={() => setSelectedDateStr(wd.dateStr)}
               className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${
                 wd.isSelected
-                  ? 'bg-indigo-50/60'
-                  : wd.isToday
-                  ? 'bg-amber-50/30'
-                  : 'hover:bg-slate-50'
+                  ? 'bg-accent-100'
+                  : 'hover:bg-slate-100'
               }`}
             >
               <div className="w-16 shrink-0">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-bold text-slate-900">
+                  <span className="text-xs font-bold text-ink">
                     {translateDay(wd.dayLabel, lang)}
                   </span>
                   {wd.isToday && (
-                    <span className="px-1.5 py-0.2 text-[9px] font-bold bg-indigo-600 text-white rounded">
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-accent text-paper rounded-full">
                       {tr(lang, '오늘', 'TODAY', '今天')}
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-mono text-slate-500 tabular-nums">
+                <span className="text-base font-mono text-ink tabular-nums">
                   {wd.dateObj.getMonth() + 1}/{wd.dayNum}
                 </span>
               </div>
 
               <div className="flex-1 space-y-1.5">
                 {wd.events.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-1">
+                  <p className="text-[11px] text-slate-500 py-1">
                     {tr(lang, '등록된 일정 없음', 'No events', '无日程')}
                   </p>
                 ) : (
@@ -528,27 +538,27 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                           e.stopPropagation();
                           openEditModal(ev);
                         }}
-                        className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 hover:border-slate-300"
+                        className="p-2.5 rounded-xl bg-paper flex items-center justify-between gap-2 hover:bg-slate-100"
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${meta.badgeBg} ${meta.badgeText}`}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${meta.badgeBg} ${meta.badgeText}`}
                             >
                               {tr(lang, meta.ko, meta.en, meta.zh)}
                             </span>
                             {ev.time && (
-                              <span className="text-[11px] font-mono text-slate-500 tabular-nums">
+                              <span className="text-[11px] font-mono text-slate-600 tabular-nums">
                                 {ev.time}
                               </span>
                             )}
                             {dDay && (
-                              <span className="px-1.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-mono font-bold tabular-nums">
+                              <span className="px-1.5 py-0.5 rounded-full bg-ink text-paper text-[10px] font-mono tabular-nums">
                                 {dDay}
                               </span>
                             )}
                           </div>
-                          <p className="text-sm font-bold text-slate-900 mt-1 truncate">
+                          <p className="text-sm font-bold text-ink mt-1 truncate">
                             {translateSampleText(ev.title, lang)}
                           </p>
                         </div>
@@ -564,11 +574,11 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       )}
 
       {/* SELECTED DATE DETAIL LIST */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
+      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+        <div className="px-3.5 py-3 border-b border-divider flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-indigo-600" />
-            <h2 className="text-sm font-bold text-slate-900 tabular-nums">
+            <CalendarIcon className="w-4 h-4 text-accent-700" strokeWidth={2.75} />
+            <h2 className="text-[13px] font-bold text-ink tabular-nums">
               {lang === 'en'
                 ? `${selectedDateObj.getMonth() + 1}/${selectedDateObj.getDate()} (${translateDay(
                     getDayOfWeekKor(selectedDateObj),
@@ -587,16 +597,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           <button
             type="button"
             onClick={() => openAddModal(selectedDateStr)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 active:scale-95 transition-all whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1 h-[30px] px-3 rounded-full bg-accent text-paper text-[11px] font-bold hover:bg-accent-600 active:scale-95 transition-all whitespace-nowrap shrink-0"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3 h-3" strokeWidth={3} />
             {tr(lang, '일정 추가', 'Add Event', '添加日程')}
           </button>
         </div>
 
         {selectedDateEvents.length === 0 ? (
-          <div className="p-7 text-center">
-            <p className="text-sm font-medium text-slate-600">
+          <div className="p-6 text-center">
+            <p className="text-xs font-medium text-slate-600">
               {tr(
                 lang,
                 '선택한 날짜에 등록된 일정이 없습니다.',
@@ -604,7 +614,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 '所选日期暂无登记日程。'
               )}
             </p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-500 mt-1">
               {tr(
                 lang,
                 '우측 상단 [+ 일정 추가] 버튼을 눌러 학교·학원·기타 일정을 등록하세요.',
@@ -614,7 +624,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-divider">
             {selectedDateEvents.map((ev) => {
               const meta = CATEGORY_META[ev.category];
               const dDay = calculateDDayLabel(ev.date, todayStr);
@@ -623,32 +633,33 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   key={ev.id}
                   type="button"
                   onClick={() => openEditModal(ev)}
-                  className="w-full p-4 text-left hover:bg-slate-50 transition-colors flex items-start justify-between gap-3"
+                  className="w-full px-3.5 py-3 text-left hover:bg-slate-100 transition-colors flex items-start justify-between gap-2.5"
                 >
+                  <span className={`w-1 self-stretch rounded-full shrink-0 ${meta.barBg}`} />
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${meta.badgeBg} ${meta.badgeText}`}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${meta.badgeBg} ${meta.badgeText}`}
                       >
                         {tr(lang, meta.ko, meta.en, meta.zh)}
                       </span>
                       {ev.time && (
-                        <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-slate-600 tabular-nums">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-600 tabular-nums">
                           <Clock className="w-3 h-3" />
                           {ev.time}
                         </span>
                       )}
                       {ev.endDate && ev.endDate > ev.date && (
-                        <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                        <span className="text-[11px] font-mono text-slate-500 tabular-nums">
                           ({ev.date} ~ {ev.endDate})
                         </span>
                       )}
                       {dDay && (
                         <span
-                          className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold tabular-nums ${
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-mono tabular-nums ${
                             dDay === 'D-Day'
-                              ? 'bg-rose-600 text-white'
-                              : 'bg-slate-900 text-white'
+                              ? 'bg-accent text-paper'
+                              : 'bg-ink text-paper'
                           }`}
                         >
                           {dDay}
@@ -656,16 +667,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                       )}
                     </div>
 
-                    <h3 className="text-base font-bold text-slate-900">
+                    <h3 className="text-sm font-bold text-ink">
                       {translateSampleText(ev.title, lang)}
                     </h3>
                     {ev.memo && (
-                      <p className="text-xs text-slate-600 leading-relaxed">
+                      <p className="text-xs text-slate-700 leading-relaxed">
                         {translateSampleText(ev.memo, lang)}
                       </p>
                     )}
                   </div>
-                  <span className="text-xs font-medium text-slate-400 shrink-0 pt-1">
+                  <span className="self-start shrink-0 h-7 px-2.5 inline-flex items-center rounded-full border border-divider text-[11px] font-medium text-ink">
                     {tr(lang, '수정', 'Edit', '修改')}
                   </span>
                 </button>
@@ -677,8 +688,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
       {/* Upcoming D-Day Summary Strip */}
       {upcomingEvents.length > 0 && (
-        <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-2.5">
-          <h3 className="text-xs font-bold text-slate-500">
+        <section className="bg-surface rounded-2xl shadow-xs px-3.5 py-3 space-y-2">
+          <h3 className="text-[13px] font-bold text-ink">
             {tr(lang, '다가오는 주요 일정 (D-Day)', 'Upcoming Events (D-Day)', '即将到来的重要日程 (D-Day)')}
           </h3>
           <div className="space-y-2">
@@ -690,27 +701,27 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 <div
                   key={ev.id}
                   onClick={() => openEditModal(ev)}
-                  className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
+                  className={`flex items-center justify-between gap-2 p-2.5 rounded-xl cursor-pointer transition-colors ${meta.badgeBg} ${meta.badgeText} hover:opacity-90`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${meta.badgeBg} ${meta.badgeText}`}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 text-paper ${meta.barBg}`}
                     >
                       {tr(lang, meta.ko, meta.en, meta.zh)}
                     </span>
-                    <span className="text-xs font-bold text-slate-800 truncate">
+                    <span className="text-xs font-bold truncate">
                       {translateSampleText(ev.title, lang)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] font-mono text-slate-400 tabular-nums">
+                    <span className="text-[11px] font-mono opacity-70 tabular-nums">
                       {ev.date.slice(5)}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold tabular-nums ${
+                      className={`px-2 py-0.5 rounded-full text-[13px] font-mono tabular-nums ${
                         dDay === 'D-Day'
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-indigo-600 text-white'
+                          ? 'bg-accent text-paper'
+                          : 'bg-ink text-paper'
                       }`}
                     >
                       {dDay}
@@ -726,18 +737,18 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       {/* ADD / EDIT SCHEDULE MODAL */}
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
           onClick={() => setIsModalOpen(false)}
         >
           <form
             onSubmit={handleSaveSchedule}
-            className="w-full max-w-md bg-white rounded-t-3xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 shadow-2xl space-y-3 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1" />
 
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-[15px] font-bold text-ink">
                 {editingItem
                   ? tr(lang, '일정 수정 및 삭제', 'Edit or Delete Event', '修改或删除日程')
                   : tr(lang, '새 일정 등록', 'Add New Event', '添加新日程')}
@@ -745,14 +756,14 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
+                className="w-9 h-9 rounded-full border border-divider bg-surface flex items-center justify-center text-ink hover:bg-slate-100"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">
+              <label className="block text-[11px] font-semibold text-slate-600">
                 {tr(
                   lang,
                   '일정 구분 라벨 선택 (필수)',
@@ -760,7 +771,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   '选择日程分类标签（必选）'
                 )}
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {(['school', 'academy', 'other'] as ScheduleCategory[]).map((cat) => {
                   const meta = CATEGORY_META[cat];
                   const selected = formCategory === cat;
@@ -769,21 +780,21 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                       key={cat}
                       type="button"
                       onClick={() => setFormCategory(cat)}
-                      className={`min-h-[52px] p-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
+                      className={`h-[34px] px-3 rounded-full border text-xs font-semibold flex items-center justify-center transition-all ${
                         selected
-                          ? `${meta.badgeBg} ${meta.badgeText} border-current ring-2 ring-offset-1`
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          ? `${meta.barBg} text-paper border-transparent`
+                          : 'bg-transparent text-ink border-divider hover:bg-slate-100'
                       }`}
                     >
                       <span className="flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full ${meta.dotBg}`} />
+                        <span className={`w-2 h-2 rounded-full ${selected ? 'bg-paper' : meta.dotBg}`} />
                         {tr(lang, meta.ko, meta.en, meta.zh)}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 {tr(
                   lang,
                   `예시: ${CATEGORY_META[formCategory].exampleKo}`,
@@ -794,7 +805,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">
+              <label className="block text-[11px] font-semibold text-slate-600">
                 {tr(lang, '일정 제목', 'Event Title', '日程标题')}
               </label>
               <input
@@ -808,13 +819,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 )}
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full h-[42px] px-3.5 rounded-full border border-divider bg-surface text-sm font-medium text-ink focus:outline-none focus:border-accent"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">
+                <label className="block text-[11px] font-semibold text-slate-600">
                   {tr(lang, '시작 날짜', 'Start Date', '开始日期')}
                 </label>
                 <input
@@ -822,11 +833,11 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   required
                   value={formDate}
                   onChange={(e) => setFormDate(e.target.value)}
-                  className="w-full h-11 px-3 rounded-xl border border-slate-300 text-xs font-mono font-semibold text-slate-900"
+                  className="w-full h-[42px] px-3 rounded-full border border-divider bg-surface text-xs font-mono text-ink min-w-0 focus:outline-none focus:border-accent"
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">
+                <label className="block text-[11px] font-semibold text-slate-600">
                   {tr(lang, '종료 날짜 (선택)', 'End Date (Optional)', '结束日期（可选）')}
                 </label>
                 <input
@@ -834,13 +845,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   value={formEndDate}
                   min={formDate}
                   onChange={(e) => setFormEndDate(e.target.value)}
-                  className="w-full h-11 px-3 rounded-xl border border-slate-300 text-xs font-mono font-semibold text-slate-900"
+                  className="w-full h-[42px] px-3 rounded-full border border-divider bg-surface text-xs font-mono text-ink min-w-0 focus:outline-none focus:border-accent"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">
+              <label className="block text-[11px] font-semibold text-slate-600">
                 {tr(
                   lang,
                   '시간 (선택 · 동일 시간대 중복 허용)',
@@ -852,12 +863,12 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 type="time"
                 value={formTime}
                 onChange={(e) => setFormTime(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm font-mono font-semibold text-slate-900"
+                className="w-full h-[42px] px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink focus:outline-none focus:border-accent"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">
+              <label className="block text-[11px] font-semibold text-slate-600">
                 {tr(lang, '상세 메모', 'Details & Memo', '详细备注')}
               </label>
               <textarea
@@ -870,7 +881,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 )}
                 value={formMemo}
                 onChange={(e) => setFormMemo(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-divider bg-surface text-[13px] leading-relaxed text-ink resize-none focus:outline-none focus:border-accent"
               />
             </div>
 
@@ -879,7 +890,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 <button
                   type="button"
                   onClick={handleDeleteSchedule}
-                  className="h-12 px-4 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-rose-100"
+                  className="h-[46px] px-[18px] rounded-full bg-accent-100 text-accent-900 border border-accent-300 text-[13px] font-semibold flex items-center justify-center gap-1.5 hover:bg-accent-200"
                 >
                   <Trash2 className="w-4 h-4" />
                   {tr(lang, '삭제', 'Delete', '删除')}
@@ -887,7 +898,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
               )}
               <button
                 type="submit"
-                className="flex-1 h-12 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 active:scale-98 transition-all"
+                className="flex-1 h-[46px] rounded-full bg-accent text-paper text-sm font-bold hover:bg-accent-600 active:scale-98 transition-all"
               >
                 {editingItem
                   ? tr(lang, '변경사항 저장', 'Save Changes', '保存修改')
