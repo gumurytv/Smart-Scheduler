@@ -16,7 +16,6 @@ import {
   CalendarRange,
   StickyNote,
   CalendarClock,
-  Radio,
 } from 'lucide-react';
 import {
   DAYS_OF_WEEK,
@@ -199,11 +198,15 @@ function categoryLabel(cat: ScheduleCategory, lang: AppLanguage): string {
   return tr(lang, '기타', 'Other', '其他');
 }
 
-const StatusTag: React.FC<{ status?: SlotStatus; lang: AppLanguage }> = ({ status, lang }) => {
+const StatusTag: React.FC<{ status?: SlotStatus; lang: AppLanguage; large?: boolean }> = ({
+  status,
+  lang,
+  large,
+}) => {
   if (!status || status === 'cancelled') return null;
   return (
     <span
-      className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full whitespace-nowrap ${
+      className={`${large ? 'px-2 py-0.5 text-[13px] shrink-0' : 'px-1.5 py-0.5 text-[10px]'} font-bold rounded-full whitespace-nowrap ${
         status === 'absent' ? 'bg-accent-800 text-paper' : 'bg-sage-200 text-sage-900'
       }`}
     >
@@ -958,6 +961,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       startTime: string;
       endTime: string;
       title: string;
+      subject: string;
+      badge: string;
       status?: SlotStatus;
       school?: ResolvedSchoolPeriod;
       academy?: ResolvedAcademyItem;
@@ -977,6 +982,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             s.status,
             lang
           )}`,
+          subject: slotTitle(s.subject, s.status, lang),
+          badge: tr(lang, `학교 ${s.period}교시`, `School · P${s.period}`, `学校 第${s.period}节`),
           status: s.status,
           school: s,
         })),
@@ -990,6 +997,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           startTime: a.startTime,
           endTime: a.endTime,
           title: slotTitle(a.subject, a.status, lang),
+          subject: slotTitle(a.subject, a.status, lang),
+          badge: a.isAdded
+            ? tr(lang, '학원 보강/특강', 'Academy · Makeup', '补习班 补课/特讲')
+            : tr(lang, '학원', 'Academy', '补习班'),
           status: a.status,
           academy: a,
         })),
@@ -1125,65 +1136,116 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* NOW CARD: live clock + current / next item + today's makeup classes (always today) */}
-      <div className="bg-surface rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ink">
-              <Radio className="w-4 h-4 text-accent" strokeWidth={2.5} />
+      {/* NOW CARD (hero): live clock + current / next item + today's makeup classes (always today) */}
+      <section
+        aria-label={tr(lang, '지금', 'Now', '现在')}
+        className="bg-ink text-paper rounded-[32px] p-5 shadow-md space-y-4"
+      >
+        {/* Clock + date */}
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 text-[13px] font-bold text-paper/85 tracking-wide">
+              <span className="relative inline-flex w-2.5 h-2.5" aria-hidden="true">
+                <span className="absolute inset-0 rounded-full bg-accent-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-accent-400" />
+              </span>
               {tr(lang, '지금', 'Now', '现在')}
+              <span className="text-paper/60 font-semibold">· {tr(lang, '실시간', 'Live', '实时')}</span>
             </div>
-            <div className="text-[11px] font-semibold text-slate-600 mt-0.5">
-              {formatDateLabel(todayStr, lang)}
+            <div className="mt-1 font-mono text-[60px] leading-[0.95] tabular-nums text-paper">
+              {minutesToTimeStr(nowMinutes)}
             </div>
           </div>
-          <div className="font-mono text-[40px] leading-none text-ink tabular-nums">
-            {minutesToTimeStr(nowMinutes)}
+          <div className="pb-1.5 text-[16px] font-bold text-paper/90 tabular-nums whitespace-nowrap">
+            {formatDateLabel(todayStr, lang)}
           </div>
         </div>
 
-        {/* Current */}
+        {/* Current (hero line) */}
         {nowCard.current.length === 0 ? (
-          <div className="px-3.5 py-3 rounded-xl bg-paper text-[13px] font-semibold text-slate-600">
-            {tr(lang, '지금은 빈 시간', 'Free right now', '现在是空闲时间')}
+          <div className="px-4 py-4 rounded-[24px] bg-paper/10">
+            <div className="text-[24px] leading-tight font-bold text-paper">
+              {tr(lang, '지금은 빈 시간', 'Free right now', '现在是空闲时间')}
+            </div>
+            {nowCard.next && (
+              <div className="mt-1.5 flex items-baseline gap-1.5 flex-wrap text-[15px] font-semibold text-paper/85">
+                <span>{tr(lang, '다음 수업까지', 'Next class in', '距离下节课')}</span>
+                <span className="font-mono text-[22px] leading-none tabular-nums text-accent-300">
+                  {formatDurationLocalized(nowCard.next.start - nowMinutes, lang)}
+                </span>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="space-y-1.5">
-            {nowCard.current.map((entry) => (
-              <button
-                key={entry.key}
-                type="button"
-                onClick={() => openNowEntry(entry)}
-                className={`w-full px-3.5 py-3 rounded-xl text-left flex items-center justify-between gap-3 transition-colors ${
-                  entry.kind === 'school'
-                    ? 'bg-sage text-paper hover:bg-sage-700'
-                    : 'bg-accent text-paper hover:bg-accent-600'
-                }`}
-              >
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold text-paper/80 flex items-center gap-1.5">
-                    {entry.kind === 'school'
-                      ? tr(lang, '학교 수업 중', 'In school class', '学校上课中')
-                      : tr(lang, '학원 수업 중', 'In academy class', '补习班上课中')}
-                    <span className="font-mono tabular-nums">
-                      {entry.startTime}~{entry.endTime}
+          <div className="space-y-2">
+            {nowCard.current.map((entry) => {
+              const total = Math.max(1, entry.end - entry.start);
+              const elapsed = Math.min(total, Math.max(0, nowMinutes - entry.start));
+              const pct = Math.round((elapsed / total) * 100);
+              const isSchool = entry.kind === 'school';
+              return (
+                <button
+                  key={entry.key}
+                  type="button"
+                  onClick={() => openNowEntry(entry)}
+                  className={`w-full px-4 py-4 rounded-[24px] text-left transition-colors ${
+                    isSchool ? 'bg-sage-800 hover:bg-sage-700' : 'bg-accent-800 hover:bg-accent-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[13px] font-bold whitespace-nowrap ${
+                        isSchool ? 'bg-sage-300 text-sage-900' : 'bg-accent-300 text-accent-900'
+                      }`}
+                    >
+                      {entry.badge}
                     </span>
+                    <span className="text-[13px] font-semibold text-paper/85">
+                      {tr(lang, '수업 중', 'In class', '上课中')}
+                    </span>
+                    <StatusTag status={entry.status} lang={lang} large />
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                    <span className="text-[15px] font-bold truncate">{entry.title}</span>
-                    <StatusTag status={entry.status} lang={lang} />
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div className="min-w-0 text-[26px] leading-tight font-bold text-paper truncate">
+                      {entry.subject}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-mono text-[28px] leading-none tabular-nums text-paper">
+                        {formatDurationLocalized(entry.end - nowMinutes, lang)}
+                      </div>
+                      <div className="text-[13px] font-semibold text-paper/85 mt-1">
+                        {tr(lang, '남음', 'left', '剩余')}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className="font-mono text-[18px] leading-none tabular-nums">
-                    {formatDurationLocalized(entry.end - nowMinutes, lang)}
+                  <div
+                    className="mt-3 h-2.5 rounded-full bg-paper/20 overflow-hidden"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={pct}
+                    aria-label={tr(lang, '진행률', 'Progress', '进度')}
+                  >
+                    <div
+                      className={`h-full rounded-full ${isSchool ? 'bg-sage-300' : 'bg-accent-300'}`}
+                      style={{ width: `${pct}%` }}
+                    />
                   </div>
-                  <div className="text-[10px] font-semibold text-paper/80 mt-0.5">
-                    {tr(lang, '남음', 'left', '剩余')}
+                  <div className="mt-1.5 flex items-center justify-between text-[13px] font-semibold text-paper/85 tabular-nums">
+                    <span className="font-mono">{entry.startTime}</span>
+                    <span>
+                      {tr(
+                        lang,
+                        `${formatDurationLocalized(elapsed, lang)} 지남`,
+                        `${formatDurationLocalized(elapsed, lang)} elapsed`,
+                        `已过${formatDurationLocalized(elapsed, lang)}`
+                      )}
+                    </span>
+                    <span className="font-mono">{entry.endTime}</span>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -1192,53 +1254,51 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           <button
             type="button"
             onClick={() => nowCard.next && openNowEntry(nowCard.next)}
-            className="w-full px-3.5 py-2.5 rounded-xl bg-paper text-left flex items-center justify-between gap-3 hover:bg-slate-200 transition-colors"
+            className="w-full px-4 py-3 rounded-[20px] bg-paper/10 text-left flex items-center justify-between gap-3 hover:bg-paper/15 transition-colors"
           >
-            <div className="min-w-0 flex items-center gap-2">
+            <div className="min-w-0 flex items-center gap-2.5">
               <span
-                className={`w-2 h-2 rounded-full shrink-0 ${
-                  nowCard.next.kind === 'school' ? 'bg-sage' : 'bg-accent'
+                className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  nowCard.next.kind === 'school' ? 'bg-sage-400' : 'bg-accent-400'
                 }`}
               />
-              <span className="text-[11px] font-semibold text-slate-600 shrink-0">
+              <span className="text-[13px] font-bold text-paper/80 shrink-0">
                 {tr(lang, '다음', 'Next', '下一个')}
               </span>
-              <span className="text-[13px] font-bold text-ink truncate">{nowCard.next.title}</span>
-              <StatusTag status={nowCard.next.status} lang={lang} />
+              <span className="text-[17px] font-bold text-paper truncate">{nowCard.next.title}</span>
+              <StatusTag status={nowCard.next.status} lang={lang} large />
             </div>
             <div className="shrink-0 text-right whitespace-nowrap">
-              <span className="font-mono text-[13px] text-ink tabular-nums">
+              <div className="font-mono text-[18px] leading-none text-paper tabular-nums">
                 {nowCard.next.startTime}
-              </span>
-              <span className="ml-1.5 text-[11px] font-semibold text-accent-700">
+              </div>
+              <div className="mt-1 text-[13px] font-bold text-accent-300 tabular-nums">
                 {tr(
                   lang,
                   `${formatDurationLocalized(nowCard.next.start - nowMinutes, lang)} 후`,
                   `in ${formatDurationLocalized(nowCard.next.start - nowMinutes, lang)}`,
                   `${formatDurationLocalized(nowCard.next.start - nowMinutes, lang)}后`
                 )}
-              </span>
+              </div>
             </div>
           </button>
         ) : (
-          <div className="px-3.5 py-2.5 rounded-xl bg-paper text-[12px] font-semibold text-slate-600">
+          <div className="px-4 py-3 rounded-[20px] bg-paper/10 text-[15px] font-semibold text-paper/85">
             {tr(lang, '오늘 남은 수업이 없어요', 'No more classes today', '今天没有剩余课程')}
           </div>
         )}
 
-        {/* Today's makeup / special classes */}
-        <div className="rounded-xl bg-accent-100 border border-accent-300 p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[14px] font-bold text-accent-900 inline-flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-accent" />
-              {tr(lang, '오늘 보강/특강', "Today's makeup / special classes", '今日补课/特讲')}
-              <span className="font-mono tabular-nums text-accent-700">
-                {nowCard.makeups.length + nowCard.makeupSchedules.length}
-              </span>
-            </div>
+        {/* Today's makeup / special classes: contrasting light panel inside the hero */}
+        <div className="rounded-[24px] bg-paper text-ink p-4 space-y-2.5">
+          <div className="text-[16px] font-bold text-ink inline-flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-accent" />
+            {tr(lang, '오늘 보강/특강', "Today's makeup / special classes", '今日补课/特讲')}
+            <span className="min-w-[24px] h-6 px-1.5 rounded-full bg-accent-700 text-paper font-mono text-[13px] tabular-nums inline-flex items-center justify-center">
+              {nowCard.makeups.length + nowCard.makeupSchedules.length}
+            </span>
           </div>
           {nowCard.makeups.length === 0 && nowCard.makeupSchedules.length === 0 ? (
-            <div className="px-3 py-2.5 rounded-xl bg-paper text-[13px] text-slate-600">
+            <div className="px-3.5 py-3 rounded-2xl bg-surface text-[14px] font-semibold text-slate-700">
               {tr(lang, '오늘 예정된 보강/특강이 없어요', 'No makeup or special classes today', '今天没有补课/特讲')}
             </div>
           ) : (
@@ -1248,26 +1308,26 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   key={m.id}
                   type="button"
                   onClick={() => openNowEntry({ kind: 'academy', academy: m })}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-colors ${
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-colors ${
                     m.isCancelled
-                      ? 'border border-dashed border-slate-400 bg-paper text-slate-500 line-through'
-                      : 'bg-accent text-paper shadow-xs hover:bg-accent-600'
+                      ? 'border border-dashed border-slate-400 bg-surface text-slate-700 line-through'
+                      : 'bg-accent-700 text-paper shadow-xs hover:bg-accent-800'
                   }`}
                 >
-                  <span className="font-mono tabular-nums text-[15px] shrink-0">
+                  <span className="font-mono tabular-nums text-[16px] shrink-0">
                     {m.startTime}~{m.endTime}
                   </span>
-                  <span className="text-[15px] font-bold truncate flex-1">{slotTitle(m.subject, m.status, lang)}</span>
-                  <StatusTag status={m.status} lang={lang} />
+                  <span className="text-[16px] font-bold truncate flex-1">{slotTitle(m.subject, m.status, lang)}</span>
+                  <StatusTag status={m.status} lang={lang} large />
                 </button>
               ))}
               {nowCard.makeupSchedules.map((s) => (
                 <div
                   key={s.id}
-                  className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl bg-paper border border-accent-300 text-ink"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-surface border border-accent-300 text-ink"
                 >
-                  {s.time && <span className="font-mono tabular-nums text-[15px] shrink-0">{s.time}</span>}
-                  <span className="text-[15px] font-bold truncate">{translateSampleText(s.title, lang)}</span>
+                  {s.time && <span className="font-mono tabular-nums text-[16px] shrink-0">{s.time}</span>}
+                  <span className="text-[16px] font-bold truncate">{translateSampleText(s.title, lang)}</span>
                 </div>
               ))}
             </div>
@@ -1275,13 +1335,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           <button
             type="button"
             onClick={() => openAddAcademyModal('18:00', '20:00')}
-            className="w-full h-11 rounded-full bg-accent text-paper text-[14px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-600 shadow-xs"
+            className="w-full h-12 rounded-full bg-accent-700 text-paper text-[15px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-800 shadow-xs"
           >
             <Plus className="w-4 h-4" strokeWidth={2.75} />
             {tr(lang, '당일 보강/특강 추가', 'Add makeup / special class', '添加当天补课/特讲')}
           </button>
         </div>
-      </div>
+      </section>
 
       {/* Top Controls Card: View Switch + Week Navigation + 7 Day Tabs */}
       <div className="bg-surface rounded-2xl p-3 shadow-xs space-y-2.5">
