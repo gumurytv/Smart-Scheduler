@@ -1005,7 +1005,85 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         </div>
       </section>
 
-      {/* 2. MONTHLY ATTENDANCE OVERVIEW (follows the calendar's month) */}
+      {/* 2. PENDING MAKEUPS (right after today's check) */}
+      <section
+        className={`p-3.5 rounded-2xl shadow-xs ${
+          monthlyStats.pendingMakeups.length > 0
+            ? 'bg-accent-100 text-accent-900'
+            : 'bg-sage-100 text-sage-900'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {monthlyStats.pendingMakeups.length > 0 ? (
+              <AlertCircle className="w-4 h-4 text-accent-800 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-sage-800 shrink-0" />
+            )}
+            <span className="text-[13px] font-bold tabular-nums">
+              {tr(
+                lang,
+                `미완료 보강 ${monthlyStats.pendingMakeups.length}건`,
+                `Pending makeups: ${monthlyStats.pendingMakeups.length}`,
+                `未完成补课：${monthlyStats.pendingMakeups.length}项`
+              )}
+            </span>
+          </div>
+          <span className="text-[11px] opacity-80 text-right">
+            {monthlyStats.pendingMakeups.length > 0
+              ? tr(lang, '보강 완료 시 체크하세요', 'Check off when completed', '补课后请点击完成')
+              : tr(lang, '모든 보강을 완료했습니다', 'All makeups completed!', '已完成所有补课')}
+          </span>
+        </div>
+
+        {monthlyStats.pendingMakeups.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            {monthlyStats.pendingMakeups.map((mk) => (
+              <div
+                key={`${mk.dateStr}-${mk.academyName}`}
+                className="px-3 py-2 rounded-xl bg-paper text-ink flex items-center justify-between gap-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    selectDate(mk.dateStr);
+                    setSelectedAcademyDetail(mk.academyName);
+                  }}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-slate-900">
+                      {translateSubject(mk.academyName, lang)}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-500 tabular-nums">
+                      ({mk.shortDateLabel} {statusShortLabel(mk.status, lang)})
+                    </span>
+                  </div>
+                  {mk.reason && (
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {tr(lang, '사유: ', 'Reason: ', '原因：')}
+                      {translateSampleText(mk.reason, lang)}
+                    </p>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleUpdateAcademyDetail(mk.dateStr, mk.academyName, {
+                      makeupCompleted: true,
+                    })
+                  }
+                  className="h-[30px] px-2.5 rounded-full bg-accent text-paper text-[11px] font-bold hover:bg-accent-600 shrink-0 whitespace-nowrap"
+                >
+                  {tr(lang, '보강 완료 체크', 'Mark done', '完成补课')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 3. MONTHLY ATTENDANCE OVERVIEW (follows the calendar's month) */}
       <section className="bg-surface rounded-2xl p-3.5 shadow-xs space-y-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -1475,84 +1553,6 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             </div>
           )}
         </div>
-      </section>
-
-      {/* 3. PENDING MAKEUPS */}
-      <section
-        className={`p-3.5 rounded-2xl shadow-xs ${
-          monthlyStats.pendingMakeups.length > 0
-            ? 'bg-accent-100 text-accent-900'
-            : 'bg-sage-100 text-sage-900'
-        }`}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {monthlyStats.pendingMakeups.length > 0 ? (
-              <AlertCircle className="w-4 h-4 text-accent-800 shrink-0" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 text-sage-800 shrink-0" />
-            )}
-            <span className="text-[13px] font-bold tabular-nums">
-              {tr(
-                lang,
-                `미완료 보강 ${monthlyStats.pendingMakeups.length}건`,
-                `Pending makeups: ${monthlyStats.pendingMakeups.length}`,
-                `未完成补课：${monthlyStats.pendingMakeups.length}项`
-              )}
-            </span>
-          </div>
-          <span className="text-[11px] opacity-80 text-right">
-            {monthlyStats.pendingMakeups.length > 0
-              ? tr(lang, '보강 완료 시 체크하세요', 'Check off when completed', '补课后请点击完成')
-              : tr(lang, '모든 보강을 완료했습니다', 'All makeups completed!', '已完成所有补课')}
-          </span>
-        </div>
-
-        {monthlyStats.pendingMakeups.length > 0 && (
-          <div className="mt-2 space-y-1.5">
-            {monthlyStats.pendingMakeups.map((mk) => (
-              <div
-                key={`${mk.dateStr}-${mk.academyName}`}
-                className="px-3 py-2 rounded-xl bg-paper text-ink flex items-center justify-between gap-2"
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    selectDate(mk.dateStr);
-                    setSelectedAcademyDetail(mk.academyName);
-                  }}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-slate-900">
-                      {translateSubject(mk.academyName, lang)}
-                    </span>
-                    <span className="text-[11px] font-mono text-slate-500 tabular-nums">
-                      ({mk.shortDateLabel} {statusShortLabel(mk.status, lang)})
-                    </span>
-                  </div>
-                  {mk.reason && (
-                    <p className="text-[11px] text-slate-500 truncate">
-                      {tr(lang, '사유: ', 'Reason: ', '原因：')}
-                      {translateSampleText(mk.reason, lang)}
-                    </p>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleUpdateAcademyDetail(mk.dateStr, mk.academyName, {
-                      makeupCompleted: true,
-                    })
-                  }
-                  className="h-[30px] px-2.5 rounded-full bg-accent text-paper text-[11px] font-bold hover:bg-accent-600 shrink-0 whitespace-nowrap"
-                >
-                  {tr(lang, '보강 완료 체크', 'Mark done', '完成补课')}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
 
       {/* 4. MONTHLY CALENDAR FOR REVIEW (drives the charts above) */}

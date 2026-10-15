@@ -295,8 +295,12 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const upcomingEvents = useMemo(() => {
     return filteredSchedules
       .filter((ev) => ev.date >= todayStr || (ev.endDate && ev.endDate >= todayStr))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 5);
+      .sort((a, b) => {
+        const ta = isDateWithinSchedule(todayStr, a) ? 0 : 1;
+        const tb = isDateWithinSchedule(todayStr, b) ? 0 : 1;
+        return ta - tb || a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '');
+      })
+      .slice(0, 6);
   }, [filteredSchedules, todayStr]);
 
   const sheetEvents = useMemo(
@@ -452,6 +456,68 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Control Card: Month/Week/Day Toggle + Category Filter */}
+      {/* Upcoming D-Day Summary Strip */}
+      {upcomingEvents.length > 0 && (
+        <section className="bg-surface rounded-2xl shadow-xs px-3.5 py-3 space-y-2">
+          <h3 className="text-[13px] font-bold text-ink">
+            {tr(lang, '다가오는 주요 일정 (D-Day)', 'Upcoming Events (D-Day)', '即将到来的重要日程 (D-Day)')}
+          </h3>
+          <div className="space-y-2">
+            {upcomingEvents.map((ev) => {
+              const meta = CATEGORY_META[ev.category];
+              const dDay = calculateDDayLabel(ev.date, todayStr) || tr(lang, '진행중', 'Ongoing', '进行中');
+              const isTodayEvent = isDateWithinSchedule(todayStr, ev);
+              return (
+                <div
+                  key={ev.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEditSheet(ev)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') openEditSheet(ev);
+                  }}
+                  className={`flex items-center justify-between gap-2 rounded-xl cursor-pointer transition-colors ${
+                    isTodayEvent
+                      ? 'p-3 bg-accent text-paper shadow-md ring-2 ring-accent-300'
+                      : `p-2.5 ${meta.badgeBg} ${meta.badgeText} hover:opacity-90`
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {isTodayEvent && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-paper text-accent-800">
+                        {tr(lang, '오늘', 'Today', '今天')}
+                      </span>
+                    )}
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                        isTodayEvent ? 'bg-accent-800 text-paper' : `text-paper ${meta.barBg}`
+                      }`}
+                    >
+                      {categoryLabel(ev.category)}
+                    </span>
+                    <span className={`font-bold truncate ${isTodayEvent ? 'text-[14px]' : 'text-xs'}`}>
+                      {translateSampleText(ev.title, lang)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-mono opacity-70 tabular-nums">
+                      {ev.time && isTodayEvent ? ev.time : formatShortDate(ev.date, lang)}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[13px] font-mono tabular-nums ${
+                        isTodayEvent ? 'bg-paper text-accent-800' : 'bg-ink text-paper'
+                      }`}
+                    >
+                      {dDay}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <div className="bg-surface rounded-2xl p-3 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex rounded-full border border-divider overflow-hidden">
@@ -942,52 +1008,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           </div>
         )}
       </section>
-
-      {/* Upcoming D-Day Summary Strip */}
-      {upcomingEvents.length > 0 && (
-        <section className="bg-surface rounded-2xl shadow-xs px-3.5 py-3 space-y-2">
-          <h3 className="text-[13px] font-bold text-ink">
-            {tr(lang, '다가오는 주요 일정 (D-Day)', 'Upcoming Events (D-Day)', '即将到来的重要日程 (D-Day)')}
-          </h3>
-          <div className="space-y-2">
-            {upcomingEvents.map((ev) => {
-              const meta = CATEGORY_META[ev.category];
-              const dDay = calculateDDayLabel(ev.date, todayStr) || tr(lang, '진행중', 'Ongoing', '进行中');
-              return (
-                <div
-                  key={ev.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openEditSheet(ev)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') openEditSheet(ev);
-                  }}
-                  className={`flex items-center justify-between gap-2 p-2.5 rounded-xl cursor-pointer transition-colors ${meta.badgeBg} ${meta.badgeText} hover:opacity-90`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 text-paper ${meta.barBg}`}>
-                      {categoryLabel(ev.category)}
-                    </span>
-                    <span className="text-xs font-bold truncate">{translateSampleText(ev.title, lang)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] font-mono opacity-70 tabular-nums">
-                      {formatShortDate(ev.date, lang)}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[13px] font-mono tabular-nums ${
-                        dDay === 'D-Day' ? 'bg-accent text-paper' : 'bg-ink text-paper'
-                      }`}
-                    >
-                      {dDay}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       {/* DATE POPUP: day's events (edit/delete) + shared add/edit form */}
       {isSheetOpen && sheetDateStr && (

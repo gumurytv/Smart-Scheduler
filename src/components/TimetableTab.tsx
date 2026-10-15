@@ -45,7 +45,7 @@ import {
   ResolvedSchoolPeriod,
   ResolvedAcademyItem,
 } from '../utils/timetableHelpers';
-import { tr, translateDay, translateSubject } from '../i18n/translations';
+import { tr, translateDay, translateSubject, translateSampleText } from '../i18n/translations';
 
 interface TimetableTabProps {
   language?: AppLanguage;
@@ -1227,42 +1227,60 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         )}
 
         {/* Today's makeup / special classes */}
-        {(nowCard.makeups.length > 0 || nowCard.makeupSchedules.length > 0) && (
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-bold text-slate-700">
+        <div className="rounded-xl bg-accent-100 border border-accent-300 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[14px] font-bold text-accent-900 inline-flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent" />
               {tr(lang, '오늘 보강/특강', "Today's makeup / special classes", '今日补课/特讲')}
+              <span className="font-mono tabular-nums text-accent-700">
+                {nowCard.makeups.length + nowCard.makeupSchedules.length}
+              </span>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+          </div>
+          {nowCard.makeups.length === 0 && nowCard.makeupSchedules.length === 0 ? (
+            <div className="px-3 py-2.5 rounded-xl bg-paper text-[13px] text-slate-600">
+              {tr(lang, '오늘 예정된 보강/특강이 없어요', 'No makeup or special classes today', '今天没有补课/特讲')}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
               {nowCard.makeups.map((m) => (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => openNowEntry({ kind: 'academy', academy: m })}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-colors ${
                     m.isCancelled
-                      ? 'border-dashed border-slate-400 text-slate-500 line-through'
-                      : 'border-transparent bg-accent-100 text-accent-900 hover:bg-accent-200'
+                      ? 'border border-dashed border-slate-400 bg-paper text-slate-500 line-through'
+                      : 'bg-accent text-paper shadow-xs hover:bg-accent-600'
                   }`}
                 >
-                  <span className="font-mono tabular-nums">
+                  <span className="font-mono tabular-nums text-[15px] shrink-0">
                     {m.startTime}~{m.endTime}
                   </span>
-                  <span className="font-bold">{slotTitle(m.subject, m.status, lang)}</span>
+                  <span className="text-[15px] font-bold truncate flex-1">{slotTitle(m.subject, m.status, lang)}</span>
                   <StatusTag status={m.status} lang={lang} />
                 </button>
               ))}
               {nowCard.makeupSchedules.map((s) => (
-                <span
+                <div
                   key={s.id}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border border-divider text-ink"
+                  className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl bg-paper border border-accent-300 text-ink"
                 >
-                  {s.time && <span className="font-mono tabular-nums">{s.time}</span>}
-                  <span className="font-bold">{s.title}</span>
-                </span>
+                  {s.time && <span className="font-mono tabular-nums text-[15px] shrink-0">{s.time}</span>}
+                  <span className="text-[15px] font-bold truncate">{translateSampleText(s.title, lang)}</span>
+                </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+          <button
+            type="button"
+            onClick={() => openAddAcademyModal('18:00', '20:00')}
+            className="w-full h-11 rounded-full bg-accent text-paper text-[14px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-600 shadow-xs"
+          >
+            <Plus className="w-4 h-4" strokeWidth={2.75} />
+            {tr(lang, '당일 보강/특강 추가', 'Add makeup / special class', '添加当天补课/特讲')}
+          </button>
+        </div>
       </div>
 
       {/* Top Controls Card: View Switch + Week Navigation + 7 Day Tabs */}
@@ -1550,16 +1568,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             )}
 
             {/* Quick add action */}
-            <div className="pt-2 border-t border-divider flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => openAddAcademyModal('18:00', '20:00')}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-accent-700 hover:underline"
-              >
-                <Plus className="w-3 h-3" />{' '}
-                {tr(lang, '당일 보강/특강 추가', 'Add Makeup Class', '添加当天补课/特讲')}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => openAddAcademyModal('18:00', '20:00')}
+              className="w-full h-11 rounded-full border-2 border-dashed border-accent bg-accent-100/60 text-accent-800 text-[14px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-100"
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.75} />
+              {tr(lang, '당일 보강/특강 추가', 'Add makeup / special class', '添加当天补课/特讲')}
+            </button>
           </div>
 
           {dailySubMode === 'timeline' ? (
@@ -2129,9 +2145,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   <button
                     type="button"
                     onClick={() => openAddAcademyModal('18:00', '20:00')}
-                    className="inline-flex items-center gap-1 px-3 h-8 rounded-full bg-accent text-paper text-xs font-semibold hover:bg-accent-600"
+                    className="inline-flex items-center gap-1.5 px-4 h-10 rounded-full bg-accent text-paper text-[13px] font-bold hover:bg-accent-600 shadow-xs"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4" strokeWidth={2.75} />
                     {tr(lang, '당일 보강/특강 추가', 'Add Makeup', '添加补课/特讲')}
                   </button>
                 </div>
