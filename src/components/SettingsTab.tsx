@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   X,
@@ -37,6 +37,9 @@ import {
   SchoolTimeConfig,
   DEFAULT_SCHOOL_TIME_CONFIG,
   MasterTimetable,
+  HOME_WIDGET_IDS,
+  HomeWidgetId,
+  WidgetConfig,
 } from '../types';
 import { formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
@@ -46,7 +49,8 @@ import {
   translateSampleText,
   USER_GUIDE_TOPICS,
 } from '../i18n/translations';
-import { buildWidgetSyncPayload, syncWidgetData } from '../utils/widgetSync';
+import { buildHomeWidgetsData, getWidgetConfig, syncWidgetData } from '../utils/widgetSync';
+import { HOME_WIDGET_META, HomeWidgetPreview } from './HomeWidgets';
 
 interface SettingsTabProps {
   state: PlannerState;
@@ -165,20 +169,6 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
     </button>
   </div>
 );
-
-const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatLocalizedDate(dateKey: string, day: DayOfWeek | string, lang: AppLanguage): string {
-  const [, mm, dd] = (dateKey || '').split('-').map((v) => Number(v));
-  const dayLabel = translateDay(day, lang);
-  if (!mm || !dd) return `${dateKey} (${dayLabel})`;
-  return tr(
-    lang,
-    `${mm}월 ${dd}일 (${dayLabel})`,
-    `${MONTHS_EN[mm - 1]} ${dd} (${dayLabel})`,
-    `${mm}月${dd}日 (${dayLabel})`
-  );
-}
 
 function createSampleTimetableImageBase64(lang: AppLanguage): string {
   const canvas = document.createElement('canvas');
@@ -341,16 +331,33 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   } | null>(null);
   const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // --- SECTION 5: HOME SCREEN WIDGET PREVIEW STATE ---
-  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('light');
+  // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
   const [widgetSyncToast, setWidgetSyncToast] = useState<string | null>(null);
-  const widgetPayload = buildWidgetSyncPayload(state);
-  const activeSchoolClasses = widgetPayload.schoolTimetable.filter(
-    (s) => !s.isCancelled && s.subject.trim() !== ''
-  );
-  const activeAcademyClasses = widgetPayload.academyTimetable.filter(
-    (a) => !a.isCancelled
-  );
+  const [widgetNow, setWidgetNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setWidgetNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const widgetConfig = getWidgetConfig(state);
+  const widgetTheme = widgetConfig.theme;
+  const widgetPreviewData = buildHomeWidgetsData(state, widgetNow);
+  const updateWidgetConfig = (patch: Partial<WidgetConfig>) => {
+    onUpdateState((prev) => {
+      const base = getWidgetConfig(prev);
+      const next: WidgetConfig = { ...base, ...patch };
+      const enabledSet = new Set(next.enabled);
+      return {
+        ...prev,
+        widgetConfig: { ...next, enabled: HOME_WIDGET_IDS.filter((id) => enabledSet.has(id)) },
+      };
+    });
+  };
+  const toggleWidget = (id: HomeWidgetId) => {
+    const isOn = widgetConfig.enabled.includes(id);
+    updateWidgetConfig({
+      enabled: isOn ? widgetConfig.enabled.filter((x) => x !== id) : [...widgetConfig.enabled, id],
+    });
+  };
 
   // --- SCHOOL CLASS-TIME CONFIG (preset vs custom) ---
   const schoolTimeConfig: SchoolTimeConfig = {
@@ -2952,280 +2959,134 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         )}
       </section>
 
-      {/* SECTION 7: 홈 화면 위젯 미리보기 (Android Home Screen Widget Preview) */}
+      {/* SECTION 7: 홈 화면 위젯 (Home-screen widget gallery: pick widgets + preview) */}
       <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-        <div className="px-3.5 py-3 border-b border-divider flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="px-3.5 py-3 border-b border-divider flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-full bg-accent-100 text-accent-700 flex items-center justify-center shrink-0">
               <Smartphone className="w-4 h-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-[13px] font-bold text-ink">
-                {tr(
-                  lang,
-                  '홈 화면 위젯 미리보기',
-                  'Home Screen Widget Preview',
-                  '主屏幕小组件预览'
-                )}
+                {tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
               </h2>
               <p className="text-[11px] text-slate-600">
                 {tr(
                   lang,
-                  '오늘의 학교·학원 시간표 및 일정 요약 위젯 (자동 동기화됨)',
-                  "Today's school, academy & schedule summary widget (Auto-synced)",
-                  '今日学校·补习班课表及日程摘要小组件（自动同步）'
+                  '홈 화면에 둘 위젯을 골라 보세요 (자동 동기화됨)',
+                  'Pick the widgets for your home screen (auto-synced)',
+                  '选择要放在主屏幕上的小组件（自动同步）'
                 )}
               </p>
             </div>
           </div>
 
-          {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) */}
-          <div className="inline-flex rounded-full border border-divider overflow-hidden shrink-0">
-            <button
-              type="button"
-              onClick={() => setWidgetTheme('light')}
-              className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                widgetTheme === 'light'
-                  ? 'bg-accent text-paper'
-                  : 'text-ink hover:bg-slate-100'
-              }`}
-            >
-              <Sun className="w-3 h-3" />
-              {tr(lang, '밝은 테마', 'Light', '浅色')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWidgetTheme('dark')}
-              className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                widgetTheme === 'dark'
-                  ? 'bg-accent text-paper'
-                  : 'text-ink hover:bg-slate-100'
-              }`}
-            >
-              <Moon className="w-3 h-3" />
-              {tr(lang, '어두운 테마', 'Dark', '深色')}
-            </button>
+          {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) — widgetConfig.theme */}
+          <div
+            className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+            role="group"
+            aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
+          >
+            {(['light', 'dark'] as const).map((th) => (
+              <button
+                key={th}
+                type="button"
+                aria-pressed={widgetTheme === th}
+                onClick={() => updateWidgetConfig({ theme: th })}
+                className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
+                  widgetTheme === th ? 'bg-accent text-paper' : 'text-ink hover:bg-slate-100'
+                }`}
+              >
+                {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+                {th === 'light'
+                  ? tr(lang, '밝은 테마', 'Light', '浅色')
+                  : tr(lang, '어두운 테마', 'Dark', '深色')}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="p-4 space-y-3">
-          {/* 스마트폰 홈 화면 배경 프레임 */}
-          <div
-            className={`p-3.5 rounded-2xl border transition-colors ${
-              widgetTheme === 'dark'
-                ? 'bg-slate-800 border-transparent'
-                : 'bg-slate-200/60 border-transparent'
-            }`}
-          >
-            {/* 실제 안드로이드 위젯 카드 UI */}
-            <div
-              className={`rounded-2xl p-3.5 shadow-md border transition-all ${
-                widgetTheme === 'dark'
-                  ? 'bg-slate-900 border-transparent text-slate-100'
-                  : 'bg-paper border-divider text-ink'
-              }`}
-            >
-              {/* 위젯 상단 헤더 */}
-              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200/20">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                  <span className="text-xs font-extrabold tracking-tight">
-                    {tr(
-                      lang,
-                      '오늘의 스마트 플래너',
-                      "Today's Smart Planner",
-                      '今日智能规划'
-                    )}
-                  </span>
-                </div>
-                <span
-                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
-                    widgetTheme === 'dark'
-                      ? 'bg-slate-800 text-slate-200'
-                      : 'bg-surface text-slate-700'
-                  }`}
-                >
-                  {formatLocalizedDate(widgetPayload.date, widgetPayload.dayOfWeek, lang)}
-                </span>
-              </div>
-
-              {/* 위젯 본문: 학교 시간표 & 학원 시간표 2열 요약 */}
-              <div className="grid grid-cols-2 gap-2.5">
-                {/* 오늘의 학교 시간표 */}
-                <div
-                  className={`p-2.5 rounded-xl border ${
-                    widgetTheme === 'dark'
-                      ? 'bg-slate-800 border-transparent'
-                      : 'bg-sage-100 border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span
-                      className={`text-[11px] font-extrabold ${
-                        widgetTheme === 'dark' ? 'text-sage-300' : 'text-sage-800'
-                      }`}
-                    >
-                      {tr(lang, '학교 수업', 'School', '学校课程')}
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold ${
-                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-sage-700'
-                      }`}
-                    >
-                      {activeSchoolClasses.length}
-                      {tr(lang, '교시', 'p', '节')}
-                    </span>
-                  </div>
-
-                  {activeSchoolClasses.length === 0 ? (
-                    <p
-                      className={`text-[11px] py-2 text-center ${
-                        widgetTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
-                      }`}
-                    >
-                      {tr(lang, '오늘 학교 수업 없음', 'No classes today', '今日无学校课程')}
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      {activeSchoolClasses.slice(0, 4).map((item) => (
-                        <div
-                          key={item.period}
-                          className="flex items-center justify-between text-[11px] gap-1"
-                        >
-                          <span
-                            className={`font-mono text-[10px] shrink-0 ${
-                              widgetTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                            }`}
-                          >
-                            {item.period}
-                            {tr(lang, '교시', 'P', '节')}
-                          </span>
-                          <span className="font-bold truncate">
-                            {translateSubject(item.subject, lang)}
-                          </span>
-                        </div>
-                      ))}
-                      {activeSchoolClasses.length > 4 && (
-                        <div
-                          className={`text-[10px] font-semibold text-right pt-0.5 ${
-                            widgetTheme === 'dark' ? 'text-sage-300' : 'text-sage-700'
-                          }`}
-                        >
-                          +{activeSchoolClasses.length - 4}
-                          {tr(lang, '개 더보기', ' more', '节更多')}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 오늘의 학원 시간표 */}
-                <div
-                  className={`p-2.5 rounded-xl border ${
-                    widgetTheme === 'dark'
-                      ? 'bg-slate-800 border-transparent'
-                      : 'bg-accent-100 border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span
-                      className={`text-[11px] font-extrabold ${
-                        widgetTheme === 'dark' ? 'text-accent-300' : 'text-accent-800'
-                      }`}
-                    >
-                      {tr(lang, '학원 일정', 'Academy', '补习班')}
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold ${
-                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-accent-700'
-                      }`}
-                    >
-                      {activeAcademyClasses.length}
-                      {tr(lang, '건', '', '项')}
-                    </span>
-                  </div>
-
-                  {activeAcademyClasses.length === 0 ? (
-                    <p
-                      className={`text-[11px] py-2 text-center ${
-                        widgetTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
-                      }`}
-                    >
-                      {tr(lang, '오늘 학원 일정 없음', 'No academies today', '今日无补习班')}
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      {activeAcademyClasses.slice(0, 3).map((ac) => (
-                        <div key={ac.id} className="text-[11px] leading-tight">
-                          <div className="font-bold truncate">
-                            {translateSubject(ac.subject, lang)}
-                          </div>
-                          <div
-                            className={`font-mono text-[10px] ${
-                              widgetTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                            }`}
-                          >
-                            {ac.startTime}~{ac.endTime}
-                          </div>
-                        </div>
-                      ))}
-                      {activeAcademyClasses.length > 3 && (
-                        <div
-                          className={`text-[10px] font-semibold text-right pt-0.5 ${
-                            widgetTheme === 'dark' ? 'text-accent-300' : 'text-accent-700'
-                          }`}
-                        >
-                          +{activeAcademyClasses.length - 3}
-                          {tr(lang, '건 더보기', ' more', '项更多')}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 오늘의 주요 일정 요약 바 */}
-              <div
-                className={`mt-2.5 pt-2 border-t flex items-center justify-between gap-2 text-[11px] ${
-                  widgetTheme === 'dark' ? 'border-slate-700' : 'border-divider'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${
-                      widgetTheme === 'dark'
-                        ? 'bg-accent/20 text-accent-300'
-                        : 'bg-accent-100 text-accent-800'
-                    }`}
-                  >
-                    {tr(lang, '오늘 일정', 'Events', '今日日程')}
-                  </span>
-                  <span className="truncate font-semibold">
-                    {widgetPayload.todaySchedules.length > 0
-                      ? widgetPayload.todaySchedules
-                          .map((s) => translateSampleText(s.title, lang))
-                          .join(', ')
-                      : tr(
-                          lang,
-                          '등록된 특별 일정이 없습니다',
-                          'No special schedules today',
-                          '今日无特别日程'
-                        )}
-                  </span>
-                </div>
-                {widgetPayload.attendanceSummary.pendingMakeupCount > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-accent-100 text-accent-900 font-bold text-[10px] shrink-0">
-                    {tr(
-                      lang,
-                      `보강 ${widgetPayload.attendanceSummary.pendingMakeupCount}건`,
-                      `Makeup ${widgetPayload.attendanceSummary.pendingMakeupCount}`,
-                      `待补课 ${widgetPayload.attendanceSummary.pendingMakeupCount}`
-                    )}
-                  </span>
-                )}
-              </div>
-            </div>
+          {/* 선택 요약 */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="px-3 py-1 rounded-full bg-accent-100 text-accent-900 text-xs font-bold">
+              {tr(
+                lang,
+                `선택한 위젯 ${widgetConfig.enabled.length}개`,
+                `${widgetConfig.enabled.length} widget${widgetConfig.enabled.length === 1 ? '' : 's'} selected`,
+                `已选择 ${widgetConfig.enabled.length} 个小组件`
+              )}
+            </span>
+            <span className="text-[11px] text-slate-600 truncate">
+              {widgetConfig.enabled.length > 0
+                ? widgetConfig.enabled.map((id) => HOME_WIDGET_META[id].name(lang)).join(' · ')
+                : tr(lang, '아직 선택한 위젯이 없어요', 'No widgets selected yet', '尚未选择小组件')}
+            </span>
           </div>
+
+          {/* 위젯 갤러리 */}
+          <div className="space-y-3">
+            {HOME_WIDGET_IDS.map((id) => {
+              const meta = HOME_WIDGET_META[id];
+              const isOn = widgetConfig.enabled.includes(id);
+              return (
+                <div
+                  key={id}
+                  className={`rounded-2xl p-3 space-y-3 transition-colors ${
+                    isOn ? 'bg-paper ring-2 ring-accent' : 'bg-paper/60'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[13px] font-bold text-ink">{meta.name(lang)}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-surface text-[10px] font-mono text-slate-700">
+                          {meta.sizeLabel(lang)}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {tr(lang, `${meta.source(lang)} 메뉴`, `from ${meta.source(lang)}`, `来自${meta.source(lang)}`)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-slate-600">{meta.description(lang)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={isOn}
+                      onClick={() => toggleWidget(id)}
+                      className={`h-8 px-3 rounded-full text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
+                        isOn
+                          ? 'bg-sage-100 text-sage-800 hover:bg-sage-200'
+                          : 'bg-accent text-paper hover:bg-accent-600'
+                      }`}
+                    >
+                      {isOn ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                      {isOn
+                        ? tr(lang, '추가됨', 'Added', '已添加')
+                        : tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
+                    </button>
+                  </div>
+
+                  {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
+                  <div
+                    className={`p-3 rounded-2xl transition-colors ${
+                      widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'
+                    } ${isOn ? '' : 'opacity-80'}`}
+                  >
+                    <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-[11px] text-slate-600 leading-relaxed px-1">
+            {tr(
+              lang,
+              '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
+              'In the Android/iOS app, the selected widgets appear as real home-screen widgets. The web app shows a preview and syncs the widget data.',
+              '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
+            )}
+          </p>
 
           {/* 위젯 브릿지 동기화 상태 및 수동 새로고침 버튼 */}
           <div className="flex items-center justify-between gap-2 pt-1">
