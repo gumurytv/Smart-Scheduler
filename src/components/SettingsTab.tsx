@@ -1,0 +1,2251 @@
+import React, { useState, useRef } from 'react';
+import {
+  Plus,
+  X,
+  Copy,
+  Camera,
+  Upload,
+  Download,
+  FileUp,
+  CheckCircle2,
+  AlertCircle,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  RotateCcw,
+  Clock,
+  Globe,
+  BookOpen,
+  Sparkles,
+  Check,
+  Smartphone,
+  Sun,
+  Moon,
+} from 'lucide-react';
+import {
+  PlannerState,
+  DAYS_OF_WEEK,
+  DayOfWeek,
+  AIExtractedEntry,
+  SchoolPeriod,
+  AcademyItem,
+  AppLanguage,
+} from '../types';
+import { formatDateKey, generatePeriodSchedule } from '../data/initialData';
+import {
+  tr,
+  translateDay,
+  translateSubject,
+  translateSampleText,
+  USER_GUIDE_TOPICS,
+} from '../i18n/translations';
+import { buildWidgetSyncPayload, syncWidgetData } from '../utils/widgetSync';
+
+interface SettingsTabProps {
+  state: PlannerState;
+  onUpdateState: (updater: (prev: PlannerState) => PlannerState) => void;
+  onResetSampleData: () => void;
+}
+
+function createSampleTimetableImageBase64(): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = 680;
+  canvas.height = 460;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#1e293b';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText('2학년 3반 주간 시간표 및 방과후 학원 안내', 24, 42);
+
+  const cols = ['교시', '월', '화', '수', '목', '금'];
+  const rows = [
+    ['1교시 (09:00~09:45)', '국어', '수학', '영어', '과학', '수학'],
+    ['2교시 (09:55~10:40)', '수학', '영어', '국어', '한국사', '과학'],
+    ['3교시 (10:50~11:35)', '영어', '과학', '수학', '국어', '체육'],
+    ['4교시 (11:45~12:30)', '사회', '체육', '정보', '영어', '국어'],
+    ['5교시 (13:25~14:10)', '과학', '음악', '미술', '수학', '동아리'],
+  ];
+
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1;
+
+  const startX = 24;
+  const startY = 65;
+  const rowH = 38;
+  const colWidths = [160, 92, 92, 92, 92, 92];
+
+  let curX = startX;
+  cols.forEach((col, cIdx) => {
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(curX, startY, colWidths[cIdx], rowH);
+    ctx.strokeRect(curX, startY, colWidths[cIdx], rowH);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(col, curX + 14, startY + 24);
+    curX += colWidths[cIdx];
+  });
+
+  rows.forEach((r, rIdx) => {
+    let x = startX;
+    const y = startY + (rIdx + 1) * rowH;
+    r.forEach((cellText, cIdx) => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x, y, colWidths[cIdx], rowH);
+      ctx.strokeRect(x, y, colWidths[cIdx], rowH);
+      ctx.fillStyle = '#334155';
+      ctx.font = cIdx === 0 ? '12px monospace' : 'bold 14px sans-serif';
+      ctx.fillText(cellText, x + 12, y + 24);
+      x += colWidths[cIdx];
+    });
+  });
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(24, 310, 620, 125);
+  ctx.strokeRect(24, 310, 620, 125);
+
+  ctx.fillStyle = '#4f46e5';
+  ctx.font = 'bold 16px sans-serif';
+  ctx.fillText('[방과후 저녁 학원 시간표]', 40, 338);
+
+  ctx.fillStyle = '#1e293b';
+  ctx.font = '14px sans-serif';
+  ctx.fillText('• 월요일 17:00 ~ 19:00 : 수학학원   /   19:30 ~ 21:30 : 영어학원', 40, 368);
+  ctx.fillText('• 수요일 17:00 ~ 19:00 : 수학학원   /   19:30 ~ 21:00 : 과학학원', 40, 394);
+  ctx.fillText('• 토요일 10:00 ~ 12:30 : 논술학원', 40, 420);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  return dataUrl.replace(/^data:image\/png;base64,/, '');
+}
+
+export const SettingsTab: React.FC<SettingsTabProps> = ({
+  state,
+  onUpdateState,
+  onResetSampleData,
+}) => {
+  const lang: AppLanguage = state.language || 'ko';
+
+  // Selected interactive guide topic (default to first topic so user immediately sees step-by-step instructions)
+  const [selectedGuideId, setSelectedGuideId] = useState<string>(USER_GUIDE_TOPICS[0].id);
+  const [isGuideExpanded, setIsGuideExpanded] = useState<boolean>(true);
+
+  const [openSections, setOpenSections] = useState<Record<number, boolean>>({
+    1: true,
+    2: true,
+    3: true,
+    4: true,
+  });
+
+  const toggleSection = (idx: number) => {
+    setOpenSections((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  // --- SECTION 1: SUBJECT POOL STATE ---
+  const [newSchoolSubject, setNewSchoolSubject] = useState('');
+  const [newAcademySubject, setNewAcademySubject] = useState('');
+
+  // --- SECTION 2: MASTER TIMETABLE & TIMELINE RANGE STATE ---
+  const [selectedMasterDay, setSelectedMasterDay] = useState<DayOfWeek>('월');
+  const [copySourceDay, setCopySourceDay] = useState<DayOfWeek>('월');
+  const [copyTargetDay, setCopyTargetDay] = useState<DayOfWeek>('화');
+  const [masterFeedback, setMasterFeedback] = useState<string | null>(null);
+
+  // --- SECTION 3: AI TIMETABLE IMAGE RECOGNITION STATE ---
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiPreviewEntries, setAiPreviewEntries] = useState<AIExtractedEntry[]>([]);
+  const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
+  const [aiMergeSuccess, setAiMergeSuccess] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+  // --- SECTION 4: BACKUP & RESTORE STATE ---
+  const [backupFeedback, setBackupFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // --- SECTION 5: HOME SCREEN WIDGET PREVIEW STATE ---
+  const [widgetTheme, setWidgetTheme] = useState<'light' | 'dark'>('light');
+  const [widgetSyncToast, setWidgetSyncToast] = useState<string | null>(null);
+  const widgetPayload = buildWidgetSyncPayload(state);
+  const activeSchoolClasses = widgetPayload.schoolTimetable.filter(
+    (s) => !s.isCancelled && s.subject.trim() !== ''
+  );
+  const activeAcademyClasses = widgetPayload.academyTimetable.filter(
+    (a) => !a.isCancelled
+  );
+
+  const timelineStartHour = state.timelineConfig?.startHour ?? 8;
+  const timelineEndHour = state.timelineConfig?.endHour ?? 24;
+
+  const activeGuideTopic =
+    USER_GUIDE_TOPICS.find((g) => g.id === selectedGuideId) || USER_GUIDE_TOPICS[0];
+
+  const handleSetLanguage = (nextLang: AppLanguage) => {
+    onUpdateState((prev) => ({
+      ...prev,
+      language: nextLang,
+    }));
+  };
+
+  // ================= SECTION 1 HANDLERS =================
+  const handleAddSchoolSubject = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newSchoolSubject.trim();
+    if (!trimmed) return;
+    onUpdateState((prev) => {
+      if (prev.subjectPool.school.includes(trimmed)) return prev;
+      return {
+        ...prev,
+        subjectPool: {
+          ...prev.subjectPool,
+          school: [...prev.subjectPool.school, trimmed],
+        },
+      };
+    });
+    setNewSchoolSubject('');
+  };
+
+  const handleRemoveSchoolSubject = (subj: string) => {
+    onUpdateState((prev) => ({
+      ...prev,
+      subjectPool: {
+        ...prev.subjectPool,
+        school: prev.subjectPool.school.filter((s) => s !== subj),
+      },
+    }));
+  };
+
+  const handleAddAcademySubject = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newAcademySubject.trim();
+    if (!trimmed) return;
+    onUpdateState((prev) => {
+      if (prev.subjectPool.academy.includes(trimmed)) return prev;
+      return {
+        ...prev,
+        subjectPool: {
+          ...prev.subjectPool,
+          academy: [...prev.subjectPool.academy, trimmed],
+        },
+      };
+    });
+    setNewAcademySubject('');
+  };
+
+  const handleRemoveAcademySubject = (acName: string) => {
+    onUpdateState((prev) => ({
+      ...prev,
+      subjectPool: {
+        ...prev.subjectPool,
+        academy: prev.subjectPool.academy.filter((a) => a !== acName),
+      },
+    }));
+  };
+
+  // ================= SECTION 2 HANDLERS =================
+  const showMasterToast = (msg: string) => {
+    setMasterFeedback(msg);
+    setTimeout(() => setMasterFeedback(null), 2800);
+  };
+
+  const handleUpdateTimelineRange = (newStart: number, newEnd: number) => {
+    const validStart = Math.max(0, Math.min(22, newStart));
+    const validEnd = Math.max(validStart + 2, Math.min(24, newEnd));
+    onUpdateState((prev) => ({
+      ...prev,
+      timelineConfig: {
+        startHour: validStart,
+        endHour: validEnd,
+      },
+    }));
+    const startStr = `${String(validStart).padStart(2, '0')}:00`;
+    const endStr = `${String(validEnd).padStart(2, '0')}:00`;
+    showMasterToast(
+      tr(
+        lang,
+        `일별 시간표 표시 범위가 ${startStr} ~ ${endStr} (${validEnd - validStart}시간)으로 설정되었습니다.`,
+        `Daily timeline range set to ${startStr} ~ ${endStr} (${validEnd - validStart} hrs).`,
+        `每日时间轴显示范围已设置为 ${startStr} ~ ${endStr}（共 ${validEnd - validStart} 小时）。`
+      )
+    );
+  };
+
+  const handleApplySchoolDurationPreset = (minutes: 40 | 45 | 50, label: string) => {
+    onUpdateState((prev) => {
+      const nextMaster = { ...prev.masterTimetable };
+      (['월', '화', '수', '목', '금', '토', '일'] as DayOfWeek[]).forEach((day) => {
+        const currentPeriods = nextMaster[day].school;
+        if (currentPeriods.length === 0) return;
+        const currentSubjects = currentPeriods.map((p) => p.subject);
+        const generated = generatePeriodSchedule(minutes, currentSubjects).slice(
+          0,
+          currentPeriods.length
+        );
+        nextMaster[day] = {
+          ...nextMaster[day],
+          school: generated,
+        };
+      });
+      return {
+        ...prev,
+        masterTimetable: nextMaster,
+      };
+    });
+    showMasterToast(
+      tr(
+        lang,
+        `${label}(${minutes}분) 교시 시간 프리셋이 전체 요일에 적용되었습니다.`,
+        `${label} (${minutes}-min) period preset applied to all days.`,
+        `${label}（${minutes}分钟）标准课时预设已应用到所有星期。`
+      )
+    );
+  };
+
+  const handleCopyDayTimetable = () => {
+    if (copySourceDay === copyTargetDay) {
+      showMasterToast(
+        tr(
+          lang,
+          '복사할 원본 요일과 대상 요일을 다르게 선택해 주세요.',
+          'Please select different source and target days.',
+          '请选择不同的源星期和目标星期。'
+        )
+      );
+      return;
+    }
+    onUpdateState((prev) => {
+      const sourceData = prev.masterTimetable[copySourceDay];
+      const clonedSchool: SchoolPeriod[] = sourceData.school.map((s) => ({ ...s }));
+      const clonedAcademy: AcademyItem[] = sourceData.academy.map((a, idx) => ({
+        ...a,
+        id: `ac-${copyTargetDay}-${Date.now()}-${idx}`,
+      }));
+
+      return {
+        ...prev,
+        masterTimetable: {
+          ...prev.masterTimetable,
+          [copyTargetDay]: {
+            school: clonedSchool,
+            academy: clonedAcademy,
+          },
+        },
+      };
+    });
+    showMasterToast(
+      tr(
+        lang,
+        `${copySourceDay}요일 기본 시간표를 ${copyTargetDay}요일로 복사했습니다.`,
+        `Copied ${translateDay(copySourceDay, lang)} schedule to ${translateDay(copyTargetDay, lang)}.`,
+        `已将${translateDay(copySourceDay, lang)}固定课表复制到${translateDay(copyTargetDay, lang)}。`
+      )
+    );
+  };
+
+  const handleUpdateMasterSchoolPeriod = (
+    periodNum: number,
+    patch: Partial<SchoolPeriod>
+  ) => {
+    onUpdateState((prev) => {
+      const dayData = prev.masterTimetable[selectedMasterDay];
+      const updatedSchool = dayData.school.map((p) =>
+        p.period === periodNum ? { ...p, ...patch } : p
+      );
+      return {
+        ...prev,
+        masterTimetable: {
+          ...prev.masterTimetable,
+          [selectedMasterDay]: {
+            ...dayData,
+            school: updatedSchool,
+          },
+        },
+      };
+    });
+  };
+
+  const handleAddMasterSchoolPeriod = () => {
+    onUpdateState((prev) => {
+      const dayData = prev.masterTimetable[selectedMasterDay];
+      const nextPeriodNum = dayData.school.length + 1;
+      const newPeriod: SchoolPeriod = {
+        period: nextPeriodNum,
+        startTime: '15:20',
+        endTime: '16:05',
+        subject: prev.subjectPool.school[0] || '국어',
+      };
+      return {
+        ...prev,
+        masterTimetable: {
+          ...prev.masterTimetable,
+          [selectedMasterDay]: {
+            ...dayData,
+            school: [...dayData.school, newPeriod],
+          },
+        },
+      };
+    });
+  };
+
+  const handleRemoveLastMasterSchoolPeriod = () => {
+    onUpdateState((prev) => {
+      const dayData = prev.masterTimetable[selectedMasterDay];
+      if (dayData.school.length === 0) return prev;
+      return {
+        ...prev,
+        masterTimetable: {
+          ...prev.masterTimetable,
+          [selectedMasterDay]: {
+            ...dayData,
+            school: dayData.school.slice(0, -1),
+          },
+        },
+      };
+    });
+  };
+
+  const handleAddMasterAcademyItem = () => {
+    onUpdateState((prev) => {
+      const dayData = prev.masterTimetable[selectedMasterDay];
+      const newItem: AcademyItem = {
+        id: `ac-${selectedMasterDay}-${Date.now()}`,
+        startTime: '17:00',
+        endTime: '19:00',
+        subject: prev.subjectPool.academy[0] || '수학학원',
+      };
+      return {
+        ...prev,
+        masterTimetable: {
+          ...prev.masterTimetable,
+          [selectedMasterDay]: {
+            ...dayData,
+            academy: [...dayData.academy, newItem],
+          },
+        },
+      };
+    });
+  };
+
+  const handleUpdateMasterAcademyItem = (id: string, patch: Partial<AcademyItem>) => {
+    onUpdateState((prev) => {
+      const dayData = prev.masterTimetable[selectedMasterDay];
+      return {
+        ...prev,
+        masterTimetable: {
+          ...prev.masterTimetable,
+          [selectedMasterDay]: {
+            ...dayData,
+            academy: dayData.academy.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+          },
+        },
+      };
+    });
+  };
+
+  const handleDeleteMasterAcademyItem = (id: string) => {
+    onUpdateState((prev) => {
+      const dayData = prev.masterTimetable[selectedMasterDay];
+      return {
+        ...prev,
+        masterTimetable: {
+          ...prev.masterTimetable,
+          [selectedMasterDay]: {
+            ...dayData,
+            academy: dayData.academy.filter((a) => a.id !== id),
+          },
+        },
+      };
+    });
+  };
+
+  // ================= SECTION 3: AI TIMETABLE IMAGE RECOGNITION HANDLERS =================
+  const runAiTimetableAnalysis = async (base64Data: string, mimeType: string) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setAiError(
+        tr(
+          lang,
+          '현재 오프라인 상태입니다. [AI 시간표 이미지 인식] 기능은 인터넷 연결이 필요합니다.',
+          'You are currently offline. [AI Timetable Image Recognition] requires an active internet connection.',
+          '当前处于离线状态。【AI 课表图片识别】功能需要连接互联网后使用。'
+        )
+      );
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError(null);
+    setAiMergeSuccess(null);
+
+    try {
+      const defaultPeriods =
+        state.masterTimetable['월'].school.length > 0
+          ? state.masterTimetable['월'].school
+          : generatePeriodSchedule(45, []);
+
+      const response = await fetch('/api/parse-timetable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Data,
+          mimeType,
+          defaultPeriods,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'AI analysis failed.');
+      }
+
+      const rawEntries = Array.isArray(data.entries) ? data.entries : [];
+      const mapped: AIExtractedEntry[] = rawEntries.map(
+        (item: Partial<AIExtractedEntry>, idx: number) => {
+          const validDay = DAYS_OF_WEEK.includes(item.day as DayOfWeek)
+            ? (item.day as DayOfWeek)
+            : '월';
+          const isAcademy = item.type === 'academy';
+          const periodNum = isAcademy ? 0 : Number(item.period) || 1;
+
+          let startTime = item.startTime || '09:00';
+          let endTime = item.endTime || '09:45';
+          if (!isAcademy) {
+            const matchedDefault = defaultPeriods.find((p) => p.period === periodNum);
+            if (matchedDefault && (!item.startTime || !item.endTime)) {
+              startTime = matchedDefault.startTime;
+              endTime = matchedDefault.endTime;
+            }
+          }
+
+          return {
+            id: `ai-entry-${Date.now()}-${idx}`,
+            day: validDay,
+            type: isAcademy ? 'academy' : 'school',
+            period: periodNum,
+            startTime,
+            endTime,
+            subject: (item.subject || '자습').trim(),
+          };
+        }
+      );
+
+      setAiSummary(
+        data.summary ||
+          tr(
+            lang,
+            `총 ${mapped.length}개의 수업/학원 항목이 인식되었습니다.`,
+            `Extracted ${mapped.length} school/academy entries.`,
+            `共识别出 ${mapped.length} 条学校/补习班课程记录。`
+          )
+      );
+      setAiPreviewEntries(mapped);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : tr(
+              lang,
+              '시간표 이미지를 분석하는 도중 오류가 발생했습니다.',
+              'An error occurred while analyzing the timetable image.',
+              '分析课表图片时发生错误。'
+            );
+      setAiError(msg);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const resultStr = reader.result as string;
+      setUploadedPreviewUrl(resultStr);
+      const base64Clean = resultStr.split(',')[1] || '';
+      runAiTimetableAnalysis(base64Clean, file.type || 'image/png');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRunSampleImageDemo = () => {
+    const base64Clean = createSampleTimetableImageBase64();
+    if (!base64Clean) return;
+    setUploadedPreviewUrl(`data:image/png;base64,${base64Clean}`);
+    runAiTimetableAnalysis(base64Clean, 'image/png');
+  };
+
+  const handleUpdatePreviewEntry = (id: string, patch: Partial<AIExtractedEntry>) => {
+    setAiPreviewEntries((prev) =>
+      prev.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry))
+    );
+  };
+
+  const handleDeletePreviewEntry = (id: string) => {
+    setAiPreviewEntries((prev) => prev.filter((entry) => entry.id !== id));
+  };
+
+  const handleMergeAiPreviewToMaster = () => {
+    if (aiPreviewEntries.length === 0) return;
+
+    onUpdateState((prev) => {
+      const nextSchoolPool = new Set(prev.subjectPool.school);
+      const nextAcademyPool = new Set(prev.subjectPool.academy);
+      const nextMaster = { ...prev.masterTimetable };
+
+      DAYS_OF_WEEK.forEach((d) => {
+        nextMaster[d] = {
+          school: [...nextMaster[d].school.map((s) => ({ ...s }))],
+          academy: [...nextMaster[d].academy.map((a) => ({ ...a }))],
+        };
+      });
+
+      aiPreviewEntries.forEach((entry) => {
+        const cleanSubj = entry.subject.trim();
+        if (!cleanSubj) return;
+
+        if (entry.type === 'school') {
+          nextSchoolPool.add(cleanSubj);
+          const daySchool = nextMaster[entry.day].school;
+          const existingIdx = daySchool.findIndex((p) => p.period === entry.period);
+          const periodObj: SchoolPeriod = {
+            period: entry.period || 1,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            subject: cleanSubj,
+          };
+          if (existingIdx >= 0) {
+            daySchool[existingIdx] = periodObj;
+          } else {
+            daySchool.push(periodObj);
+            daySchool.sort((a, b) => a.period - b.period);
+          }
+        } else {
+          nextAcademyPool.add(cleanSubj);
+          const dayAcademy = nextMaster[entry.day].academy;
+          const dupIdx = dayAcademy.findIndex(
+            (a) => a.startTime === entry.startTime && a.subject === cleanSubj
+          );
+          const acObj: AcademyItem = {
+            id: `ac-ai-${entry.day}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            subject: cleanSubj,
+          };
+          if (dupIdx >= 0) {
+            dayAcademy[dupIdx] = acObj;
+          } else {
+            dayAcademy.push(acObj);
+          }
+        }
+      });
+
+      return {
+        ...prev,
+        subjectPool: {
+          school: Array.from(nextSchoolPool),
+          academy: Array.from(nextAcademyPool),
+        },
+        masterTimetable: nextMaster,
+      };
+    });
+
+    setAiMergeSuccess(
+      tr(
+        lang,
+        `총 ${aiPreviewEntries.length}개 항목이 기본 시간표 및 과목 후보군에 성공적으로 병합되었습니다!`,
+        `Successfully merged ${aiPreviewEntries.length} items into your master timetable and subject pool!`,
+        `已成功将 ${aiPreviewEntries.length} 个项目合并到固定课表及候选科目库中！`
+      )
+    );
+    setAiPreviewEntries([]);
+  };
+
+  // ================= SECTION 4: BACKUP & RESTORE HANDLERS =================
+  const handleExportBackupJson = () => {
+    const now = new Date();
+    const ymd = formatDateKey(now).replace(/-/g, '');
+    const timestamp = `${formatDateKey(now)} ${String(now.getHours()).padStart(2, '0')}:${String(
+      now.getMinutes()
+    ).padStart(2, '0')}`;
+
+    const exportState: PlannerState = {
+      ...state,
+      backupMeta: {
+        lastBackupDate: timestamp,
+      },
+    };
+
+    onUpdateState(() => exportState);
+
+    const blob = new Blob([JSON.stringify(exportState, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `smart_student_planner_backup_${ymd}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setBackupFeedback({
+      type: 'success',
+      message: tr(
+        lang,
+        `smart_student_planner_backup_${ymd}.json 파일이 저장되었습니다.`,
+        `Saved backup file: smart_student_planner_backup_${ymd}.json`,
+        `备份文件 smart_student_planner_backup_${ymd}.json 已保存。`
+      ),
+    });
+  };
+
+  const handleImportBackupJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+
+        if (
+          !parsed ||
+          typeof parsed !== 'object' ||
+          !parsed.subjectPool ||
+          !Array.isArray(parsed.subjectPool.school) ||
+          !Array.isArray(parsed.subjectPool.academy) ||
+          !parsed.masterTimetable ||
+          !Array.isArray(parsed.schedules) ||
+          typeof parsed.attendance !== 'object' ||
+          typeof parsed.memos !== 'object'
+        ) {
+          throw new Error(
+            tr(
+              lang,
+              '유효한 스마트 플래너 백업 JSON 파일 형식이 아닙니다.',
+              'Invalid Smart Planner backup JSON file format.',
+              '无效的智能规划器备份 JSON 文件格式。'
+            )
+          );
+        }
+
+        const now = new Date();
+        const timestamp = `${formatDateKey(now)} ${String(now.getHours()).padStart(
+          2,
+          '0'
+        )}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        onUpdateState((prev) => ({
+          language: parsed.language || prev.language || 'ko',
+          subjectPool: parsed.subjectPool,
+          masterTimetable: parsed.masterTimetable,
+          dailyOverrides: parsed.dailyOverrides || {},
+          schedules: parsed.schedules,
+          attendance: parsed.attendance,
+          memos: parsed.memos,
+          backupMeta: {
+            lastBackupDate: parsed.backupMeta?.lastBackupDate || timestamp,
+          },
+          timelineConfig: parsed.timelineConfig || {
+            startHour: 8,
+            endHour: 24,
+          },
+        }));
+
+        setBackupFeedback({
+          type: 'success',
+          message: tr(
+            lang,
+            '백업 파일 검증이 완료되어 모든 시간표·일정·출석·메모 데이터가 100% 복원되었습니다!',
+            'Backup verified! All timetable, schedule, attendance, and memo data restored 100%.',
+            '备份文件验证通过，所有课表、日程、出勤及备忘数据已 100% 恢复！'
+          ),
+        });
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : tr(lang, '파일을 읽는 중 오류가 발생했습니다.', 'Failed to read file.', '读取文件时出错。');
+        setBackupFeedback({
+          type: 'error',
+          message: msg,
+        });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const currentMasterDayData = state.masterTimetable[selectedMasterDay];
+
+  return (
+    <div className="space-y-4">
+      {/* TOP BAR 1: LANGUAGE SWITCHER (한국어 / English / 中文) */}
+      <section className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <Globe className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                {tr(lang, '앱 표시 언어 설정 (Language)', 'App Language Settings', '应用显示语言设置 (Language)')}
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                {tr(
+                  lang,
+                  '선택 즉시 앱의 모든 메뉴·과목·가이드가 해당 언어로 전환됩니다.',
+                  'Instantly switches all menus, subjects, and guides to the selected language.',
+                  '点击后立即将应用内所有菜单、科目及使用指南切换为所选语言。'
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {(
+            [
+              { code: 'ko', label: '한국어', sub: 'Korean' },
+              { code: 'en', label: 'English', sub: '영어권' },
+              { code: 'zh', label: '中文', sub: '중국어권' },
+            ] as Array<{ code: AppLanguage; label: string; sub: string }>
+          ).map((item) => {
+            const isSelected = lang === item.code;
+            return (
+              <button
+                key={item.code}
+                type="button"
+                onClick={() => handleSetLanguage(item.code)}
+                className={`min-h-[46px] px-3 py-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                    : 'bg-slate-50 text-slate-800 border-slate-200/90 hover:border-indigo-300 hover:bg-indigo-50/30'
+                }`}
+              >
+                <div className="flex items-center gap-1 text-xs font-bold">
+                  {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                  <span>{item.label}</span>
+                </div>
+                <span
+                  className={`text-[10px] ${
+                    isSelected ? 'text-indigo-100' : 'text-slate-400'
+                  }`}
+                >
+                  {item.sub}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* TOP BAR 2: INTERACTIVE STEP-BY-STEP APP USER GUIDE */}
+      <section className="bg-white rounded-2xl border-2 border-indigo-500/80 shadow-xs overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setIsGuideExpanded((prev) => !prev)}
+          className="w-full px-4 py-3.5 bg-indigo-50/70 border-b border-indigo-100 flex items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-slate-900">
+                  {tr(
+                    lang,
+                    '스마트 플래너 핵심 기능 & 단계별 사용 가이드',
+                    'Interactive Feature & Step-by-Step Guide',
+                    '智能规划器核心功能与分步使用指南'
+                  )}
+                </h2>
+                <span className="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-bold">
+                  GUIDE
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                {tr(
+                  lang,
+                  '원하는 주요 기능을 터치하면 구체적인 설정·사용 스텝(Step 1~3)을 안내합니다.',
+                  'Select any feature below to view detailed step-by-step instructions.',
+                  '点击下方任意核心功能，即可查看具体的设置与操作步骤（Step 1~3）。'
+                )}
+              </p>
+            </div>
+          </div>
+          {isGuideExpanded ? (
+            <ChevronUp className="w-4 h-4 text-indigo-700 shrink-0" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-indigo-700 shrink-0" />
+          )}
+        </button>
+
+        {isGuideExpanded && (
+          <div className="p-4 space-y-3.5">
+            {/* 6 Major Feature Selector Grid */}
+            <div className="grid grid-cols-2 gap-1.5">
+              {USER_GUIDE_TOPICS.map((topic, idx) => {
+                const isSelected = topic.id === selectedGuideId;
+                return (
+                  <button
+                    key={topic.id}
+                    type="button"
+                    onClick={() => setSelectedGuideId(topic.id)}
+                    className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-1.5 ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200/80 hover:border-indigo-300'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div
+                        className={`text-[10px] font-mono font-bold ${
+                          isSelected ? 'text-indigo-200' : 'text-indigo-600'
+                        }`}
+                      >
+                        0{idx + 1}
+                      </div>
+                      <div className="text-xs font-bold truncate mt-0.5">
+                        {tr(lang, topic.badge.ko, topic.badge.en, topic.badge.zh)}
+                      </div>
+                    </div>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform ${
+                        isSelected ? 'text-white -rotate-90' : 'text-slate-400'
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Feature Step-by-Step Walkthrough Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-indigo-200/90 space-y-3">
+              <div className="space-y-1 border-b border-slate-200/80 pb-2.5">
+                <span className="inline-block px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+                  {tr(
+                    lang,
+                    activeGuideTopic.badge.ko,
+                    activeGuideTopic.badge.en,
+                    activeGuideTopic.badge.zh
+                  )}
+                </span>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {tr(
+                    lang,
+                    activeGuideTopic.title.ko,
+                    activeGuideTopic.title.en,
+                    activeGuideTopic.title.zh
+                  )}
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {tr(
+                    lang,
+                    activeGuideTopic.summary.ko,
+                    activeGuideTopic.summary.en,
+                    activeGuideTopic.summary.zh
+                  )}
+                </p>
+              </div>
+
+              {/* Concrete Steps */}
+              <div className="space-y-2">
+                {activeGuideTopic.steps.map((st, sIdx) => (
+                  <div
+                    key={sIdx}
+                    className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-1"
+                  >
+                    <div className="text-xs font-bold text-indigo-700">
+                      {tr(lang, st.stepTitle.ko, st.stepTitle.en, st.stepTitle.zh)}
+                    </div>
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      {tr(lang, st.stepDesc.ko, st.stepDesc.en, st.stepDesc.zh)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pro Tip Box */}
+              <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/90 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] font-semibold text-amber-900 leading-relaxed">
+                  <strong className="font-bold mr-1">TIP:</strong>
+                  {tr(
+                    lang,
+                    activeGuideTopic.tip.ko,
+                    activeGuideTopic.tip.en,
+                    activeGuideTopic.tip.zh
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 1: 과목 후보군(Subject Pool) 설정 */}
+      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <button
+          type="button"
+          onClick={() => toggleSection(1)}
+          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+        >
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              {tr(
+                lang,
+                '1. 과목 후보군 (Subject Pool) 설정',
+                '1. Subject & Academy Pool Setup',
+                '1. 候选科目库 (Subject Pool) 设置'
+              )}
+            </h2>
+            <p className="text-[11px] text-slate-500">
+              {tr(
+                lang,
+                '시간표 터치 수정 시 버튼으로 나타날 학교 과목 및 학원 후보군',
+                'School subjects and academies shown as quick-select buttons when editing timetables',
+                '点击课表修改时作为快捷按钮显示的学校科目与补习班候选列表'
+              )}
+            </p>
+          </div>
+          {openSections[1] ? (
+            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+          )}
+        </button>
+
+        {openSections[1] && (
+          <div className="p-4 space-y-5">
+            {/* School Subject Pool */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-indigo-700">
+                  {tr(
+                    lang,
+                    `학교 과목 후보군 (${state.subjectPool.school.length}종)`,
+                    `School Subjects (${state.subjectPool.school.length})`,
+                    `学校候选科目 (${state.subjectPool.school.length}种)`
+                  )}
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {state.subjectPool.school.map((subj) => (
+                  <span
+                    key={subj}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-bold"
+                  >
+                    {translateSubject(subj, lang)}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSchoolSubject(subj)}
+                      className="text-slate-400 hover:text-rose-600"
+                      aria-label={`${subj} delete`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <form onSubmit={handleAddSchoolSubject} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={tr(
+                    lang,
+                    '새 학교 과목 입력 (예: 제2외국어, 진로)',
+                    'Add new school subject (e.g. Physics, Spanish)',
+                    '输入新学校科目（如：物理、第二外语）'
+                  )}
+                  value={newSchoolSubject}
+                  onChange={(e) => setNewSchoolSubject(e.target.value)}
+                  className="flex-1 h-10 px-3 rounded-xl border border-slate-300 text-xs font-medium text-slate-900"
+                />
+                <button
+                  type="submit"
+                  className="h-10 px-3.5 rounded-xl bg-indigo-600 text-white text-xs font-bold inline-flex items-center gap-1 hover:bg-indigo-700 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
+                </button>
+              </form>
+            </div>
+
+            {/* Academy Subject Pool */}
+            <div className="space-y-2.5 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-violet-700">
+                  {tr(
+                    lang,
+                    `학원 후보군 (${state.subjectPool.academy.length}종)`,
+                    `Academies (${state.subjectPool.academy.length})`,
+                    `补习班候选库 (${state.subjectPool.academy.length}家)`
+                  )}
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {state.subjectPool.academy.map((acName) => (
+                  <span
+                    key={acName}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-50 text-violet-900 border border-violet-200 text-xs font-bold"
+                  >
+                    {translateSubject(acName, lang)}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAcademySubject(acName)}
+                      className="text-violet-400 hover:text-rose-600"
+                      aria-label={`${acName} delete`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <form onSubmit={handleAddAcademySubject} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={tr(
+                    lang,
+                    '새 학원명 입력 (예: 피아노학원, 국어학원)',
+                    'Add new academy (e.g. Piano Academy)',
+                    '输入新补习班名称（如：钢琴班、语文班）'
+                  )}
+                  value={newAcademySubject}
+                  onChange={(e) => setNewAcademySubject(e.target.value)}
+                  className="flex-1 h-10 px-3 rounded-xl border border-slate-300 text-xs font-medium text-slate-900"
+                />
+                <button
+                  type="submit"
+                  className="h-10 px-3.5 rounded-xl bg-violet-600 text-white text-xs font-bold inline-flex items-center gap-1 hover:bg-violet-700 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 2: 하루 시간표 표시 시간(시작~종료) 및 학교/학원 기본 시간표 설정 */}
+      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <button
+          type="button"
+          onClick={() => toggleSection(2)}
+          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+        >
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              {tr(
+                lang,
+                '2. 시간표 표시 시간 (시작~종료) 및 기본 시간표 설정',
+                '2. Timeline Display Hours & Master Timetable Setup',
+                '2. 时间轴起止时间与每周固定课表设置'
+              )}
+            </h2>
+            <p className="text-[11px] text-slate-500">
+              {tr(
+                lang,
+                '일별 타임라인 시작·종료 시각 설정, 초·중·고 교시 프리셋 및 요일별 시간표 편집',
+                'Configure daily timeline start/end hours, school period presets, and weekly master schedules',
+                '设置每日时间轴开始与结束时间、标准课时预设及编辑各星期固定课表'
+              )}
+            </p>
+          </div>
+          {openSections[2] ? (
+            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+          )}
+        </button>
+
+        {openSections[2] && (
+          <div className="p-4 space-y-4">
+            {masterFeedback && (
+              <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-900">
+                {masterFeedback}
+              </div>
+            )}
+
+            {/* Daily Timeline Start & End Hour Configuration */}
+            <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-slate-900">
+                    {tr(
+                      lang,
+                      '시간표 하루 시작·종료 시간 설정',
+                      'Daily Timeline Start & End Hours',
+                      '课程表每日开始与结束时间设置'
+                    )}
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[11px] font-mono font-bold tabular-nums">
+                  {String(timelineStartHour).padStart(2, '0')}:00 ~{' '}
+                  {String(timelineEndHour).padStart(2, '0')}:00 ({timelineEndHour - timelineStartHour}h)
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-600">
+                {tr(
+                  lang,
+                  '[시간표 > 일별 상세 보기]의 타임라인 표와 빈 시간 계산에 적용할 하루의 시작 시각과 종료 시각을 선택하세요.',
+                  'Choose the start and end hours displayed on the Daily Timeline and used for free-time calculation.',
+                  '选择应用于【课程表 > 每日详情】时间轴视图及空闲时间计算的每日起止时间。'
+                )}
+              </p>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    {tr(lang, '하루 시작 시간', 'Start Hour', '开始时间')}
+                  </label>
+                  <select
+                    value={timelineStartHour}
+                    onChange={(e) => {
+                      const nextStart = Number(e.target.value);
+                      const adjustedEnd =
+                        timelineEndHour <= nextStart + 1
+                          ? Math.min(24, nextStart + 2)
+                          : timelineEndHour;
+                      handleUpdateTimelineRange(nextStart, adjustedEnd);
+                    }}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-mono font-bold text-slate-900 tabular-nums"
+                  >
+                    {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                      <option key={h} value={h}>
+                        {String(h).padStart(2, '0')}:00
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    {tr(lang, '하루 종료 시간', 'End Hour', '结束时间')}
+                  </label>
+                  <select
+                    value={timelineEndHour}
+                    onChange={(e) => {
+                      const nextEnd = Number(e.target.value);
+                      handleUpdateTimelineRange(timelineStartHour, nextEnd);
+                    }}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-mono font-bold text-slate-900 tabular-nums"
+                  >
+                    {[16, 17, 18, 19, 20, 21, 22, 23, 24]
+                      .filter((h) => h >= timelineStartHour + 2)
+                      .map((h) => (
+                        <option key={h} value={h}>
+                          {String(h).padStart(2, '0')}:00
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Quick Presets for Timeline Range */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleUpdateTimelineRange(6, 24)}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
+                    timelineStartHour === 6 && timelineEndHour === 24
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {tr(lang, '얼리버드 (06~24시)', 'Early (06-24h)', '早鸟 (06~24时)')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateTimelineRange(8, 24)}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
+                    timelineStartHour === 8 && timelineEndHour === 24
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {tr(lang, '기본 (08~24시)', 'Default (08-24h)', '默认 (08~24时)')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateTimelineRange(8, 22)}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-colors ${
+                    timelineStartHour === 8 && timelineEndHour === 22
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {tr(lang, '표준 (08~22시)', 'Compact (08-22h)', '紧凑 (08~22时)')}
+                </button>
+              </div>
+            </div>
+
+            {/* School Duration Presets */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <span className="block text-xs font-bold text-slate-800">
+                {tr(
+                  lang,
+                  '교시 시간 자동 세팅 프리셋 (1교시 09:00 시작 기준)',
+                  'Auto Period Duration Presets (Starts at 09:00)',
+                  '课时长度自动预设（以第1节 09:00 开始为准）'
+                )}
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplySchoolDurationPreset(40, tr(lang, '초등', 'Elementary', '小学'))
+                  }
+                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
+                >
+                  {tr(lang, '초등 (40분)', 'Elem (40m)', '小学 (40分)')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplySchoolDurationPreset(45, tr(lang, '중등', 'Middle', '初中'))
+                  }
+                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
+                >
+                  {tr(lang, '중등 (45분)', 'Middle (45m)', '初中 (45分)')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplySchoolDurationPreset(50, tr(lang, '고등', 'High', '高中'))
+                  }
+                  className="min-h-[40px] px-2 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-indigo-50 hover:border-indigo-300"
+                >
+                  {tr(lang, '고등 (50분)', 'High (50m)', '高中 (50分)')}
+                </button>
+              </div>
+            </div>
+
+            {/* Copy Day Timetable Control */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <span className="block text-xs font-bold text-slate-800">
+                {tr(lang, '다른 요일 시간표 복사하기', 'Copy Day Schedule', '复制星期课表')}
+              </span>
+              <div className="flex items-center gap-2">
+                <select
+                  value={copySourceDay}
+                  onChange={(e) => setCopySourceDay(e.target.value as DayOfWeek)}
+                  className="h-10 px-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800"
+                >
+                  {DAYS_OF_WEEK.map((d) => (
+                    <option key={d} value={d}>
+                      {translateDay(d, lang)} {tr(lang, '원본', 'From', '源')}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs font-bold text-slate-400">→</span>
+                <select
+                  value={copyTargetDay}
+                  onChange={(e) => setCopyTargetDay(e.target.value as DayOfWeek)}
+                  className="h-10 px-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800"
+                >
+                  {DAYS_OF_WEEK.map((d) => (
+                    <option key={d} value={d}>
+                      {translateDay(d, lang)} {tr(lang, '대상', 'To', '目标')}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleCopyDayTimetable}
+                  className="flex-1 h-10 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-slate-800 whitespace-nowrap"
+                >
+                  <Copy className="w-3.5 h-3.5" /> {tr(lang, '복사 실행', 'Copy', '执行复制')}
+                </button>
+              </div>
+            </div>
+
+            {/* Day Selector Tabs for Editing Master Timetable */}
+            <div className="grid grid-cols-7 gap-1">
+              {DAYS_OF_WEEK.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setSelectedMasterDay(d)}
+                  className={`py-2 rounded-xl text-xs font-bold transition-colors ${
+                    selectedMasterDay === d
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {translateDay(d, lang)}
+                </button>
+              ))}
+            </div>
+
+            {/* Master School Periods Editor */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-700">
+                  {translateDay(selectedMasterDay, lang)}{' '}
+                  {tr(
+                    lang,
+                    `기본 학교 시간표 (${currentMasterDayData.school.length}교시)`,
+                    `Master School Schedule (${currentMasterDayData.school.length} periods)`,
+                    `固定学校课表 (${currentMasterDayData.school.length}节课)`
+                  )}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleRemoveLastMasterSchoolPeriod}
+                    className="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-bold hover:bg-slate-200"
+                  >
+                    {tr(lang, '- 교시 삭제', '- Remove', '- 删除末节')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddMasterSchoolPeriod}
+                    className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-bold hover:bg-indigo-100"
+                  >
+                    {tr(lang, '+ 교시 추가', '+ Period', '+ 添加课时')}
+                  </button>
+                </div>
+              </div>
+
+              {currentMasterDayData.school.length === 0 ? (
+                <p className="text-xs text-slate-400 py-2 text-center">
+                  {tr(
+                    lang,
+                    '등록된 정규 교시가 없습니다. [+ 교시 추가]를 눌러 추가하세요.',
+                    'No school periods configured for this day.',
+                    '当天未登记学校常规课时，请点击【+ 添加课时】。'
+                  )}
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {currentMasterDayData.school.map((p) => (
+                    <div
+                      key={p.period}
+                      className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                    >
+                      <span className="w-11 text-xs font-mono font-bold text-indigo-700 shrink-0 tabular-nums">
+                        {tr(lang, `${p.period}교시`, `P${p.period}`, `第${p.period}节`)}
+                      </span>
+                      <input
+                        type="time"
+                        value={p.startTime}
+                        onChange={(e) =>
+                          handleUpdateMasterSchoolPeriod(p.period, {
+                            startTime: e.target.value,
+                          })
+                        }
+                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                      />
+                      <span className="text-xs text-slate-400">~</span>
+                      <input
+                        type="time"
+                        value={p.endTime}
+                        onChange={(e) =>
+                          handleUpdateMasterSchoolPeriod(p.period, {
+                            endTime: e.target.value,
+                          })
+                        }
+                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                      />
+                      <select
+                        value={p.subject}
+                        onChange={(e) =>
+                          handleUpdateMasterSchoolPeriod(p.period, {
+                            subject: e.target.value,
+                          })
+                        }
+                        className="flex-1 h-8 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 min-w-0"
+                      >
+                        {state.subjectPool.school.map((s) => (
+                          <option key={s} value={s}>
+                            {translateSubject(s, lang)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Master Academy Editor */}
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-violet-700">
+                  {translateDay(selectedMasterDay, lang)}{' '}
+                  {tr(
+                    lang,
+                    `기본 학원 시간표 (${currentMasterDayData.academy.length}건)`,
+                    `Master Academies (${currentMasterDayData.academy.length})`,
+                    `固定补习班课表 (${currentMasterDayData.academy.length}项)`
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAddMasterAcademyItem}
+                  className="px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 text-[11px] font-bold hover:bg-violet-100"
+                >
+                  {tr(lang, '+ 학원 시간 추가', '+ Add Academy', '+ 添加补习班')}
+                </button>
+              </div>
+
+              {currentMasterDayData.academy.length === 0 ? (
+                <p className="text-xs text-slate-400 py-2 text-center">
+                  {tr(
+                    lang,
+                    '이 요일에 등록된 기본 학원 일정이 없습니다.',
+                    'No default academy classes on this day.',
+                    '当天没有登记固定补习班课程。'
+                  )}
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {currentMasterDayData.academy.map((ac) => (
+                    <div
+                      key={ac.id}
+                      className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                    >
+                      <input
+                        type="time"
+                        value={ac.startTime}
+                        onChange={(e) =>
+                          handleUpdateMasterAcademyItem(ac.id, {
+                            startTime: e.target.value,
+                          })
+                        }
+                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                      />
+                      <span className="text-xs text-slate-400">~</span>
+                      <input
+                        type="time"
+                        value={ac.endTime}
+                        onChange={(e) =>
+                          handleUpdateMasterAcademyItem(ac.id, {
+                            endTime: e.target.value,
+                          })
+                        }
+                        className="w-24 h-8 px-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
+                      />
+                      <select
+                        value={ac.subject}
+                        onChange={(e) =>
+                          handleUpdateMasterAcademyItem(ac.id, {
+                            subject: e.target.value,
+                          })
+                        }
+                        className="flex-1 h-8 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900 min-w-0"
+                      >
+                        {state.subjectPool.academy.map((aName) => (
+                          <option key={aName} value={aName}>
+                            {translateSubject(aName, lang)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMasterAcademyItem(ac.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600"
+                        aria-label="delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 3: AI 비정형 시간표 이미지 자동 인식 */}
+      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <button
+          type="button"
+          onClick={() => toggleSection(3)}
+          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+        >
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              {tr(
+                lang,
+                '3. AI 비정형 시간표 이미지 자동 인식',
+                '3. AI Timetable Image Recognition',
+                '3. AI 非结构化课表图片自动识别'
+              )}
+            </h2>
+            <p className="text-[11px] text-slate-500">
+              {tr(
+                lang,
+                '가정통신문·칠판·손글씨 시간표 사진 분석 후 미리보기 표에서 검수/병합',
+                'Analyze timetable photos with Gemini AI, edit in preview table, and merge',
+                '分析纸质通知单、黑板或手写课表照片，在预览表中核对后一键合并'
+              )}
+            </p>
+          </div>
+          {openSections[3] ? (
+            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+          )}
+        </button>
+
+        {openSections[3] && (
+          <div className="p-4 space-y-4">
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageFileChange}
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                disabled={aiLoading}
+                onClick={() => imageInputRef.current?.click()}
+                className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-60 active:scale-98 transition-all"
+              >
+                {aiLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {tr(
+                      lang,
+                      'Gemini AI가 시간표 이미지를 정밀 분석 중입니다...',
+                      'Gemini AI is analyzing your timetable image...',
+                      'Gemini AI 正在精准解析课表图片...'
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4" />
+                    {tr(
+                      lang,
+                      '카메라로 시간표 촬영 또는 이미지 업로드',
+                      'Take Photo or Upload Timetable Image',
+                      '拍摄课表照片或上传图片'
+                    )}
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={aiLoading}
+                onClick={handleRunSampleImageDemo}
+                className="w-full min-h-[40px] px-3 py-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-200 disabled:opacity-60"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {tr(
+                  lang,
+                  '샘플 가정통신문 시간표 이미지로 AI 인식 즉시 체험하기',
+                  'Try Instant Demo with Sample Timetable Image',
+                  '使用示例课表图片立即体验 AI 自动识别'
+                )}
+              </button>
+            </div>
+
+            {uploadedPreviewUrl && (
+              <div className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 p-2">
+                <img
+                  src={uploadedPreviewUrl}
+                  alt="Uploaded Timetable Preview"
+                  referrerPolicy="no-referrer"
+                  className="max-h-44 mx-auto object-contain rounded-lg"
+                />
+              </div>
+            )}
+
+            {aiError && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2 text-xs text-rose-800">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{aiError}</span>
+              </div>
+            )}
+
+            {aiMergeSuccess && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-xs font-bold text-emerald-900">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>{aiMergeSuccess}</span>
+              </div>
+            )}
+
+            {aiPreviewEntries.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900">
+                      {tr(
+                        lang,
+                        `AI 추출 결과 검수 표 (${aiPreviewEntries.length}건)`,
+                        `Editable AI Preview Table (${aiPreviewEntries.length} items)`,
+                        `AI 识别结果核对表 (${aiPreviewEntries.length}条)`
+                      )}
+                    </h3>
+                    {aiSummary && (
+                      <p className="text-[11px] text-slate-500 mt-0.5">{aiSummary}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                  {aiPreviewEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="p-2.5 bg-white flex items-center gap-1.5 flex-wrap text-xs"
+                    >
+                      <select
+                        value={entry.day}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            day: e.target.value as DayOfWeek,
+                          })
+                        }
+                        className="h-8 px-1.5 rounded-lg border border-slate-300 font-bold text-slate-800"
+                      >
+                        {DAYS_OF_WEEK.map((d) => (
+                          <option key={d} value={d}>
+                            {translateDay(d, lang)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={entry.type}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            type: e.target.value as 'school' | 'academy',
+                            period: e.target.value === 'academy' ? 0 : 1,
+                          })
+                        }
+                        className={`h-8 px-2 rounded-lg border font-bold ${
+                          entry.type === 'school'
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                            : 'bg-violet-50 border-violet-200 text-violet-800'
+                        }`}
+                      >
+                        <option value="school">{tr(lang, '학교', 'School', '学校')}</option>
+                        <option value="academy">{tr(lang, '학원', 'Academy', '补习班')}</option>
+                      </select>
+
+                      {entry.type === 'school' && (
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={entry.period}
+                          onChange={(e) =>
+                            handleUpdatePreviewEntry(entry.id, {
+                              period: Number(e.target.value) || 1,
+                            })
+                          }
+                          className="w-12 h-8 px-1.5 rounded-lg border border-slate-300 text-center font-mono font-bold"
+                          title="교시"
+                        />
+                      )}
+
+                      <input
+                        type="time"
+                        value={entry.startTime}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            startTime: e.target.value,
+                          })
+                        }
+                        className="w-22 h-8 px-1 rounded-lg border border-slate-300 font-mono"
+                      />
+                      <span className="text-slate-400">~</span>
+                      <input
+                        type="time"
+                        value={entry.endTime}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            endTime: e.target.value,
+                          })
+                        }
+                        className="w-22 h-8 px-1 rounded-lg border border-slate-300 font-mono"
+                      />
+
+                      <input
+                        type="text"
+                        value={entry.subject}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            subject: e.target.value,
+                          })
+                        }
+                        className="flex-1 min-w-[90px] h-8 px-2 rounded-lg border border-slate-300 font-bold text-slate-900"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePreviewEntry(entry.id)}
+                        className="p-1 text-slate-400 hover:text-rose-600"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleMergeAiPreviewToMaster}
+                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-700"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {tr(
+                    lang,
+                    '검수 완료 · 기존 시간표에 병합하기',
+                    'Confirm & Merge into Master Timetable',
+                    '核对完成 · 合并到现有课表'
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 4: 데이터 백업(내보내기) 및 복원(불러오기) */}
+      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <button
+          type="button"
+          onClick={() => toggleSection(4)}
+          className="w-full px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between text-left"
+        >
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              {tr(
+                lang,
+                '4. 데이터 백업(내보내기) 및 복원(불러오기)',
+                '4. Data Backup (Export) & Restore (Import)',
+                '4. 数据备份（导出）与恢复（导入）'
+              )}
+            </h2>
+            <p className="text-[11px] text-slate-500">
+              {tr(
+                lang,
+                '스마트폰 교체나 브라우저 초기화에 대비해 전체 플래너 상태를 파일로 보관',
+                'Save or restore your entire planner state as a JSON file across devices',
+                '将全部规划器数据保存为 JSON 文件，更换手机或重置浏览器后可一键恢复'
+              )}
+            </p>
+          </div>
+          {openSections[4] ? (
+            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+          )}
+        </button>
+
+        {openSections[4] && (
+          <div className="p-4 space-y-4">
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700">
+                {tr(lang, '마지막 백업 일시', 'Last Backup Date', '上次备份时间')}
+              </span>
+              <span className="text-xs font-mono font-bold text-indigo-700 tabular-nums">
+                {state.backupMeta.lastBackupDate ||
+                  tr(lang, '백업 기록 없음', 'Never backed up', '暂无备份记录')}
+              </span>
+            </div>
+
+            {backupFeedback && (
+              <div
+                className={`p-3 rounded-xl border text-xs font-bold flex items-start gap-2 ${
+                  backupFeedback.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}
+              >
+                {backupFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <span>{backupFeedback.message}</span>
+              </div>
+            )}
+
+            <input
+              ref={restoreFileInputRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleImportBackupJson}
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={handleExportBackupJson}
+                className="min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-slate-800"
+              >
+                <Download className="w-4 h-4" />
+                {tr(lang, '데이터 내보내기 (저장)', 'Export Backup (.json)', '导出备份文件')}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => restoreFileInputRef.current?.click()}
+                className="min-h-[46px] px-3 py-2.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100"
+              >
+                <FileUp className="w-4 h-4" />
+                {tr(lang, '데이터 불러오기 (복원)', 'Import Backup (.json)', '导入恢复数据')}
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  onResetSampleData();
+                  setBackupFeedback({
+                    type: 'success',
+                    message: tr(
+                      lang,
+                      '초기 샘플 데이터 상태로 초기화되었습니다.',
+                      'Reset to initial sample data.',
+                      '已重置为初始示例数据状态。'
+                    ),
+                  });
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-700"
+              >
+                <RotateCcw className="w-3 h-3" />
+                {tr(
+                  lang,
+                  '초기 샘플 데이터로 전체 리셋',
+                  'Reset All to Initial Sample Data',
+                  '全部重置为初始示例数据'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 5: 홈 화면 위젯 미리보기 (Android Home Screen Widget Preview) */}
+      <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="px-4 py-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+              <Smartphone className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                {tr(
+                  lang,
+                  '홈 화면 위젯 미리보기',
+                  'Home Screen Widget Preview',
+                  '主屏幕小组件预览'
+                )}
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                {tr(
+                  lang,
+                  '오늘의 학교·학원 시간표 및 일정 요약 위젯 (자동 동기화됨)',
+                  "Today's school, academy & schedule summary widget (Auto-synced)",
+                  '今日学校·补习班课表及日程摘要小组件（自动同步）'
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) */}
+          <div className="inline-flex rounded-xl bg-slate-200/80 p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setWidgetTheme('light')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
+                widgetTheme === 'light'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Sun className="w-3 h-3 text-amber-500" />
+              {tr(lang, '밝은 테마', 'Light', '浅色')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setWidgetTheme('dark')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
+                widgetTheme === 'dark'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Moon className="w-3 h-3 text-indigo-400" />
+              {tr(lang, '어두운 테마', 'Dark', '深色')}
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {/* 스마트폰 홈 화면 배경 프레임 */}
+          <div
+            className={`p-3.5 rounded-2xl border transition-colors ${
+              widgetTheme === 'dark'
+                ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 border-slate-700'
+                : 'bg-gradient-to-br from-indigo-50/70 via-slate-100 to-violet-50/70 border-slate-200/90'
+            }`}
+          >
+            {/* 실제 안드로이드 위젯 카드 UI */}
+            <div
+              className={`rounded-2xl p-3.5 shadow-md border transition-all ${
+                widgetTheme === 'dark'
+                  ? 'bg-slate-900/90 border-slate-700/90 text-slate-100'
+                  : 'bg-white/95 border-white text-slate-900'
+              }`}
+            >
+              {/* 위젯 상단 헤더 */}
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200/20">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                  <span className="text-xs font-extrabold tracking-tight">
+                    {tr(
+                      lang,
+                      '오늘의 스마트 플래너',
+                      "Today's Smart Planner",
+                      '今日智能规划'
+                    )}
+                  </span>
+                </div>
+                <span
+                  className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                    widgetTheme === 'dark'
+                      ? 'bg-slate-800 text-indigo-300'
+                      : 'bg-indigo-50 text-indigo-700'
+                  }`}
+                >
+                  {widgetPayload.date} ({translateDay(widgetPayload.dayOfWeek, lang)})
+                </span>
+              </div>
+
+              {/* 위젯 본문: 학교 시간표 & 학원 시간표 2열 요약 */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* 오늘의 학교 시간표 */}
+                <div
+                  className={`p-2.5 rounded-xl border ${
+                    widgetTheme === 'dark'
+                      ? 'bg-slate-800/70 border-slate-700/80'
+                      : 'bg-indigo-50/50 border-indigo-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span
+                      className={`text-[11px] font-extrabold ${
+                        widgetTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-800'
+                      }`}
+                    >
+                      {tr(lang, '학교 수업', 'School', '学校课程')}
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono font-bold ${
+                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-indigo-600'
+                      }`}
+                    >
+                      {activeSchoolClasses.length}
+                      {tr(lang, '교시', 'p', '节')}
+                    </span>
+                  </div>
+
+                  {activeSchoolClasses.length === 0 ? (
+                    <p
+                      className={`text-[11px] py-2 text-center ${
+                        widgetTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                      }`}
+                    >
+                      {tr(lang, '오늘 학교 수업 없음', 'No classes today', '今日无学校课程')}
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {activeSchoolClasses.slice(0, 4).map((item) => (
+                        <div
+                          key={item.period}
+                          className="flex items-center justify-between text-[11px] gap-1"
+                        >
+                          <span
+                            className={`font-mono text-[10px] shrink-0 ${
+                              widgetTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                            }`}
+                          >
+                            {item.period}
+                            {tr(lang, '교시', 'P', '节')}
+                          </span>
+                          <span className="font-bold truncate">
+                            {translateSubject(item.subject, lang)}
+                          </span>
+                        </div>
+                      ))}
+                      {activeSchoolClasses.length > 4 && (
+                        <div
+                          className={`text-[10px] font-semibold text-right pt-0.5 ${
+                            widgetTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-600'
+                          }`}
+                        >
+                          +{activeSchoolClasses.length - 4}
+                          {tr(lang, '개 더보기', ' more', '节更多')}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 오늘의 학원 시간표 */}
+                <div
+                  className={`p-2.5 rounded-xl border ${
+                    widgetTheme === 'dark'
+                      ? 'bg-slate-800/70 border-slate-700/80'
+                      : 'bg-violet-50/50 border-violet-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span
+                      className={`text-[11px] font-extrabold ${
+                        widgetTheme === 'dark' ? 'text-violet-300' : 'text-violet-800'
+                      }`}
+                    >
+                      {tr(lang, '학원 일정', 'Academy', '补习班')}
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono font-bold ${
+                        widgetTheme === 'dark' ? 'text-slate-400' : 'text-violet-600'
+                      }`}
+                    >
+                      {activeAcademyClasses.length}
+                      {tr(lang, '건', '', '项')}
+                    </span>
+                  </div>
+
+                  {activeAcademyClasses.length === 0 ? (
+                    <p
+                      className={`text-[11px] py-2 text-center ${
+                        widgetTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                      }`}
+                    >
+                      {tr(lang, '오늘 학원 일정 없음', 'No academies today', '今日无补习班')}
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {activeAcademyClasses.slice(0, 3).map((ac) => (
+                        <div key={ac.id} className="text-[11px] leading-tight">
+                          <div className="font-bold truncate">
+                            {translateSubject(ac.subject, lang)}
+                          </div>
+                          <div
+                            className={`font-mono text-[10px] ${
+                              widgetTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                            }`}
+                          >
+                            {ac.startTime}~{ac.endTime}
+                          </div>
+                        </div>
+                      ))}
+                      {activeAcademyClasses.length > 3 && (
+                        <div
+                          className={`text-[10px] font-semibold text-right pt-0.5 ${
+                            widgetTheme === 'dark' ? 'text-violet-300' : 'text-violet-600'
+                          }`}
+                        >
+                          +{activeAcademyClasses.length - 3}
+                          {tr(lang, '건 더보기', ' more', '项更多')}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 오늘의 주요 일정 요약 바 */}
+              <div
+                className={`mt-2.5 pt-2 border-t flex items-center justify-between gap-2 text-[11px] ${
+                  widgetTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className={`px-1.5 py-0.5 rounded font-bold text-[10px] shrink-0 ${
+                      widgetTheme === 'dark'
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {tr(lang, '오늘 일정', 'Events', '今日日程')}
+                  </span>
+                  <span className="truncate font-semibold">
+                    {widgetPayload.todaySchedules.length > 0
+                      ? widgetPayload.todaySchedules
+                          .map((s) => translateSampleText(s.title, lang))
+                          .join(', ')
+                      : tr(
+                          lang,
+                          '등록된 특별 일정이 없습니다',
+                          'No special schedules today',
+                          '今日无特别日程'
+                        )}
+                  </span>
+                </div>
+                {widgetPayload.attendanceSummary.pendingMakeupCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 font-bold text-[10px] shrink-0">
+                    {tr(
+                      lang,
+                      `보강 ${widgetPayload.attendanceSummary.pendingMakeupCount}건`,
+                      `Makeup ${widgetPayload.attendanceSummary.pendingMakeupCount}`,
+                      `待补课 ${widgetPayload.attendanceSummary.pendingMakeupCount}`
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 위젯 브릿지 동기화 상태 및 수동 새로고침 버튼 */}
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-[11px] text-slate-500">
+              {widgetSyncToast ||
+                tr(
+                  lang,
+                  '시간표·일정·출석 변경 시 WIDGET_SYNC_DATA 및 안드로이드 위젯에 즉시 반영됩니다.',
+                  'Automatically syncs to WIDGET_SYNC_DATA & AndroidWidgetBridge on any change.',
+                  '修改课表、日程或考勤时会自动同步至 WIDGET_SYNC_DATA 与安卓桌面小组件。'
+                )}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                syncWidgetData(state);
+                setWidgetSyncToast(
+                  tr(
+                    lang,
+                    '✓ 방금 위젯 데이터가 동기화되었습니다.',
+                    '✓ Widget data synced just now.',
+                    '✓ 小组件数据刚刚已同步。'
+                  )
+                );
+                setTimeout(() => setWidgetSyncToast(null), 2500);
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold shrink-0 transition-colors"
+            >
+              {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+};
