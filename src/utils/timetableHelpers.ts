@@ -4,6 +4,7 @@ import {
   DailyOverrides,
   SchoolPeriod,
   AcademyOverrideItem,
+  SlotStatus,
 } from '../types';
 import { getDayOfWeekKor } from '../data/initialData';
 
@@ -12,6 +13,8 @@ export interface ResolvedSchoolPeriod extends SchoolPeriod {
   isModified: boolean;
   isCancelled: boolean;
   isOverlapping: boolean;
+  status?: SlotStatus;
+  note?: string;
 }
 
 export interface ResolvedAcademyItem {
@@ -27,6 +30,8 @@ export interface ResolvedAcademyItem {
   isCancelled: boolean;
   isAdded: boolean;
   isOverlapping: boolean;
+  status?: SlotStatus;
+  note?: string;
 }
 
 export function timeToMinutes(timeStr: string): number {
@@ -76,6 +81,8 @@ export function resolveDailyTimetable(
       originalSubject: item.subject,
       isModified,
       isCancelled,
+      status: ov.status ?? (isCancelled ? 'cancelled' : undefined),
+      note: ov.note,
     };
   });
 
@@ -130,6 +137,8 @@ export function resolveDailyTimetable(
           isModified,
           isCancelled,
           isAdded: false,
+          status: ov.status ?? (isCancelled ? 'cancelled' : undefined),
+          note: ov.note,
         });
       }
     }
@@ -143,6 +152,8 @@ export function resolveDailyTimetable(
         isModified: true,
         isCancelled: Boolean(added.isCancelled),
         isAdded: true,
+        status: added.status ?? (added.isCancelled ? 'cancelled' : undefined),
+        note: added.note,
       });
     }
   } else {

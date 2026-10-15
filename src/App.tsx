@@ -14,9 +14,10 @@ import {
   AttendanceMap,
   MemoMap,
   AppLanguage,
+  DEFAULT_SCHOOL_TIME_CONFIG,
 } from './types';
-import { createInitialPlannerState, getDayOfWeekKor } from './data/initialData';
-import { tr, translateDay } from './i18n/translations';
+import { createInitialPlannerState } from './data/initialData';
+import { tr, formatDateLabel } from './i18n/translations';
 import { TimetableTab } from './components/TimetableTab';
 import { ScheduleTab } from './components/ScheduleTab';
 import { AttendanceTab } from './components/AttendanceTab';
@@ -45,6 +46,7 @@ function loadInitialState(): PlannerState {
           ...(parsed as PlannerState),
           language: parsed.language || 'ko',
           timelineConfig: parsed.timelineConfig || { startHour: 8, endHour: 24 },
+          schoolTimeConfig: parsed.schoolTimeConfig || { ...DEFAULT_SCHOOL_TIME_CONFIG },
         };
       }
     }
@@ -54,6 +56,7 @@ function loadInitialState(): PlannerState {
   return {
     ...createInitialPlannerState(new Date()),
     language: 'ko',
+    schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
   };
 }
 
@@ -121,17 +124,12 @@ export default function App() {
     setState((prev) => ({
       ...fresh,
       language: prev.language || 'ko',
+      schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
     }));
   };
 
   const today = new Date();
-  const dayKor = getDayOfWeekKor(today);
-  const todayFormatted =
-    lang === 'en'
-      ? `${today.getMonth() + 1}/${today.getDate()} (${translateDay(dayKor, lang)})`
-      : lang === 'zh'
-      ? `${today.getMonth() + 1}月${today.getDate()}日 (${translateDay(dayKor, lang)})`
-      : `${today.getMonth() + 1}월 ${today.getDate()}일 (${dayKor})`;
+  const todayFormatted = formatDateLabel(today, lang);
 
   // Count pending makeups for header quick badge
   const pendingMakeupCount = Object.values(state.attendance).reduce((acc, dayAtt) => {
@@ -226,6 +224,10 @@ export default function App() {
             dailyOverrides={state.dailyOverrides}
             timelineConfig={state.timelineConfig}
             onUpdateDailyOverrides={handleUpdateDailyOverrides}
+            schedules={state.schedules}
+            onUpdateSchedules={handleUpdateSchedules}
+            attendance={state.attendance}
+            onUpdateAttendance={handleUpdateAttendance}
           />
         )}
 
@@ -234,6 +236,8 @@ export default function App() {
             language={lang}
             schedules={state.schedules}
             onUpdateSchedules={handleUpdateSchedules}
+            masterTimetable={state.masterTimetable}
+            dailyOverrides={state.dailyOverrides}
           />
         )}
 
@@ -267,7 +271,7 @@ export default function App() {
 
       {/* Fixed Bottom 5-Tab Navigation Bar */}
       <nav
-        aria-label="Main Navigation"
+        aria-label={tr(lang, '메인 메뉴', 'Main Navigation', '主导航')}
         className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-surface/95 backdrop-blur-md border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
       >
         {navTabs.map((tab) => {

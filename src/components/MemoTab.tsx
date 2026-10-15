@@ -10,8 +10,14 @@ import {
   Check,
 } from 'lucide-react';
 import { MemoMap, AppLanguage } from '../types';
-import { formatDateKey, addDays, getDayOfWeekKor } from '../data/initialData';
-import { tr, translateDay, translateSampleText } from '../i18n/translations';
+import { formatDateKey, addDays } from '../data/initialData';
+import {
+  tr,
+  translateSampleText,
+  formatDateLabel,
+  formatFullDateLabel,
+  formatTimestampLabel,
+} from '../i18n/translations';
 
 interface MemoTabProps {
   language?: AppLanguage;
@@ -113,7 +119,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
         const localizedContent = translateSampleText(val.content, lang);
         return {
           dateStr,
-          dayLabel: getDayOfWeekKor(dObj),
+          dateLabel: formatFullDateLabel(dObj, lang),
           content: localizedContent,
           updatedAt: val.updatedAt,
           isToday: dateStr === todayStr,
@@ -126,7 +132,9 @@ export const MemoTab: React.FC<MemoTabProps> = ({
     if (!kw) return [];
     return memoTimeline.filter(
       (item) =>
-        item.content.toLowerCase().includes(kw) || item.dateStr.includes(kw)
+        item.content.toLowerCase().includes(kw) ||
+        item.dateStr.includes(kw) ||
+        item.dateLabel.toLowerCase().includes(kw)
     );
   }, [memoTimeline, searchKeyword]);
 
@@ -153,7 +161,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
               type="button"
               onClick={() => setSearchKeyword('')}
               className="w-[26px] h-[26px] rounded-full bg-slate-300 text-ink flex items-center justify-center absolute right-2 hover:bg-slate-400"
-              aria-label="Clear search"
+              aria-label={tr(lang, '검색어 지우기', 'Clear search', '清除搜索')}
             >
               <X strokeWidth={3} className="w-3 h-3" />
             </button>
@@ -206,10 +214,10 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-accent-700 font-mono tabular-nums">
-                      {item.dateStr} ({translateDay(item.dayLabel, lang)})
+                      {item.dateLabel}
                     </span>
                     <span className="text-[11px] font-mono text-slate-500 tabular-nums">
-                      {item.updatedAt}
+                      {formatTimestampLabel(item.updatedAt, lang)}
                     </span>
                   </div>
                   <p className="text-xs text-ink whitespace-pre-wrap leading-normal">
@@ -231,7 +239,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                 type="button"
                 onClick={() => handleStepDate(-1)}
                 className="w-[34px] h-[34px] rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100 active:scale-95 transition-transform"
-                aria-label="Prev Day"
+                aria-label={tr(lang, '이전 날짜', 'Previous day', '前一天')}
               >
                 <ChevronLeft strokeWidth={2.75} className="w-3.5 h-3.5" />
               </button>
@@ -239,6 +247,9 @@ export const MemoTab: React.FC<MemoTabProps> = ({
               <input
                 type="date"
                 value={selectedDateStr}
+                lang={tr(lang, 'ko-KR', 'en-US', 'zh-CN')}
+                aria-label={tr(lang, '날짜 선택', 'Pick a date', '选择日期')}
+                title={formatFullDateLabel(selectedDateObj, lang)}
                 onChange={(e) => {
                   if (e.target.value) setSelectedDateStr(e.target.value);
                 }}
@@ -249,7 +260,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                 type="button"
                 onClick={() => handleStepDate(1)}
                 className="w-[34px] h-[34px] rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100 active:scale-95 transition-transform"
-                aria-label="Next Day"
+                aria-label={tr(lang, '다음 날짜', 'Next day', '后一天')}
               >
                 <ChevronRight strokeWidth={2.75} className="w-3.5 h-3.5" />
               </button>
@@ -272,12 +283,16 @@ export const MemoTab: React.FC<MemoTabProps> = ({
             <div className="flex items-center gap-1.5">
               <StickyNote strokeWidth={2.75} className="w-4 h-4 text-accent" />
               <span className="text-xs font-bold text-ink tabular-nums">
-                {selectedDateStr} ({translateDay(getDayOfWeekKor(selectedDateObj), lang)}){' '}
-                {tr(lang, '일일 메모', 'Daily Memo', '每日备忘')}
+                {tr(
+                  lang,
+                  `${formatDateLabel(selectedDateObj, lang)} 일일 메모`,
+                  `Daily Memo · ${formatDateLabel(selectedDateObj, lang)}`,
+                  `${formatDateLabel(selectedDateObj, lang)} 每日备忘`
+                )}
               </span>
               {selectedDateStr === todayStr && (
                 <span className="px-1.5 py-0.5 text-[9px] font-bold bg-accent-200 text-accent-900 rounded-full">
-                  TODAY
+                  {tr(lang, '오늘', 'TODAY', '今天')}
                 </span>
               )}
             </div>
@@ -288,7 +303,12 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                   <Check strokeWidth={2.75} className="w-3 h-3 text-sage" />
                   {saveFeedback
                     ? tr(lang, '자동 저장됨', 'Auto-saved', '已自动保存')
-                    : `${currentUpdatedAt.slice(5)}`}
+                    : tr(
+                        lang,
+                        `${formatTimestampLabel(currentUpdatedAt, lang)} 저장`,
+                        `Saved ${formatTimestampLabel(currentUpdatedAt, lang)}`,
+                        `${formatTimestampLabel(currentUpdatedAt, lang)} 已保存`
+                      )}
                 </span>
               ) : (
                 <span className="text-slate-500">
@@ -307,17 +327,21 @@ export const MemoTab: React.FC<MemoTabProps> = ({
             onChange={(e) => handleMemoChange(e.target.value)}
             placeholder={tr(
               lang,
-              `${selectedDateStr}의 알림장, 숙제, 준비물, 수업 핵심 내용을 바로 입력하세요. 입력 즉시 기기에 자동 저장됩니다.`,
-              `Write homework, reminders, or class notes for ${selectedDateStr}. Saved automatically to your device.`,
-              `在此输入 ${selectedDateStr} 的作业、待办事项或课堂重点，输入后立即自动保存至本地设备。`
+              `${formatDateLabel(selectedDateObj, lang)}의 알림장, 숙제, 준비물, 수업 핵심 내용을 바로 입력하세요. 입력 즉시 기기에 자동 저장됩니다.`,
+              `Write homework, reminders, or class notes for ${formatDateLabel(selectedDateObj, lang)}. Saved automatically to your device.`,
+              `在此输入 ${formatDateLabel(selectedDateObj, lang)} 的作业、待办事项或课堂重点，输入后立即自动保存至本地设备。`
             )}
             className="w-full p-3 rounded-xl bg-paper border border-divider text-[13px] text-ink leading-relaxed placeholder:text-slate-500 focus:outline-none focus:border-accent resize-y"
           />
 
           <div className="flex items-center justify-between text-[11px] text-slate-600">
             <span className="font-mono tabular-nums">
-              {displayedCurrentMemo.length}{' '}
-              {tr(lang, '자 작성됨', 'chars', '字')}
+              {tr(
+                lang,
+                `${displayedCurrentMemo.length}자 작성됨`,
+                `${displayedCurrentMemo.length} chars`,
+                `${displayedCurrentMemo.length} 字`
+              )}
             </span>
             {displayedCurrentMemo.trim().length > 0 && (
               <button
@@ -377,7 +401,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-ink font-mono tabular-nums">
-                        {item.dateStr} ({translateDay(item.dayLabel, lang)})
+                        {item.dateLabel}
                       </span>
                       {item.isToday && (
                         <span className="px-1.5 py-px rounded-full text-[9px] font-bold bg-accent text-paper">
@@ -391,7 +415,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({
                       )}
                     </div>
                     <span className="text-[11px] font-mono text-slate-500 tabular-nums">
-                      {item.updatedAt}
+                      {formatTimestampLabel(item.updatedAt, lang)}
                     </span>
                   </div>
                   <p className="text-xs text-slate-700 line-clamp-2 whitespace-pre-wrap leading-normal">

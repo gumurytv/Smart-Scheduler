@@ -14,6 +14,9 @@ import {
   Sparkles,
   AlignJustify,
   CalendarRange,
+  StickyNote,
+  CalendarClock,
+  Radio,
 } from 'lucide-react';
 import {
   DAYS_OF_WEEK,
@@ -23,11 +26,17 @@ import {
   AcademyOverrideItem,
   TimelineConfig,
   AppLanguage,
+  ScheduleItem,
+  ScheduleCategory,
+  AttendanceMap,
+  SlotStatus,
+  SchoolPeriodOverride,
 } from '../types';
 import {
   formatDateKey,
   addDays,
   getMondayOfCurrentWeek,
+  getDayOfWeekKor,
 } from '../data/initialData';
 import {
   resolveDailyTimetable,
@@ -45,6 +54,10 @@ interface TimetableTabProps {
   dailyOverrides: DailyOverrides;
   timelineConfig?: TimelineConfig;
   onUpdateDailyOverrides: (updater: (prev: DailyOverrides) => DailyOverrides) => void;
+  schedules?: ScheduleItem[];
+  onUpdateSchedules?: (updater: (prev: ScheduleItem[]) => ScheduleItem[]) => void;
+  attendance?: AttendanceMap;
+  onUpdateAttendance?: (updater: (prev: AttendanceMap) => AttendanceMap) => void;
 }
 
 const HOUR_HEIGHT_PX = 84;
@@ -140,6 +153,67 @@ interface SpectrumSegment {
   label: string;
 }
 
+type EditTarget =
+  | { kind: 'school'; date: string; period: number }
+  | { kind: 'academy'; date: string; id: string };
+
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatDateLabel(dateStr: string, lang: AppLanguage): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dateObj = new Date(y, m - 1, d);
+  const day = translateDay(getDayOfWeekKor(dateObj), lang);
+  if (lang === 'en') return `${MONTHS_EN[m - 1]} ${d} (${day})`;
+  if (lang === 'zh') return `${m}月${d}日 (${day})`;
+  return `${m}월 ${d}일 (${day})`;
+}
+
+function getSchedulesForDate(schedules: ScheduleItem[] | undefined, dateStr: string): ScheduleItem[] {
+  if (!schedules) return [];
+  return schedules
+    .filter((s) => {
+      if (s.date === dateStr) return true;
+      if (s.endDate && s.date <= dateStr && dateStr <= s.endDate) return true;
+      return false;
+    })
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+}
+
+function statusLabel(status: SlotStatus, lang: AppLanguage): string {
+  if (status === 'cancelled') return tr(lang, '휴강', 'Cancelled', '停课');
+  if (status === 'absent') return tr(lang, '결석', 'Absent', '缺席');
+  return tr(lang, '자습', 'Self-Study', '自习');
+}
+
+function slotTitle(subject: string, status: SlotStatus | undefined, lang: AppLanguage): string {
+  if (status === 'selfStudy') return tr(lang, '자습', 'Self-Study', '自习');
+  if (status === 'cancelled')
+    return `${translateSubject(subject, lang)} (${tr(lang, '휴강', 'Cancelled', '停课')})`;
+  return translateSubject(subject, lang);
+}
+
+function categoryLabel(cat: ScheduleCategory, lang: AppLanguage): string {
+  if (cat === 'school') return tr(lang, '학교', 'School', '学校');
+  if (cat === 'academy') return tr(lang, '학원', 'Academy', '补习班');
+  return tr(lang, '기타', 'Other', '其他');
+}
+
+const StatusTag: React.FC<{ status?: SlotStatus; lang: AppLanguage }> = ({ status, lang }) => {
+  if (!status || status === 'cancelled') return null;
+  return (
+    <span
+      className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full whitespace-nowrap ${
+        status === 'absent' ? 'bg-accent-800 text-paper' : 'bg-sage-200 text-sage-900'
+      }`}
+    >
+      {statusLabel(status, lang)}
+    </span>
+  );
+};
+
+const STATUS_OPTIONS: SlotStatus[] = ['cancelled', 'absent', 'selfStudy'];
+
 export const TimetableTab: React.FC<TimetableTabProps> = ({
   language = 'ko',
   subjectPool,
@@ -147,6 +221,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   dailyOverrides,
   timelineConfig,
   onUpdateDailyOverrides,
+  schedules,
+  onUpdateSchedules,
+  onUpdateAttendance,
 }) => {
   const lang = language;
   const startHour = timelineConfig?.startHour ?? 8;
@@ -159,31 +236,29 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   const startHourFormatted = `${String(startHour).padStart(2, '0')}:00`;
   const endHourFormatted = `${String(endHour).padStart(2, '0')}:00`;
 
-  const today = useMemo(() => new Date(), []);
-  const todayStr = useMemo(() => formatDateKey(today), [today]);
-
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
-  const [dailySubMode, setDailySubMode] = useState<'timeline' | 'list'>('timeline');
-  const [nowMinutes, setNowMinutes] = useState<number>(() => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  });
-
+  const [now, setNow] = useState<Date>(() => new Date());
   useEffect(() => {
-    const timer = setInterval(() => {
-      const d = new Date();
-      setNowMinutes(d.getHours() * 60 + d.getMinutes());
-    }, 30000);
+    const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayStr = formatDateKey(now);
 
-  const [editingSchoolPeriod, setEditingSchoolPeriod] = useState<ResolvedSchoolPeriod | null>(null);
-  const [editingAcademyItem, setEditingAcademyItem] = useState<ResolvedAcademyItem | null>(null);
-  const [isAddingAcademy, setIsAddingAcademy] = useState<boolean>(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
+  const [dailySubMode, setDailySubMode] = useState<'timeline' | 'list'>('timeline');
+
+  // Edit / add sheet targets (keyed by date so they work from the weekly view and the "Now" card too)
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [addTarget, setAddTarget] = useState<{ date: string } | null>(null);
+  const [addKind, setAddKind] = useState<'academy' | 'schedule'>('academy');
   const [tempStartTime, setTempStartTime] = useState<string>('17:00');
   const [tempEndTime, setTempEndTime] = useState<string>('19:00');
   const [tempAcademySubject, setTempAcademySubject] = useState<string>('');
+  const [tempNote, setTempNote] = useState<string>('');
+  const [newScheduleTitle, setNewScheduleTitle] = useState<string>('');
+  const [newScheduleCategory, setNewScheduleCategory] = useState<ScheduleCategory>('other');
+  const [newScheduleMemo, setNewScheduleMemo] = useState<string>('');
 
   const selectedDateStr = formatDateKey(selectedDate);
   const isSelectedToday = selectedDateStr === todayStr;
@@ -207,6 +282,33 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   const dailyData = useMemo(
     () => resolveDailyTimetable(selectedDateStr, masterTimetable, dailyOverrides),
     [selectedDateStr, masterTimetable, dailyOverrides]
+  );
+
+  const todayData = useMemo(
+    () => resolveDailyTimetable(todayStr, masterTimetable, dailyOverrides),
+    [todayStr, masterTimetable, dailyOverrides]
+  );
+
+  const editDateStr = editTarget?.date ?? addTarget?.date ?? selectedDateStr;
+  const editResolved = useMemo(
+    () => resolveDailyTimetable(editDateStr, masterTimetable, dailyOverrides),
+    [editDateStr, masterTimetable, dailyOverrides]
+  );
+  const editingSchoolPeriod: ResolvedSchoolPeriod | null =
+    editTarget?.kind === 'school'
+      ? editResolved.school.find((s) => s.period === editTarget.period) ?? null
+      : null;
+  const editingAcademyItem: ResolvedAcademyItem | null =
+    editTarget?.kind === 'academy'
+      ? editResolved.academy.find(
+          (a) => a.id === editTarget.id || (a.masterId && a.masterId === editTarget.id)
+        ) ?? null
+      : null;
+  const isAddingAcademy = addTarget !== null;
+
+  const daySchedules = useMemo(
+    () => getSchedulesForDate(schedules, selectedDateStr),
+    [schedules, selectedDateStr]
   );
 
   const weeklyData = useMemo(() => {
@@ -507,102 +609,22 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     setSelectedDate(new Date());
   };
 
-  const handleSelectSchoolSubject = (newSubject: string) => {
-    if (!editingSchoolPeriod) return;
-    const periodNum = editingSchoolPeriod.period;
-    const originalSubj = editingSchoolPeriod.originalSubject;
+  const closeEditSheet = () => setEditTarget(null);
+  const closeAddSheet = () => setAddTarget(null);
 
-    onUpdateDailyOverrides((prev) => {
-      const next = { ...prev };
-      const currentDayOv = { ...(next[selectedDateStr] || {}) };
-      const currentSchoolOv = { ...(currentDayOv.school || {}) };
-
-      if (newSubject === originalSubj) {
-        delete currentSchoolOv[periodNum];
-      } else {
-        currentSchoolOv[periodNum] = {
-          subject: newSubject,
-          isCancelled: false,
-        };
-      }
-
-      currentDayOv.school = currentSchoolOv;
-      next[selectedDateStr] = currentDayOv;
-      return next;
-    });
-
-    setEditingSchoolPeriod(null);
+  const openSchoolEdit = (item: ResolvedSchoolPeriod, dateStr: string = selectedDateStr) => {
+    setAddTarget(null);
+    setEditTarget({ kind: 'school', date: dateStr, period: item.period });
+    setTempNote(item.note ?? '');
   };
 
-  const handleRestoreSchoolPeriod = () => {
-    if (!editingSchoolPeriod) return;
-    const periodNum = editingSchoolPeriod.period;
-
-    onUpdateDailyOverrides((prev) => {
-      const next = { ...prev };
-      const currentDayOv = { ...(next[selectedDateStr] || {}) };
-      const currentSchoolOv = { ...(currentDayOv.school || {}) };
-      delete currentSchoolOv[periodNum];
-      currentDayOv.school = currentSchoolOv;
-      next[selectedDateStr] = currentDayOv;
-      return next;
-    });
-
-    setEditingSchoolPeriod(null);
-  };
-
-  const handleCancelOrSelfStudySchoolPeriod = () => {
-    if (!editingSchoolPeriod) return;
-    const periodNum = editingSchoolPeriod.period;
-
-    onUpdateDailyOverrides((prev) => {
-      const next = { ...prev };
-      const currentDayOv = { ...(next[selectedDateStr] || {}) };
-      const currentSchoolOv = { ...(currentDayOv.school || {}) };
-      currentSchoolOv[periodNum] = {
-        subject: '자습',
-        isCancelled: true,
-      };
-      currentDayOv.school = currentSchoolOv;
-      next[selectedDateStr] = currentDayOv;
-      return next;
-    });
-
-    setEditingSchoolPeriod(null);
-  };
-
-  const getUpdatedAcademyOverrides = (
-    prev: DailyOverrides,
-    modifier: (currentList: AcademyOverrideItem[]) => AcademyOverrideItem[]
-  ): DailyOverrides => {
-    const next = { ...prev };
-    const currentDayOv = { ...(next[selectedDateStr] || {}) };
-    const existingList: AcademyOverrideItem[] = currentDayOv.academy
-      ? [...currentDayOv.academy]
-      : dailyData.academy.map((item) => ({
-          id: item.id,
-          masterId: item.masterId,
-          startTime: item.startTime,
-          endTime: item.endTime,
-          subject: item.subject,
-          isCancelled: item.isCancelled,
-          isAdded: item.isAdded,
-          originalSubject: item.originalSubject,
-          originalStartTime: item.originalStartTime,
-          originalEndTime: item.originalEndTime,
-        }));
-
-    currentDayOv.academy = modifier(existingList);
-    next[selectedDateStr] = currentDayOv;
-    return next;
-  };
-
-  const openEditAcademyModal = (item: ResolvedAcademyItem) => {
-    setEditingAcademyItem(item);
-    setIsAddingAcademy(false);
+  const openEditAcademyModal = (item: ResolvedAcademyItem, dateStr: string = selectedDateStr) => {
+    setAddTarget(null);
+    setEditTarget({ kind: 'academy', date: dateStr, id: item.id });
     setTempStartTime(item.startTime);
     setTempEndTime(item.endTime);
     setTempAcademySubject(item.subject);
+    setTempNote(item.note ?? '');
   };
 
   const openAddAcademyModal = (defaultStart = '18:00', defaultEnd = '20:00') => {
@@ -611,15 +633,232 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     const reasonableEndMin =
       rawEndMin - startMin > 120 ? Math.min(1440, startMin + 120) : rawEndMin;
 
-    setEditingAcademyItem(null);
-    setIsAddingAcademy(true);
+    setEditTarget(null);
+    setAddTarget({ date: selectedDateStr });
+    setAddKind('academy');
     setTempStartTime(defaultStart);
     setTempEndTime(minutesToTimeStr(reasonableEndMin));
-    setTempAcademySubject(subjectPool.academy[0] || '수학학원');
+    setTempAcademySubject(subjectPool.academy[0] || '');
+    setNewScheduleTitle('');
+    setNewScheduleCategory('other');
+    setNewScheduleMemo('');
+  };
+
+  // Jump to a date (keeps the current view mode) and open the edit sheet for one of its items
+  const openItemOnDate = (
+    target: { kind: 'school'; item: ResolvedSchoolPeriod } | { kind: 'academy'; item: ResolvedAcademyItem },
+    dateObj: Date
+  ) => {
+    const dateStr = formatDateKey(dateObj);
+    setSelectedDate(dateObj);
+    if (target.kind === 'school') openSchoolEdit(target.item, dateStr);
+    else openEditAcademyModal(target.item, dateStr);
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const rawMin = timelineStartMin + (y / HOUR_HEIGHT_PX) * 60;
+    const snapped = Math.max(
+      timelineStartMin,
+      Math.min(timelineEndMin - 30, Math.floor(rawMin / 30) * 30)
+    );
+    const end = Math.min(timelineEndMin, snapped + 60);
+    openAddAcademyModal(minutesToTimeStr(snapped), minutesToTimeStr(end));
+  };
+
+  // ---- Attendance sync for 결석 (absent) ----
+  const syncAbsence = (
+    dateStr: string,
+    kind: 'school' | 'academy',
+    subject: string,
+    prevStatus: SlotStatus | undefined,
+    nextStatus: SlotStatus | undefined
+  ) => {
+    if (!onUpdateAttendance) return;
+    if (nextStatus === 'absent' && prevStatus !== 'absent') {
+      onUpdateAttendance((prev) => {
+        const day = { ...(prev[dateStr] || {}) };
+        if (kind === 'school') {
+          day.school = { status: 'absent' };
+        } else {
+          day.academies = {
+            ...(day.academies || {}),
+            [subject]: { status: 'absent', needsMakeup: true, makeupCompleted: false },
+          };
+        }
+        return { ...prev, [dateStr]: day };
+      });
+    } else if (prevStatus === 'absent' && nextStatus !== 'absent') {
+      onUpdateAttendance((prev) => {
+        const existingDay = prev[dateStr];
+        if (!existingDay) return prev;
+        const day = { ...existingDay };
+        if (kind === 'school') {
+          if (day.school?.status !== 'absent') return prev;
+          delete day.school;
+        } else {
+          if (day.academies?.[subject]?.status !== 'absent') return prev;
+          const acs = { ...(day.academies || {}) };
+          delete acs[subject];
+          day.academies = acs;
+        }
+        return { ...prev, [dateStr]: day };
+      });
+    }
+  };
+
+  // ---- School overrides ----
+  const writeSchoolOverride = (
+    dateStr: string,
+    item: ResolvedSchoolPeriod,
+    patch: Partial<SchoolPeriodOverride>
+  ) => {
+    onUpdateDailyOverrides((prev) => {
+      const next = { ...prev };
+      const currentDayOv = { ...(next[dateStr] || {}) };
+      const currentSchoolOv = { ...(currentDayOv.school || {}) };
+      const existing = currentSchoolOv[item.period];
+      const merged: SchoolPeriodOverride = {
+        subject: existing?.subject ?? item.subject,
+        status: existing?.status ?? (existing?.isCancelled ? 'cancelled' : undefined),
+        note: existing?.note,
+        ...patch,
+      };
+      merged.isCancelled = merged.status === 'cancelled';
+      if (!merged.status) delete merged.status;
+      if (!merged.note) delete merged.note;
+
+      if (merged.subject === item.originalSubject && !merged.status && !merged.note) {
+        delete currentSchoolOv[item.period];
+      } else {
+        currentSchoolOv[item.period] = merged;
+      }
+      currentDayOv.school = currentSchoolOv;
+      next[dateStr] = currentDayOv;
+      return next;
+    });
+  };
+
+  const handleSelectSchoolSubject = (newSubject: string) => {
+    if (!editingSchoolPeriod) return;
+    const patch: Partial<SchoolPeriodOverride> = { subject: newSubject };
+    if (editingSchoolPeriod.status === 'cancelled') patch.status = undefined;
+    writeSchoolOverride(editDateStr, editingSchoolPeriod, patch);
+    closeEditSheet();
+  };
+
+  const handleToggleSchoolStatus = (status: SlotStatus) => {
+    if (!editingSchoolPeriod) return;
+    const nextStatus = editingSchoolPeriod.status === status ? undefined : status;
+    writeSchoolOverride(editDateStr, editingSchoolPeriod, { status: nextStatus });
+    syncAbsence(
+      editDateStr,
+      'school',
+      editingSchoolPeriod.subject,
+      editingSchoolPeriod.status,
+      nextStatus
+    );
+  };
+
+  const handleSaveSchoolNote = () => {
+    if (!editingSchoolPeriod) return;
+    const trimmed = tempNote.trim();
+    if ((editingSchoolPeriod.note ?? '') === trimmed) return;
+    writeSchoolOverride(editDateStr, editingSchoolPeriod, { note: trimmed || undefined });
+  };
+
+  const handleRestoreSchoolPeriod = () => {
+    if (!editingSchoolPeriod) return;
+    const periodNum = editingSchoolPeriod.period;
+    const dateStr = editDateStr;
+
+    onUpdateDailyOverrides((prev) => {
+      const next = { ...prev };
+      const currentDayOv = { ...(next[dateStr] || {}) };
+      const currentSchoolOv = { ...(currentDayOv.school || {}) };
+      delete currentSchoolOv[periodNum];
+      currentDayOv.school = currentSchoolOv;
+      next[dateStr] = currentDayOv;
+      return next;
+    });
+    syncAbsence(dateStr, 'school', editingSchoolPeriod.subject, editingSchoolPeriod.status, undefined);
+    closeEditSheet();
+  };
+
+  // ---- Academy overrides ----
+  const getUpdatedAcademyOverrides = (
+    prev: DailyOverrides,
+    dateStr: string,
+    modifier: (currentList: AcademyOverrideItem[]) => AcademyOverrideItem[]
+  ): DailyOverrides => {
+    const next = { ...prev };
+    const currentDayOv = { ...(next[dateStr] || {}) };
+    const existingList: AcademyOverrideItem[] = currentDayOv.academy
+      ? [...currentDayOv.academy]
+      : resolveDailyTimetable(dateStr, masterTimetable, prev).academy.map((item) => ({
+          id: item.id,
+          masterId: item.masterId,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          subject: item.subject,
+          isCancelled: item.isCancelled,
+          isAdded: item.isAdded,
+          status: item.status,
+          note: item.note,
+          originalSubject: item.originalSubject,
+          originalStartTime: item.originalStartTime,
+          originalEndTime: item.originalEndTime,
+        }));
+
+    currentDayOv.academy = modifier(existingList);
+    next[dateStr] = currentDayOv;
+    return next;
+  };
+
+  const upsertAcademyOverride = (
+    dateStr: string,
+    item: ResolvedAcademyItem,
+    patch: Partial<AcademyOverrideItem>
+  ) => {
+    onUpdateDailyOverrides((prev) =>
+      getUpdatedAcademyOverrides(prev, dateStr, (list) => {
+        const foundIdx = list.findIndex(
+          (x) => (item.masterId && x.masterId === item.masterId) || x.id === item.id
+        );
+        const existing = foundIdx >= 0 ? list[foundIdx] : undefined;
+        const entry: AcademyOverrideItem = {
+          id: item.id,
+          masterId: item.masterId,
+          startTime: existing?.startTime ?? item.startTime,
+          endTime: existing?.endTime ?? item.endTime,
+          subject: existing?.subject ?? item.subject,
+          isCancelled: existing?.isCancelled ?? item.isCancelled,
+          isAdded: item.isAdded,
+          status: existing?.status ?? item.status,
+          note: existing?.note ?? item.note,
+          originalSubject: item.originalSubject,
+          originalStartTime: item.originalStartTime,
+          originalEndTime: item.originalEndTime,
+          ...patch,
+        };
+        if ('status' in patch) entry.isCancelled = patch.status === 'cancelled';
+        if (!entry.status) delete entry.status;
+        if (!entry.note) delete entry.note;
+        if (!entry.masterId) delete entry.masterId;
+        if (foundIdx >= 0) {
+          const copy = [...list];
+          copy[foundIdx] = entry;
+          return copy;
+        }
+        return [...list, entry];
+      })
+    );
   };
 
   const handleSelectAcademySubject = (chosenSubject: string) => {
-    if (isAddingAcademy) {
+    if (isAddingAcademy && addTarget) {
       const newItem: AcademyOverrideItem = {
         id: `added-${Date.now()}`,
         startTime: tempStartTime,
@@ -628,43 +867,23 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         isCancelled: false,
         isAdded: true,
       };
+      const dateStr = addTarget.date;
       onUpdateDailyOverrides((prev) =>
-        getUpdatedAcademyOverrides(prev, (list) => [...list, newItem])
+        getUpdatedAcademyOverrides(prev, dateStr, (list) => [...list, newItem])
       );
-      setIsAddingAcademy(false);
+      closeAddSheet();
       return;
     }
 
     if (!editingAcademyItem) return;
-
-    onUpdateDailyOverrides((prev) =>
-      getUpdatedAcademyOverrides(prev, (list) => {
-        const foundIdx = list.findIndex(
-          (x) =>
-            (editingAcademyItem.masterId && x.masterId === editingAcademyItem.masterId) ||
-            x.id === editingAcademyItem.id
-        );
-        const updatedEntry: AcademyOverrideItem = {
-          id: editingAcademyItem.id,
-          masterId: editingAcademyItem.masterId,
-          startTime: tempStartTime,
-          endTime: tempEndTime,
-          subject: chosenSubject,
-          isCancelled: false,
-          isAdded: editingAcademyItem.isAdded,
-          originalSubject: editingAcademyItem.originalSubject,
-          originalStartTime: editingAcademyItem.originalStartTime,
-          originalEndTime: editingAcademyItem.originalEndTime,
-        };
-        if (foundIdx >= 0) {
-          const copy = [...list];
-          copy[foundIdx] = updatedEntry;
-          return copy;
-        }
-        return [...list, updatedEntry];
-      })
-    );
-    setEditingAcademyItem(null);
+    const patch: Partial<AcademyOverrideItem> = {
+      startTime: tempStartTime,
+      endTime: tempEndTime,
+      subject: chosenSubject,
+    };
+    if (editingAcademyItem.status === 'cancelled') patch.status = undefined;
+    upsertAcademyOverride(editDateStr, editingAcademyItem, patch);
+    closeEditSheet();
   };
 
   const handleSaveAcademyTimeOnly = () => {
@@ -672,55 +891,215 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     handleSelectAcademySubject(tempAcademySubject || editingAcademyItem.subject);
   };
 
-  const handleCancelAcademyToday = () => {
+  const handleToggleAcademyStatus = (status: SlotStatus) => {
     if (!editingAcademyItem) return;
-    onUpdateDailyOverrides((prev) =>
-      getUpdatedAcademyOverrides(prev, (list) => {
-        const foundIdx = list.findIndex(
-          (x) =>
-            (editingAcademyItem.masterId && x.masterId === editingAcademyItem.masterId) ||
-            x.id === editingAcademyItem.id
-        );
-        const updatedEntry: AcademyOverrideItem = {
-          id: editingAcademyItem.id,
-          masterId: editingAcademyItem.masterId,
-          startTime: tempStartTime,
-          endTime: tempEndTime,
-          subject: editingAcademyItem.subject,
-          isCancelled: true,
-          isAdded: editingAcademyItem.isAdded,
-          originalSubject: editingAcademyItem.originalSubject,
-          originalStartTime: editingAcademyItem.originalStartTime,
-          originalEndTime: editingAcademyItem.originalEndTime,
-        };
-        if (foundIdx >= 0) {
-          const copy = [...list];
-          copy[foundIdx] = updatedEntry;
-          return copy;
-        }
-        return [...list, updatedEntry];
-      })
+    const nextStatus = editingAcademyItem.status === status ? undefined : status;
+    upsertAcademyOverride(editDateStr, editingAcademyItem, { status: nextStatus });
+    syncAbsence(
+      editDateStr,
+      'academy',
+      editingAcademyItem.subject,
+      editingAcademyItem.status,
+      nextStatus
     );
-    setEditingAcademyItem(null);
+  };
+
+  const handleSaveAcademyNote = () => {
+    if (!editingAcademyItem) return;
+    const trimmed = tempNote.trim();
+    if ((editingAcademyItem.note ?? '') === trimmed) return;
+    upsertAcademyOverride(editDateStr, editingAcademyItem, { note: trimmed || undefined });
   };
 
   const handleRestoreOrDeleteAcademyItem = () => {
     if (!editingAcademyItem) return;
+    const dateStr = editDateStr;
+    const target = editingAcademyItem;
 
-    if (editingAcademyItem.isAdded) {
+    if (target.isAdded) {
       onUpdateDailyOverrides((prev) =>
-        getUpdatedAcademyOverrides(prev, (list) =>
-          list.filter((x) => x.id !== editingAcademyItem.id)
-        )
+        getUpdatedAcademyOverrides(prev, dateStr, (list) => list.filter((x) => x.id !== target.id))
       );
-    } else if (editingAcademyItem.masterId) {
+    } else if (target.masterId) {
       onUpdateDailyOverrides((prev) =>
-        getUpdatedAcademyOverrides(prev, (list) =>
-          list.filter((x) => x.masterId !== editingAcademyItem.masterId)
+        getUpdatedAcademyOverrides(prev, dateStr, (list) =>
+          list.filter((x) => x.masterId !== target.masterId)
         )
       );
     }
-    setEditingAcademyItem(null);
+    syncAbsence(dateStr, 'academy', target.subject, target.status, undefined);
+    closeEditSheet();
+  };
+
+  // ---- Schedule items (일정) ----
+  const handleAddScheduleItem = () => {
+    if (!onUpdateSchedules || !addTarget) return;
+    const title = newScheduleTitle.trim();
+    if (!title) return;
+    const item: ScheduleItem = {
+      id: `sch-${Date.now()}`,
+      date: addTarget.date,
+      time: tempStartTime || undefined,
+      title,
+      category: newScheduleCategory,
+      memo: newScheduleMemo.trim(),
+    };
+    onUpdateSchedules((prev) => [...prev, item]);
+    closeAddSheet();
+  };
+
+  // ---- "Now" card data (always today) ----
+  const nowCard = useMemo(() => {
+    type Entry = {
+      key: string;
+      kind: 'school' | 'academy';
+      start: number;
+      end: number;
+      startTime: string;
+      endTime: string;
+      title: string;
+      status?: SlotStatus;
+      school?: ResolvedSchoolPeriod;
+      academy?: ResolvedAcademyItem;
+    };
+    const entries: Entry[] = [
+      ...todayData.school
+        .filter((s) => !s.isCancelled)
+        .map((s) => ({
+          key: `school-${s.period}`,
+          kind: 'school' as const,
+          start: timeToMinutes(s.startTime),
+          end: timeToMinutes(s.endTime),
+          startTime: s.startTime,
+          endTime: s.endTime,
+          title: `${tr(lang, `${s.period}교시`, `P${s.period}`, `第${s.period}节`)} · ${slotTitle(
+            s.subject,
+            s.status,
+            lang
+          )}`,
+          status: s.status,
+          school: s,
+        })),
+      ...todayData.academy
+        .filter((a) => !a.isCancelled)
+        .map((a) => ({
+          key: `academy-${a.id}`,
+          kind: 'academy' as const,
+          start: timeToMinutes(a.startTime),
+          end: timeToMinutes(a.endTime),
+          startTime: a.startTime,
+          endTime: a.endTime,
+          title: slotTitle(a.subject, a.status, lang),
+          status: a.status,
+          academy: a,
+        })),
+    ].sort((a, b) => a.start - b.start);
+
+    const current = entries.filter((e) => e.start <= nowMinutes && nowMinutes < e.end);
+    const next = entries.find((e) => e.start > nowMinutes) ?? null;
+    const makeups = todayData.academy.filter((a) => a.isAdded);
+    const makeupSchedules = getSchedulesForDate(schedules, todayStr).filter(
+      (s) => s.category === 'academy' && s.title.includes('보강')
+    );
+    return { current, next, makeups, makeupSchedules };
+  }, [todayData, nowMinutes, schedules, todayStr, lang]);
+
+  const openNowEntry = (entry: {
+    kind: 'school' | 'academy';
+    school?: ResolvedSchoolPeriod;
+    academy?: ResolvedAcademyItem;
+  }) => {
+    const todayObj = new Date();
+    if (entry.kind === 'school' && entry.school) {
+      openItemOnDate({ kind: 'school', item: entry.school }, todayObj);
+    } else if (entry.academy) {
+      openItemOnDate({ kind: 'academy', item: entry.academy }, todayObj);
+    }
+  };
+
+  // Quick status pills (휴강 / 결석 / 자습) + free-text note, shared by both edit sheets
+  const renderStatusAndNote = (
+    currentStatus: SlotStatus | undefined,
+    onToggle: (s: SlotStatus) => void,
+    onSaveNote: () => void,
+    savedNote: string
+  ) => {
+    const dirty = tempNote.trim() !== savedNote;
+    return (
+      <div className="space-y-3 p-3 rounded-2xl bg-surface">
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold text-slate-600">
+            {tr(lang, '빠른 표시 (다시 누르면 해제)', 'Quick mark (tap again to clear)', '快速标记（再次点击取消）')}
+          </span>
+          <div className="flex gap-1.5">
+            {STATUS_OPTIONS.map((opt) => {
+              const active = currentStatus === opt;
+              const activeCls =
+                opt === 'cancelled'
+                  ? 'bg-slate-500 text-paper border-transparent'
+                  : opt === 'absent'
+                  ? 'bg-accent-800 text-paper border-transparent'
+                  : 'bg-sage text-paper border-transparent';
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onToggle(opt)}
+                  className={`flex-1 h-9 rounded-full text-xs font-bold border transition-all active:scale-95 inline-flex items-center justify-center gap-1 ${
+                    active ? activeCls : 'bg-paper text-ink border-divider hover:bg-slate-200'
+                  }`}
+                >
+                  {opt === 'cancelled' && <Ban className="w-3.5 h-3.5" />}
+                  {statusLabel(opt, lang)}
+                </button>
+              );
+            })}
+          </div>
+          {currentStatus === 'absent' && onUpdateAttendance && (
+            <p className="text-[10px] text-slate-600">
+              {tr(
+                lang,
+                '출결 기록에도 결석으로 저장돼요.',
+                'Also saved as absent in attendance.',
+                '也会作为缺席记录到出勤中。'
+              )}
+            </p>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <label className="block text-[11px] font-semibold text-slate-600">
+            {tr(lang, '메모', 'Note', '备注')}
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={tempNote}
+              onChange={(e) => setTempNote(e.target.value)}
+              onBlur={onSaveNote}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onSaveNote();
+              }}
+              placeholder={tr(
+                lang,
+                '예: 숙제 검사, 교실 변경',
+                'e.g. Homework check, room change',
+                '例如：检查作业、换教室'
+              )}
+              className="flex-1 min-w-0 h-10 px-4 rounded-full border border-divider bg-paper text-[13px] text-ink outline-none focus:border-accent"
+            />
+            <button
+              type="button"
+              onClick={onSaveNote}
+              disabled={!dirty}
+              className="h-10 px-3.5 rounded-full bg-accent text-paper text-xs font-bold whitespace-nowrap hover:bg-accent-600 disabled:opacity-40 disabled:cursor-default"
+            >
+              {dirty ? tr(lang, '저장', 'Save', '保存') : tr(lang, '저장됨', 'Saved', '已保存')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const hoursArray = useMemo(
@@ -746,6 +1125,146 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* NOW CARD: live clock + current / next item + today's makeup classes (always today) */}
+      <div className="bg-surface rounded-2xl p-4 shadow-xs space-y-3">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-[13px] font-bold text-ink">
+              <Radio className="w-4 h-4 text-accent" strokeWidth={2.5} />
+              {tr(lang, '지금', 'Now', '现在')}
+            </div>
+            <div className="text-[11px] font-semibold text-slate-600 mt-0.5">
+              {formatDateLabel(todayStr, lang)}
+            </div>
+          </div>
+          <div className="font-mono text-[40px] leading-none text-ink tabular-nums">
+            {minutesToTimeStr(nowMinutes)}
+          </div>
+        </div>
+
+        {/* Current */}
+        {nowCard.current.length === 0 ? (
+          <div className="px-3.5 py-3 rounded-xl bg-paper text-[13px] font-semibold text-slate-600">
+            {tr(lang, '지금은 빈 시간', 'Free right now', '现在是空闲时间')}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {nowCard.current.map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                onClick={() => openNowEntry(entry)}
+                className={`w-full px-3.5 py-3 rounded-xl text-left flex items-center justify-between gap-3 transition-colors ${
+                  entry.kind === 'school'
+                    ? 'bg-sage text-paper hover:bg-sage-700'
+                    : 'bg-accent text-paper hover:bg-accent-600'
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold text-paper/80 flex items-center gap-1.5">
+                    {entry.kind === 'school'
+                      ? tr(lang, '학교 수업 중', 'In school class', '学校上课中')
+                      : tr(lang, '학원 수업 중', 'In academy class', '补习班上课中')}
+                    <span className="font-mono tabular-nums">
+                      {entry.startTime}~{entry.endTime}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                    <span className="text-[15px] font-bold truncate">{entry.title}</span>
+                    <StatusTag status={entry.status} lang={lang} />
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="font-mono text-[18px] leading-none tabular-nums">
+                    {formatDurationLocalized(entry.end - nowMinutes, lang)}
+                  </div>
+                  <div className="text-[10px] font-semibold text-paper/80 mt-0.5">
+                    {tr(lang, '남음', 'left', '剩余')}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Next */}
+        {nowCard.next ? (
+          <button
+            type="button"
+            onClick={() => nowCard.next && openNowEntry(nowCard.next)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-paper text-left flex items-center justify-between gap-3 hover:bg-slate-200 transition-colors"
+          >
+            <div className="min-w-0 flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  nowCard.next.kind === 'school' ? 'bg-sage' : 'bg-accent'
+                }`}
+              />
+              <span className="text-[11px] font-semibold text-slate-600 shrink-0">
+                {tr(lang, '다음', 'Next', '下一个')}
+              </span>
+              <span className="text-[13px] font-bold text-ink truncate">{nowCard.next.title}</span>
+              <StatusTag status={nowCard.next.status} lang={lang} />
+            </div>
+            <div className="shrink-0 text-right whitespace-nowrap">
+              <span className="font-mono text-[13px] text-ink tabular-nums">
+                {nowCard.next.startTime}
+              </span>
+              <span className="ml-1.5 text-[11px] font-semibold text-accent-700">
+                {tr(
+                  lang,
+                  `${formatDurationLocalized(nowCard.next.start - nowMinutes, lang)} 후`,
+                  `in ${formatDurationLocalized(nowCard.next.start - nowMinutes, lang)}`,
+                  `${formatDurationLocalized(nowCard.next.start - nowMinutes, lang)}后`
+                )}
+              </span>
+            </div>
+          </button>
+        ) : (
+          <div className="px-3.5 py-2.5 rounded-xl bg-paper text-[12px] font-semibold text-slate-600">
+            {tr(lang, '오늘 남은 수업이 없어요', 'No more classes today', '今天没有剩余课程')}
+          </div>
+        )}
+
+        {/* Today's makeup / special classes */}
+        {(nowCard.makeups.length > 0 || nowCard.makeupSchedules.length > 0) && (
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-bold text-slate-700">
+              {tr(lang, '오늘 보강/특강', "Today's makeup / special classes", '今日补课/特讲')}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {nowCard.makeups.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => openNowEntry({ kind: 'academy', academy: m })}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                    m.isCancelled
+                      ? 'border-dashed border-slate-400 text-slate-500 line-through'
+                      : 'border-transparent bg-accent-100 text-accent-900 hover:bg-accent-200'
+                  }`}
+                >
+                  <span className="font-mono tabular-nums">
+                    {m.startTime}~{m.endTime}
+                  </span>
+                  <span className="font-bold">{slotTitle(m.subject, m.status, lang)}</span>
+                  <StatusTag status={m.status} lang={lang} />
+                </button>
+              ))}
+              {nowCard.makeupSchedules.map((s) => (
+                <span
+                  key={s.id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border border-divider text-ink"
+                >
+                  {s.time && <span className="font-mono tabular-nums">{s.time}</span>}
+                  <span className="font-bold">{s.title}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Top Controls Card: View Switch + Week Navigation + 7 Day Tabs */}
       <div className="bg-surface rounded-2xl p-3 shadow-xs space-y-2.5">
         <div className="flex items-center justify-between gap-2">
@@ -779,7 +1298,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               type="button"
               onClick={() => handleShiftWeek(-1)}
               className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-200 active:scale-95 transition-transform"
-              aria-label="Prev Week"
+              aria-label={tr(lang, '이전 주', 'Previous week', '上一周')}
             >
               <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.75} />
             </button>
@@ -796,7 +1315,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               type="button"
               onClick={() => handleShiftWeek(1)}
               className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-200 active:scale-95 transition-transform"
-              aria-label="Next Week"
+              aria-label={tr(lang, '다음 주', 'Next week', '下一周')}
             >
               <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.75} />
             </button>
@@ -806,7 +1325,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         {/* Selected Date Caption */}
         <div className="flex items-center justify-between px-1">
           <div className="text-xs font-bold text-ink tabular-nums">
-            {selectedDateStr} ({translateDay(dailyData.dayOfWeek, lang)})
+            {formatDateLabel(selectedDateStr, lang)}
           </div>
           <div className="text-[11px] text-slate-600 tabular-nums">
             {startHourFormatted}~{endHourFormatted} ·{' '}
@@ -848,7 +1367,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         : 'bg-accent text-paper'
                     }`}
                   >
-                    TODAY
+                    {tr(lang, '오늘', 'TODAY', '今天')}
                   </span>
                 )}
                 <span
@@ -1030,46 +1549,17 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </div>
             )}
 
-            {/* Quick Free Time Chips List */}
-            {timelineLayout.freeSlots.length > 0 && (
-              <div className="pt-2 border-t border-divider space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-700">
-                    {tr(
-                      lang,
-                      `오늘 비어있는 주요 여유 시간대 (${timelineLayout.freeSlots.length}구간)`,
-                      `Available Free Time Slots (${timelineLayout.freeSlots.length})`,
-                      `今日主要空闲时间段 (${timelineLayout.freeSlots.length}处)`
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => openAddAcademyModal('18:00', '20:00')}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-accent-700 hover:underline"
-                  >
-                    <Plus className="w-3 h-3" />{' '}
-                    {tr(lang, '당일 보강/특강 추가', 'Add Makeup Class', '添加当天补课/特讲')}
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {timelineLayout.freeSlots.map((slot) => (
-                    <button
-                      key={`chip-${slot.startTime}-${slot.endTime}`}
-                      type="button"
-                      onClick={() => openAddAcademyModal(slot.startTime, slot.endTime)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-paper border border-divider text-[11px] text-ink hover:bg-slate-200 transition-colors"
-                    >
-                      <span className="font-mono font-bold tabular-nums">
-                        {slot.startTime}~{slot.endTime}
-                      </span>
-                      <span className="text-slate-600 font-semibold">
-                        ({formatDurationLocalized(slot.durationMin, lang)})
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Quick add action */}
+            <div className="pt-2 border-t border-divider flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => openAddAcademyModal('18:00', '20:00')}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-accent-700 hover:underline"
+              >
+                <Plus className="w-3 h-3" />{' '}
+                {tr(lang, '당일 보강/특강 추가', 'Add Makeup Class', '添加当天补课/特讲')}
+              </button>
+            </div>
           </div>
 
           {dailySubMode === 'timeline' ? (
@@ -1123,7 +1613,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   </div>
 
                   {/* Right Schedule Canvas Column */}
-                  <div className="flex-1 relative ml-1.5">
+                  <div
+                    className="flex-1 relative ml-1.5 cursor-pointer"
+                    onClick={handleCanvasClick}
+                    title={tr(lang, '빈 곳을 눌러 추가', 'Tap empty space to add', '点击空白处添加')}
+                  >
                     {hoursArray.map((hour, idx) => {
                       const topPx = idx * HOUR_HEIGHT_PX;
                       const isLast = hour === endHour;
@@ -1207,7 +1701,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                             )}
                           </div>
                           <span className="text-[10px] font-bold text-accent-700 group-hover:text-accent-800 shrink-0 ml-2 px-2 py-1 rounded-full bg-paper border border-divider">
-                            {tr(lang, '+ 보강 추가', '+ Add', '+ 补课')}
+                            {tr(lang, '+ 추가', '+ Add', '+ 添加')}
                           </span>
                         </button>
                       );
@@ -1228,7 +1722,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           <button
                             key={`school-${item.period}`}
                             type="button"
-                            onClick={() => setEditingSchoolPeriod(item)}
+                            onClick={() => openSchoolEdit(item)}
                             style={{
                               top: `${topPx + 1}px`,
                               height: `${Math.max(36, heightPx - 2)}px`,
@@ -1242,6 +1736,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                 ? 'bg-paper text-slate-500 border-dashed border-slate-400 line-through'
                                 : item.isOverlapping
                                 ? 'bg-orange-50/95 text-ink border-orange-500 ring-1 ring-orange-400 hover:bg-orange-100/80'
+                                : item.status === 'selfStudy'
+                                ? 'bg-slate-200 text-ink border-transparent hover:bg-slate-300'
                                 : item.isModified
                                 ? 'bg-sage-100 text-sage-900 border-amber-400 hover:bg-sage-200'
                                 : 'bg-sage-100 text-sage-900 border-transparent hover:bg-sage-200'
@@ -1305,14 +1801,20 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                       : 'text-sage-900'
                                   }`}
                                 >
-                                  {item.isCancelled
-                                    ? `${tr(lang, '휴강/자습', 'Self-Study', '停课/自习')} (${translateSubject(
-                                        item.subject,
-                                        lang
-                                      )})`
-                                    : translateSubject(item.subject, lang)}
+                                  {slotTitle(item.subject, item.status, lang)}
                                 </span>
+                                <StatusTag status={item.status} lang={lang} />
                               </div>
+                              {item.note && (
+                                <p
+                                  className={`mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 ${
+                                    isCurrentClass ? 'text-paper/85' : 'text-slate-700'
+                                  }`}
+                                >
+                                  <StickyNote className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{item.note}</span>
+                                </p>
+                              )}
                             </div>
 
                             <span
@@ -1356,6 +1858,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                 ? 'bg-paper text-slate-500 border-dashed border-slate-400 line-through'
                                 : item.isOverlapping
                                 ? 'bg-orange-50/95 text-ink border-orange-500 ring-1 ring-orange-400 hover:bg-orange-100/85'
+                                : item.status === 'selfStudy'
+                                ? 'bg-slate-200 text-ink border-transparent hover:bg-slate-300'
                                 : 'bg-accent-100 text-accent-900 border-transparent hover:bg-accent-200'
                             }`}
                           >
@@ -1406,15 +1910,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                       : 'text-accent-900'
                                   }`}
                                 >
-                                  {item.isCancelled
-                                    ? `${translateSubject(item.subject, lang)} (${tr(
-                                        lang,
-                                        '당일 휴강',
-                                        'Cancelled',
-                                        '停课'
-                                      )})`
-                                    : translateSubject(item.subject, lang)}
+                                  {slotTitle(item.subject, item.status, lang)}
                                 </span>
+                                <StatusTag status={item.status} lang={lang} />
 
                                 {item.isModified && !item.isAdded && item.originalSubject && (
                                   <span
@@ -1433,6 +1931,16 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                   </span>
                                 )}
                               </div>
+                              {item.note && (
+                                <p
+                                  className={`mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 ${
+                                    isCurrentAcademy ? 'text-paper/85' : 'text-slate-700'
+                                  }`}
+                                >
+                                  <StickyNote className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{item.note}</span>
+                                </p>
+                              )}
                             </div>
 
                             <div
@@ -1451,6 +1959,34 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       }
                     )}
 
+                    {/* SCHEDULE ITEM MARKERS (일정) */}
+                    {daySchedules
+                      .filter((sch) => sch.time)
+                      .map((sch) => {
+                        const m = timeToMinutes(sch.time as string);
+                        if (m < timelineStartMin || m > timelineEndMin) return null;
+                        const topPx = ((m - timelineStartMin) / 60) * HOUR_HEIGHT_PX;
+                        return (
+                          <div
+                            key={`sch-${sch.id}`}
+                            className="absolute right-1 z-20 pointer-events-none max-w-[55%] -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-paper border border-divider shadow-xs text-[10px] text-ink"
+                            style={{ top: `${Math.max(10, topPx)}px` }}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                sch.category === 'school'
+                                  ? 'bg-sage'
+                                  : sch.category === 'academy'
+                                  ? 'bg-accent'
+                                  : 'bg-slate-500'
+                              }`}
+                            />
+                            <span className="font-mono tabular-nums">{sch.time}</span>
+                            <span className="font-semibold truncate">{sch.title}</span>
+                          </div>
+                        );
+                      })}
+
                     {/* CURRENT TIME LIVE INDICATOR LINE */}
                     {showLiveNowLine && (
                       <div
@@ -1458,7 +1994,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         style={{ top: `${liveNowTopPx}px` }}
                       >
                         <span className="-ml-1.5 px-1.5 py-0.5 rounded-full bg-ink text-paper text-[9px] font-mono tabular-nums shadow-xs">
-                          NOW {minutesToTimeStr(nowMinutes)}
+                          {tr(lang, '지금', 'NOW', '现在')} {minutesToTimeStr(nowMinutes)}
                         </span>
                         <div className="flex-1 border-t-2 border-ink" />
                       </div>
@@ -1509,7 +2045,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         <button
                           key={item.period}
                           type="button"
-                          onClick={() => setEditingSchoolPeriod(item)}
+                          onClick={() => openSchoolEdit(item)}
                           className={`w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left transition-colors min-h-[60px] ${
                             isCurrentClass
                               ? 'bg-sage-100 ring-2 ring-inset ring-sage'
@@ -1546,13 +2082,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                     : 'text-ink'
                                 }`}
                               >
-                                {item.isCancelled
-                                  ? `${tr(lang, '휴강/자습', 'Self-Study', '停课/自习')} (${translateSubject(
-                                      item.subject,
-                                      lang
-                                    )})`
-                                  : translateSubject(item.subject, lang)}
+                                {slotTitle(item.subject, item.status, lang)}
                               </span>
+                              <StatusTag status={item.status} lang={lang} />
                               {item.isModified && (
                                 <span className="px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-900 rounded-full whitespace-nowrap">
                                   {tr(
@@ -1564,6 +2096,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                 </span>
                               )}
                             </div>
+                            {item.note && (
+                              <p
+                                className="mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 text-slate-700"
+                              >
+                                <StickyNote className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{item.note}</span>
+                              </p>
+                            )}
                           </div>
                           <span className="text-[11px] font-semibold text-accent-700 shrink-0">
                             {tr(lang, '변경', 'Edit', '修改')}
@@ -1601,9 +2141,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                     <p className="text-xs font-medium text-slate-600">
                       {tr(
                         lang,
-                        '오늘 예정된 학원 수업이 없습니다.',
-                        'No academy classes scheduled for today.',
-                        '今天没有安排补习班课程。'
+                        '이 날 예정된 학원 수업이 없습니다.',
+                        'No academy classes scheduled for this day.',
+                        '当天没有安排补习班课程。'
                       )}
                     </p>
                   </div>
@@ -1651,16 +2191,18 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                     : 'text-ink'
                                 }`}
                               >
-                                {item.isCancelled
-                                  ? `${translateSubject(item.subject, lang)} (${tr(
-                                      lang,
-                                      '당일 휴강',
-                                      'Cancelled',
-                                      '停课'
-                                    )})`
-                                  : translateSubject(item.subject, lang)}
+                                {slotTitle(item.subject, item.status, lang)}
                               </span>
+                              <StatusTag status={item.status} lang={lang} />
                             </div>
+                            {item.note && (
+                              <p
+                                className="mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 text-slate-700"
+                              >
+                                <StickyNote className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{item.note}</span>
+                              </p>
+                            )}
                           </div>
                           <span className="text-[11px] font-semibold text-accent-700 shrink-0">
                             {tr(lang, '수정', 'Edit', '修改')}
@@ -1671,6 +2213,45 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   </div>
                 )}
               </section>
+
+              {daySchedules.length > 0 && (
+                <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+                  <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4 text-slate-600" />
+                    <h2 className="text-[13px] font-bold text-ink">
+                      {tr(lang, '이날의 일정', 'Schedules on this day', '当天日程')}
+                    </h2>
+                    <span className="text-xs text-slate-600 tabular-nums">· {daySchedules.length}</span>
+                  </div>
+                  <div className="divide-y divide-divider">
+                    {daySchedules.map((sch) => (
+                      <div key={sch.id} className="px-4 py-2.5 flex items-center gap-2.5">
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${
+                            sch.category === 'school'
+                              ? 'bg-sage'
+                              : sch.category === 'academy'
+                              ? 'bg-accent'
+                              : 'bg-slate-500'
+                          }`}
+                        />
+                        <span className="w-12 shrink-0 text-xs font-mono text-slate-700 tabular-nums">
+                          {sch.time || tr(lang, '종일', 'All day', '全天')}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-bold text-ink truncate">{sch.title}</div>
+                          {sch.memo && (
+                            <div className="text-[11px] text-slate-600 truncate">{sch.memo}</div>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-600 shrink-0">
+                          {categoryLabel(sch.category, lang)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
           )}
         </div>
@@ -1686,7 +2267,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 </h2>
               </div>
               <span className="text-[11px] text-slate-600">
-                {tr(lang, '요일 클릭 시 상세 이동', 'Tap day to open detail', '点击星期查看详情')}
+                {tr(lang, '칸을 눌러 수정', 'Tap a cell to edit', '点击单元格修改')}
               </span>
             </div>
 
@@ -1736,13 +2317,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         return (
                           <td
                             key={wd.dateStr}
-                            onClick={() => {
-                              setSelectedDate(wd.dateObj);
-                              setViewMode('daily');
-                            }}
+                            onClick={() => openItemOnDate({ kind: 'school', item: cell }, wd.dateObj)}
                             className={`py-2.5 px-1 cursor-pointer transition-colors ${
                               cell.isCancelled
                                 ? 'text-slate-500 line-through bg-paper'
+                                : cell.status === 'absent'
+                                ? 'bg-accent-100 text-accent-900 font-semibold'
+                                : cell.status === 'selfStudy'
+                                ? 'bg-slate-200 text-ink'
                                 : cell.isModified
                                 ? 'bg-amber-50/80 text-amber-900 font-bold'
                                 : wd.isToday
@@ -1751,8 +2333,20 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                             }`}
                           >
                             <div className="truncate max-w-[54px] mx-auto">
-                              {translateSubject(cell.subject, lang)}
+                              {cell.status === 'selfStudy'
+                                ? tr(lang, '자습', 'Self-Study', '自习')
+                                : translateSubject(cell.subject, lang)}
                             </div>
+                            {(cell.status === 'absent' || cell.note) && (
+                              <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                                {cell.status === 'absent' && (
+                                  <span className="px-1 rounded-full bg-accent-800 text-paper text-[9px] font-bold no-underline">
+                                    {statusLabel('absent', lang)}
+                                  </span>
+                                )}
+                                {cell.note && <StickyNote className="w-2.5 h-2.5 text-slate-600" />}
+                              </div>
+                            )}
                           </td>
                         );
                       })}
@@ -1799,11 +2393,18 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       </span>
                     ) : (
                       wd.resolved.academy.map((ac) => (
-                        <div
+                        <button
                           key={ac.id}
-                          className={`px-2.5 py-1 rounded-full text-[11px] border inline-flex items-center gap-1 ${
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openItemOnDate({ kind: 'academy', item: ac }, wd.dateObj);
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-[11px] border inline-flex items-center gap-1 hover:brightness-95 active:scale-95 transition-transform ${
                             ac.isCancelled
-                              ? 'bg-paper border-divider text-slate-500 line-through'
+                              ? 'bg-paper border-dashed border-slate-400 text-slate-500 line-through'
+                              : ac.status === 'selfStudy'
+                              ? 'bg-slate-200 border-transparent text-ink'
                               : ac.isOverlapping
                               ? 'bg-orange-50 border-orange-300 text-orange-900'
                               : 'bg-accent-100 border-transparent text-accent-800'
@@ -1815,13 +2416,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           <span className="font-mono text-[11px] font-semibold tabular-nums">
                             {ac.startTime}~{ac.endTime}
                           </span>
-                          <span className="font-bold">{translateSubject(ac.subject, lang)}</span>
+                          <span className="font-bold">{slotTitle(ac.subject, ac.status, lang)}</span>
+                          <StatusTag status={ac.status} lang={lang} />
+                          {ac.note && <StickyNote className="w-3 h-3 shrink-0 opacity-70" />}
                           {ac.isOverlapping && (
                             <span className="text-[10px] font-bold text-orange-700">
                               {overlapBadgeLabel}
                             </span>
                           )}
-                        </div>
+                        </button>
                       ))
                     )}
                   </div>
@@ -1832,14 +2435,17 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         </div>
       )}
 
-      {/* MODAL 1: 2-TAP SCHOOL PERIOD OVERRIDE BOTTOM SHEET */}
+      {/* MODAL 1: SCHOOL PERIOD EDIT BOTTOM SHEET */}
       {editingSchoolPeriod && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
-          onClick={() => setEditingSchoolPeriod(null)}
+          onClick={() => {
+            handleSaveSchoolNote();
+            closeEditSheet();
+          }}
         >
           <div
-            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto"
+            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1" />
@@ -1847,7 +2453,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="text-xs text-sage-700 font-mono tabular-nums">
-                  {selectedDateStr} ({translateDay(dailyData.dayOfWeek, lang)}) ·{' '}
+                  {formatDateLabel(editDateStr, lang)} ·{' '}
                   {tr(
                     lang,
                     `${editingSchoolPeriod.period}교시`,
@@ -1857,73 +2463,79 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   ({editingSchoolPeriod.startTime} ~ {editingSchoolPeriod.endTime})
                 </span>
                 <h3 className="text-[15px] font-bold text-ink mt-0.5">
-                  {tr(lang, '당일 학교 과목 2-Tap 변경', '2-Tap Daily Subject Override', '当天学校课程 2步修改')}
+                  {tr(lang, '이 날 수업 변경', 'Edit this class for the day', '修改当天课程')}
                 </h3>
                 <p className="text-xs text-slate-700 mt-0.5">
                   {tr(
                     lang,
-                    `과목 후보군을 터치하면 오늘(${selectedDateStr}) 시간표만 즉시 변경됩니다.`,
-                    `Tap any subject below to override only ${selectedDateStr}.`,
-                    `点击下方候选科目，仅立即修改当天（${selectedDateStr}）的课表。`
+                    '여기서 바꾼 내용은 이 날짜에만 적용됩니다.',
+                    'Changes here apply to this date only.',
+                    '此处的修改仅适用于当天。'
                   )}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setEditingSchoolPeriod(null)}
+                onClick={() => {
+                  handleSaveSchoolNote();
+                  closeEditSheet();
+                }}
                 className="w-9 h-9 shrink-0 rounded-full bg-surface flex items-center justify-center text-slate-600 hover:bg-slate-200"
-                aria-label="Close"
+                aria-label={tr(lang, '닫기', 'Close', '关闭')}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              {subjectPool.school.map((subj) => {
-                const isCurrent =
-                  !editingSchoolPeriod.isCancelled && editingSchoolPeriod.subject === subj;
-                const isOriginal = editingSchoolPeriod.originalSubject === subj;
+            {renderStatusAndNote(
+              editingSchoolPeriod.status,
+              handleToggleSchoolStatus,
+              handleSaveSchoolNote,
+              editingSchoolPeriod.note ?? ''
+            )}
 
-                return (
-                  <button
-                    key={subj}
-                    type="button"
-                    onClick={() => handleSelectSchoolSubject(subj)}
-                    className={`min-h-[44px] px-3 py-2 rounded-full text-xs font-semibold border transition-all flex flex-col items-center justify-center ${
-                      isCurrent
-                        ? 'bg-sage text-paper border-transparent'
-                        : 'bg-surface text-ink border-divider hover:bg-sage-100 active:scale-95'
-                    }`}
-                  >
-                    <span>{translateSubject(subj, lang)}</span>
-                    {isOriginal && (
-                      <span
-                        className={`text-[10px] font-medium ${
-                          isCurrent ? 'text-paper/70' : 'text-slate-600'
-                        }`}
-                      >
-                        {tr(lang, '기본 과목', 'Default', '默认科目')}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-600">
+                {tr(lang, '과목 바꾸기 (터치 시 즉시 적용)', 'Change subject (applies instantly)', '更换科目（点击立即生效）')}
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {subjectPool.school.map((subj) => {
+                  const isCurrent =
+                    !editingSchoolPeriod.isCancelled && editingSchoolPeriod.subject === subj;
+                  const isOriginal = editingSchoolPeriod.originalSubject === subj;
+
+                  return (
+                    <button
+                      key={subj}
+                      type="button"
+                      onClick={() => handleSelectSchoolSubject(subj)}
+                      className={`min-h-[44px] px-3 py-2 rounded-full text-xs font-semibold border transition-all flex flex-col items-center justify-center ${
+                        isCurrent
+                          ? 'bg-sage text-paper border-transparent'
+                          : 'bg-surface text-ink border-divider hover:bg-sage-100 active:scale-95'
+                      }`}
+                    >
+                      <span>{translateSubject(subj, lang)}</span>
+                      {isOriginal && (
+                        <span
+                          className={`text-[10px] font-medium ${
+                            isCurrent ? 'text-paper/70' : 'text-slate-600'
+                          }`}
+                        >
+                          {tr(lang, '기본 과목', 'Default', '默认科目')}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-divider">
-              <button
-                type="button"
-                onClick={handleCancelOrSelfStudySchoolPeriod}
-                className="min-h-[44px] px-3 py-2.5 rounded-full bg-accent text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-600 active:scale-98 transition-all"
-              >
-                <Ban className="w-4 h-4 text-paper" />
-                {tr(lang, '당일 휴강/자습 처리', 'Mark Self-Study / Off', '设为今日停课/自习')}
-              </button>
-
+            <div className="pt-2 border-t border-divider">
               <button
                 type="button"
                 onClick={handleRestoreSchoolPeriod}
-                className="min-h-[44px] px-3 py-2.5 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 active:scale-98 transition-all"
+                className="w-full min-h-[44px] px-3 py-2.5 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 active:scale-98 transition-all"
               >
                 <RotateCcw className="w-4 h-4 text-slate-600" />
                 {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
@@ -1933,13 +2545,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         </div>
       )}
 
-      {/* MODAL 2: ACADEMY 2-TAP EDIT OR ADD MAKEUP CLASS BOTTOM SHEET */}
-      {(editingAcademyItem || isAddingAcademy) && (
+      {/* MODAL 2: ACADEMY EDIT BOTTOM SHEET */}
+      {editingAcademyItem && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
           onClick={() => {
-            setEditingAcademyItem(null);
-            setIsAddingAcademy(false);
+            handleSaveAcademyNote();
+            closeEditSheet();
           }}
         >
           <div
@@ -1951,34 +2563,45 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="text-xs text-accent-700 font-mono tabular-nums">
-                  {selectedDateStr} ({translateDay(dailyData.dayOfWeek, lang)})
+                  {formatDateLabel(editDateStr, lang)} · {editingAcademyItem.startTime} ~{' '}
+                  {editingAcademyItem.endTime}
                 </span>
                 <h3 className="text-[15px] font-bold text-ink mt-0.5">
-                  {isAddingAcademy
-                    ? tr(lang, '당일 학원 보강/특강 추가', 'Add Makeup / Special Class', '添加当天补课/特讲')
-                    : tr(lang, '당일 학원 시간표 변경', 'Edit Daily Academy Slot', '修改当天补习班时间')}
+                  {translateSubject(editingAcademyItem.subject, lang)}
+                  {editingAcademyItem.isAdded && (
+                    <span className="ml-1.5 align-middle px-1.5 py-0.5 text-[10px] font-bold bg-sage-100 text-sage-800 rounded-full">
+                      {tr(lang, '당일 보강', 'Makeup', '临时补课')}
+                    </span>
+                  )}
                 </h3>
                 <p className="text-xs text-slate-700 mt-0.5">
                   {tr(
                     lang,
-                    '시간대를 조정하고 학원 후보군 버튼을 터치하면 즉시 반영됩니다.',
-                    'Adjust the time and tap an academy button below to apply.',
-                    '调整时间段后点击下方补习班按钮即可立即生效。'
+                    '여기서 바꾼 내용은 이 날짜에만 적용됩니다.',
+                    'Changes here apply to this date only.',
+                    '此处的修改仅适用于当天。'
                   )}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  setEditingAcademyItem(null);
-                  setIsAddingAcademy(false);
+                  handleSaveAcademyNote();
+                  closeEditSheet();
                 }}
                 className="w-9 h-9 shrink-0 rounded-full bg-surface flex items-center justify-center text-slate-600 hover:bg-slate-200"
-                aria-label="Close"
+                aria-label={tr(lang, '닫기', 'Close', '关闭')}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {renderStatusAndNote(
+              editingAcademyItem.status,
+              handleToggleAcademyStatus,
+              handleSaveAcademyNote,
+              editingAcademyItem.note ?? ''
+            )}
 
             <div className="space-y-1.5">
               <label className="block text-[11px] font-semibold text-slate-600">
@@ -1998,30 +2621,24 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   onChange={(e) => setTempEndTime(e.target.value)}
                   className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
                 />
-                {!isAddingAcademy && (
-                  <button
-                    type="button"
-                    onClick={handleSaveAcademyTimeOnly}
-                    className="h-10 px-3 rounded-full bg-ink text-paper text-xs font-bold whitespace-nowrap hover:bg-slate-800"
-                  >
-                    {tr(lang, '시간만 저장', 'Save Time', '仅保存时间')}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleSaveAcademyTimeOnly}
+                  className="h-10 px-3 rounded-full bg-ink text-paper text-xs font-bold whitespace-nowrap hover:bg-slate-800"
+                >
+                  {tr(lang, '시간만 저장', 'Save Time', '仅保存时间')}
+                </button>
               </div>
             </div>
 
             <div className="space-y-1.5">
               <span className="text-[11px] font-semibold text-slate-600">
-                {tr(lang, '학원 후보군 선택 (터치 시 즉시 적용)', 'Select Academy (Instant Apply)', '选择补习班（点击立即应用）')}
+                {tr(lang, '학원 바꾸기 (터치 시 즉시 적용)', 'Change academy (applies instantly)', '更换补习班（点击立即生效）')}
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {subjectPool.academy.map((acName) => {
                   const isCurrent =
-                    !isAddingAcademy &&
-                    editingAcademyItem &&
-                    !editingAcademyItem.isCancelled &&
-                    editingAcademyItem.subject === acName;
-
+                    !editingAcademyItem.isCancelled && editingAcademyItem.subject === acName;
                   return (
                     <button
                       key={acName}
@@ -2040,33 +2657,204 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </div>
             </div>
 
-            {!isAddingAcademy && editingAcademyItem && (
-              <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-divider">
-                <button
-                  type="button"
-                  onClick={handleCancelAcademyToday}
-                  className="min-h-[44px] px-3 py-2.5 rounded-full bg-accent text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-600 active:scale-98 transition-all"
-                >
-                  <Ban className="w-4 h-4 text-paper" />
-                  {tr(lang, '당일 휴강 처리', 'Cancel Today', '今日停课')}
-                </button>
+            <div className="pt-2 border-t border-divider">
+              <button
+                type="button"
+                onClick={handleRestoreOrDeleteAcademyItem}
+                className="w-full min-h-[44px] px-3 py-2.5 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 active:scale-98 transition-all"
+              >
+                {editingAcademyItem.isAdded ? (
+                  <>
+                    <Trash2 className="w-4 h-4 text-accent-800" />
+                    {tr(lang, '추가 보강 삭제', 'Delete Makeup', '删除补课')}
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4 text-slate-600" />
+                    {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* MODAL 3: ADD SHEET (academy makeup/special class OR schedule item) */}
+      {isAddingAcademy && addTarget && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
+          onClick={closeAddSheet}
+        >
+          <div
+            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1" />
+
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="text-xs text-accent-700 font-mono tabular-nums">
+                  {formatDateLabel(addTarget.date, lang)}
+                </span>
+                <h3 className="text-[15px] font-bold text-ink mt-0.5">
+                  {tr(lang, '이 시간에 추가하기', 'Add at this time', '在此时间添加')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeAddSheet}
+                className="w-9 h-9 shrink-0 rounded-full bg-surface flex items-center justify-center text-slate-600 hover:bg-slate-200"
+                aria-label={tr(lang, '닫기', 'Close', '关闭')}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {onUpdateSchedules && (
+              <div className="grid grid-cols-2 rounded-full border border-divider overflow-hidden">
                 <button
                   type="button"
-                  onClick={handleRestoreOrDeleteAcademyItem}
-                  className="min-h-[44px] px-3 py-2.5 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 active:scale-98 transition-all"
+                  onClick={() => setAddKind('academy')}
+                  className={`h-9 text-xs font-semibold transition-colors ${
+                    addKind === 'academy' ? 'bg-accent text-paper' : 'text-ink hover:bg-slate-200'
+                  }`}
                 >
-                  {editingAcademyItem.isAdded ? (
-                    <>
-                      <Trash2 className="w-4 h-4 text-accent-800" />
-                      {tr(lang, '추가 보강 삭제', 'Delete Makeup', '删除补课')}
-                    </>
+                  {tr(lang, '학원 보강/특강', 'Academy makeup / special', '补习班补课/特讲')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddKind('schedule')}
+                  className={`h-9 text-xs font-semibold transition-colors ${
+                    addKind === 'schedule' ? 'bg-accent text-paper' : 'text-ink hover:bg-slate-200'
+                  }`}
+                >
+                  {tr(lang, '일정', 'Schedule', '日程')}
+                </button>
+              </div>
+            )}
+
+            {addKind === 'academy' || !onUpdateSchedules ? (
+              <>
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    {tr(lang, '수업 시간 설정', 'Class Time Range', '设置上课时间')}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      value={tempStartTime}
+                      onChange={(e) => setTempStartTime(e.target.value)}
+                      className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                    />
+                    <span className="text-sm font-bold text-slate-400">~</span>
+                    <input
+                      type="time"
+                      value={tempEndTime}
+                      onChange={(e) => setTempEndTime(e.target.value)}
+                      className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-slate-600">
+                    {tr(lang, '학원 선택 (터치 시 바로 추가)', 'Pick an academy (adds instantly)', '选择补习班（点击立即添加）')}
+                  </span>
+                  {subjectPool.academy.length === 0 ? (
+                    <p className="text-xs text-slate-600">
+                      {tr(
+                        lang,
+                        '설정에서 학원 후보를 먼저 추가해 주세요.',
+                        'Add academies in Settings first.',
+                        '请先在设置中添加补习班。'
+                      )}
+                    </p>
                   ) : (
-                    <>
-                      <RotateCcw className="w-4 h-4 text-slate-600" />
-                      {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
-                    </>
+                    <div className="grid grid-cols-2 gap-2">
+                      {subjectPool.academy.map((acName) => (
+                        <button
+                          key={acName}
+                          type="button"
+                          onClick={() => handleSelectAcademySubject(acName)}
+                          className="min-h-[40px] px-3 py-2 rounded-full text-xs font-semibold border transition-all flex items-center justify-center bg-transparent text-ink border-divider hover:bg-accent-100 active:scale-95"
+                        >
+                          {translateSubject(acName, lang)}
+                        </button>
+                      ))}
+                    </div>
                   )}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    {tr(lang, '시작 시간', 'Start time', '开始时间')}
+                  </label>
+                  <input
+                    type="time"
+                    value={tempStartTime}
+                    onChange={(e) => setTempStartTime(e.target.value)}
+                    className="w-full h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    {tr(lang, '제목', 'Title', '标题')}
+                  </label>
+                  <input
+                    type="text"
+                    value={newScheduleTitle}
+                    onChange={(e) => setNewScheduleTitle(e.target.value)}
+                    placeholder={tr(lang, '예: 수행평가 준비', 'e.g. Prepare for quiz', '例如：准备测验')}
+                    className="w-full h-10 px-4 rounded-full border border-divider bg-surface text-[13px] text-ink outline-none focus:border-accent"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <span className="block text-[11px] font-semibold text-slate-600">
+                    {tr(lang, '분류', 'Category', '分类')}
+                  </span>
+                  <div className="flex gap-1.5">
+                    {(['school', 'academy', 'other'] as ScheduleCategory[]).map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setNewScheduleCategory(cat)}
+                        className={`h-8 px-3.5 rounded-full text-xs font-semibold border transition-colors ${
+                          newScheduleCategory === cat
+                            ? cat === 'school'
+                              ? 'bg-sage text-paper border-transparent'
+                              : cat === 'academy'
+                              ? 'bg-accent text-paper border-transparent'
+                              : 'bg-ink text-paper border-transparent'
+                            : 'border-divider text-ink hover:bg-slate-200'
+                        }`}
+                      >
+                        {categoryLabel(cat, lang)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    {tr(lang, '메모', 'Memo', '备注')}
+                  </label>
+                  <textarea
+                    value={newScheduleMemo}
+                    onChange={(e) => setNewScheduleMemo(e.target.value)}
+                    rows={2}
+                    placeholder={tr(lang, '선택 사항', 'Optional', '可选')}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-divider bg-surface text-[13px] text-ink outline-none focus:border-accent resize-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddScheduleItem}
+                  disabled={!newScheduleTitle.trim()}
+                  className="w-full min-h-[44px] rounded-full bg-accent text-paper text-[13px] font-bold hover:bg-accent-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {tr(lang, '일정 추가', 'Add schedule', '添加日程')}
                 </button>
               </div>
             )}

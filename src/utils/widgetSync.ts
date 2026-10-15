@@ -1,18 +1,32 @@
-import { PlannerState, ScheduleItem } from '../types';
+import { AppLanguage, PlannerState, ScheduleItem } from '../types';
 import { formatDateKey, getDayOfWeekKor } from '../data/initialData';
 import { resolveDailyTimetable } from './timetableHelpers';
+import {
+  translateDay,
+  translateSubject,
+  translateSampleText,
+  translateAttendanceStatus,
+  formatDateLabel,
+} from '../i18n/translations';
 
 export const WIDGET_STORAGE_KEY = 'WIDGET_SYNC_DATA';
 
 export interface WidgetSyncPayload {
   syncedAt: string;
+  /** UI language the localized *Label fields were rendered in. */
+  language: AppLanguage;
   date: string;
+  /** Localized date, e.g. `10월 15일 (목)` / `Oct 15 (Thu)` / `10月15日 (周四)`. */
+  dateLabel: string;
+  /** Korean weekday key ('월'…'일'), kept as an identifier. */
   dayOfWeek: string;
+  dayOfWeekLabel: string;
   schoolTimetable: Array<{
     period: number;
     startTime: string;
     endTime: string;
     subject: string;
+    subjectLabel: string;
     isCancelled: boolean;
     isModified: boolean;
   }>;
@@ -21,6 +35,7 @@ export interface WidgetSyncPayload {
     startTime: string;
     endTime: string;
     subject: string;
+    subjectLabel: string;
     isCancelled: boolean;
     isAdded: boolean;
     isOverlapping: boolean;
@@ -28,11 +43,13 @@ export interface WidgetSyncPayload {
   todaySchedules: Array<{
     id: string;
     title: string;
+    titleLabel: string;
     category: ScheduleItem['category'];
     time?: string;
   }>;
   attendanceSummary: {
     todaySchoolStatus: string | null;
+    todaySchoolStatusLabel: string | null;
     pendingMakeupCount: number;
   };
 }
@@ -48,6 +65,7 @@ export function buildWidgetSyncPayload(
   state: PlannerState,
   targetDate: Date = new Date()
 ): WidgetSyncPayload {
+  const lang: AppLanguage = state.language || 'ko';
   const dateStr = formatDateKey(targetDate);
   const dayOfWeek = getDayOfWeekKor(targetDate);
   const resolved = resolveDailyTimetable(
@@ -62,6 +80,7 @@ export function buildWidgetSyncPayload(
     .map((s) => ({
       id: s.id,
       title: s.title,
+      titleLabel: translateSampleText(s.title, lang),
       category: s.category,
       time: s.time,
     }));
@@ -78,13 +97,17 @@ export function buildWidgetSyncPayload(
 
   return {
     syncedAt: new Date().toISOString(),
+    language: lang,
     date: dateStr,
+    dateLabel: formatDateLabel(targetDate, lang),
     dayOfWeek,
+    dayOfWeekLabel: translateDay(dayOfWeek, lang),
     schoolTimetable: resolved.school.map((s) => ({
       period: s.period,
       startTime: s.startTime,
       endTime: s.endTime,
       subject: s.subject,
+      subjectLabel: translateSubject(s.subject, lang),
       isCancelled: s.isCancelled,
       isModified: s.isModified,
     })),
@@ -93,6 +116,7 @@ export function buildWidgetSyncPayload(
       startTime: a.startTime,
       endTime: a.endTime,
       subject: a.subject,
+      subjectLabel: translateSubject(a.subject, lang),
       isCancelled: a.isCancelled,
       isAdded: a.isAdded,
       isOverlapping: a.isOverlapping,
@@ -100,6 +124,9 @@ export function buildWidgetSyncPayload(
     todaySchedules,
     attendanceSummary: {
       todaySchoolStatus,
+      todaySchoolStatusLabel: todaySchoolStatus
+        ? translateAttendanceStatus(todaySchoolStatus, lang)
+        : null,
       pendingMakeupCount,
     },
   };
