@@ -31,6 +31,8 @@ import {
   DatabaseBackup,
   ShieldAlert,
   type LucideIcon,
+  FlaskConical,
+  Lock,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -47,6 +49,7 @@ import {
   HomeWidgetId,
   WidgetConfig,
 } from '../types';
+import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
@@ -1233,6 +1236,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           `每周 ${totalAcademyCount} 节 · ${academyDaysUsed} 天`
         )
       : tr(lang, '등록된 학원 없음', 'No academy classes yet', '尚未登记补习班');
+  const aiEnabled = isAiTimetableEnabled();
   const aiSummaryLine = aiLoading
     ? tr(lang, '이미지 분석 중…', 'Analyzing image…', '正在分析图片…')
     : aiPreviewEntries.length > 0
@@ -2608,8 +2612,92 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           tone="other"
           icon={ScanLine}
           title={tr(lang, 'AI 시간표 이미지 인식', 'AI Timetable Recognition', 'AI 课表图片识别')}
-          summary={aiSummaryLine}
+          summary={aiEnabled ? aiSummaryLine : tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · coming soon', '实验功能 · 即将推出')}
         >
+          {!aiEnabled ? (
+            <div className="p-4 space-y-4">
+              <div className="rounded-xl bg-other-100 border border-other-300 p-3.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-other-800">
+                  <FlaskConical className="w-4 h-4" strokeWidth={2.75} />
+                  <span className="text-[13px] font-bold">
+                    {tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · Coming soon', '实验功能 · 即将推出')}
+                  </span>
+                </div>
+                <p className="text-[12px] text-other-800 leading-relaxed">
+                  {tr(
+                    lang,
+                    '시간표 사진 한 장으로 요일·교시·과목과 학원 일정을 자동으로 채워 주는 기능이에요. 지금은 비공개 테스트 중이라 정식 출시 후에 쓸 수 있어요.',
+                    'Fill in your days, periods, subjects and academy classes from a single timetable photo. It is in private testing and will open after the official release.',
+                    '只需一张课表照片，即可自动填入星期、节次、科目和补习班日程。目前处于内部测试中，正式发布后即可使用。'
+                  )}
+                </p>
+              </div>
+
+              <ol className="space-y-2">
+                {[
+                  {
+                    icon: Camera,
+                    title: tr(lang, '사진 찍기', 'Take a photo', '拍照'),
+                    body: tr(lang, '가정통신문·칠판·손글씨 시간표를 찍거나 올려요.', 'Snap or upload a printed, blackboard or handwritten timetable.', '拍摄或上传通知单、黑板或手写课表。'),
+                  },
+                  {
+                    icon: ScanLine,
+                    title: tr(lang, 'AI가 읽기', 'AI reads it', 'AI 识别'),
+                    body: tr(lang, '요일·교시·과목·학원 시간을 뽑아 표로 보여 줘요.', 'It extracts days, periods, subjects and academy times into a table.', '提取星期、节次、科目和补习班时间并以表格显示。'),
+                  },
+                  {
+                    icon: Check,
+                    title: tr(lang, '확인하고 합치기', 'Review and merge', '核对并合并'),
+                    body: tr(lang, '틀린 곳을 고친 뒤 기본 시간표에 합쳐요.', 'Fix anything it got wrong, then merge into your timetable.', '修改错误后合并到固定课表。'),
+                  },
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-3 rounded-xl bg-paper px-3 py-2.5">
+                    <span className="w-8 h-8 rounded-full bg-surface text-slate-700 grid place-items-center shrink-0">
+                      <step.icon className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-bold text-ink">
+                        <span className="font-mono text-slate-500 mr-1">{i + 1}</span>
+                        {step.title}
+                      </span>
+                      <span className="block text-[12px] text-slate-600 leading-relaxed">{step.body}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="grid grid-cols-1 gap-2" aria-disabled="true">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full min-h-[56px] px-4 rounded-xl border-[1.5px] border-dashed border-slate-300 bg-paper/60 text-slate-500 text-xs font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+                >
+                  <Lock className="w-4 h-4" />
+                  {tr(lang, '사진으로 시간표 인식 · 준비 중', 'Recognize from photo · In preparation', '照片识别课表 · 准备中')}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 text-center">
+                {tr(
+                  lang,
+                  '지금은 [학교 시간표] 표에서 칸을 눌러 직접 입력할 수 있어요.',
+                  'For now, tap the cells in the [School timetable] table to enter it yourself.',
+                  '目前可在【学校课表】表格中点击格子手动输入。'
+                )}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mx-4 mt-4 rounded-xl bg-other-100 border border-other-300 px-3 py-2 flex items-center gap-1.5 text-other-800">
+                <FlaskConical className="w-3.5 h-3.5 shrink-0" strokeWidth={2.75} />
+                <span className="text-[11px] font-semibold">
+                  {tr(
+                    lang,
+                    '실험 기능 · 테스트 모드로 켜져 있어요. 결과를 꼭 확인한 뒤 합쳐 주세요.',
+                    'Experimental · enabled in test mode. Please review results before merging.',
+                    '实验功能 · 已在测试模式下开启。合并前请仔细核对结果。'
+                  )}
+                </span>
+              </div>
           <div className="p-4 space-y-4">
             <p className="text-[11px] text-slate-600 leading-relaxed">
               {tr(
@@ -2834,6 +2922,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
             )}
           </div>
+            </>
+          )}
         </SettingsCard>
 
         <SettingsCard
