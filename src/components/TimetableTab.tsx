@@ -16,6 +16,11 @@ import {
   CalendarRange,
   StickyNote,
   CalendarClock,
+  CalendarDays,
+  LayoutGrid,
+  Check,
+  UserX,
+  BookOpen,
 } from 'lucide-react';
 import {
   DAYS_OF_WEEK,
@@ -206,7 +211,7 @@ const StatusTag: React.FC<{ status?: SlotStatus; lang: AppLanguage; large?: bool
   if (!status || status === 'cancelled') return null;
   return (
     <span
-      className={`${large ? 'px-2 py-0.5 text-[13px] shrink-0' : 'px-1.5 py-0.5 text-[10px]'} font-bold rounded-full whitespace-nowrap ${
+      className={`${large ? 'px-2 py-0.5 text-[13px] shrink-0' : 'px-1.5 py-px text-[11px] leading-tight shrink-0'} font-bold rounded-full whitespace-nowrap ${
         status === 'absent' ? 'bg-accent-800 text-paper' : 'bg-sage-200 text-sage-900'
       }`}
     >
@@ -216,6 +221,77 @@ const StatusTag: React.FC<{ status?: SlotStatus; lang: AppLanguage; large?: bool
 };
 
 const STATUS_OPTIONS: SlotStatus[] = ['cancelled', 'absent', 'selfStudy'];
+
+const EN_MONTHS_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const FULL_WEEKDAYS: { ko: string; en: string; zh: string }[] = [
+  { ko: '일요일', en: 'Sunday', zh: '星期日' },
+  { ko: '월요일', en: 'Monday', zh: '星期一' },
+  { ko: '화요일', en: 'Tuesday', zh: '星期二' },
+  { ko: '수요일', en: 'Wednesday', zh: '星期三' },
+  { ko: '목요일', en: 'Thursday', zh: '星期四' },
+  { ko: '금요일', en: 'Friday', zh: '星期五' },
+  { ko: '토요일', en: 'Saturday', zh: '星期六' },
+];
+
+function monthLabel(d: Date, lang: AppLanguage): string {
+  const mo = d.getMonth() + 1;
+  return tr(lang, `${mo}월`, EN_MONTHS_FULL[d.getMonth()], `${mo}月`);
+}
+
+function periodLabel(period: number, lang: AppLanguage): string {
+  return tr(lang, `${period}교시`, `P${period}`, `第${period}节`);
+}
+
+function parseDateKey(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+/** Weekday text tint for Sat / Sun (AA on paper/surface). */
+function weekendTint(dayLabel: string): string {
+  if (dayLabel === '일') return 'text-accent-700';
+  if (dayLabel === '토') return 'text-sage-700';
+  return '';
+}
+
+/** Caprasimo duration: big numerals with small localized units. */
+const DurationNum: React.FC<{ minutes: number; lang: AppLanguage; size?: string }> = ({
+  minutes,
+  lang,
+  size = 'text-[19px]',
+}) => {
+  const total = Math.max(0, Math.round(minutes));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  const hu = tr(lang, '시간', 'h', '小时');
+  const mu = tr(lang, '분', 'm', '分');
+  return (
+    <span className="inline-flex items-baseline flex-wrap gap-x-0.5 leading-none">
+      {h > 0 && (
+        <>
+          <span className={`font-mono ${size} tabular-nums`}>{h}</span>
+          <span className="text-[11px] font-bold mr-1">{hu}</span>
+        </>
+      )}
+      {(m > 0 || h === 0) && (
+        <>
+          <span className={`font-mono ${size} tabular-nums`}>{m}</span>
+          <span className="text-[11px] font-bold">{mu}</span>
+        </>
+      )}
+    </span>
+  );
+};
+
+const SCHEDULE_CAT_TONE: Record<ScheduleCategory, { dot: string; pill: string }> = {
+  school: { dot: 'bg-sage-600', pill: 'bg-sage-100 text-sage-900 border-sage-300' },
+  academy: { dot: 'bg-accent', pill: 'bg-accent-100 text-accent-900 border-accent-300' },
+  other: { dot: 'bg-other', pill: 'bg-other-100 text-other-800 border-other-300' },
+};
 
 export const TimetableTab: React.FC<TimetableTabProps> = ({
   language = 'ko',
@@ -604,8 +680,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     };
   }, [dailyData, timelineStartMin, timelineEndMin, totalTimelineMinutes, lang, overlapBadgeLabel]);
 
-  const handleShiftWeek = (deltaWeeks: number) => {
-    setSelectedDate((prev) => addDays(prev, deltaWeeks * 7));
+  // Daily view steps one day, weekly view steps one week
+  const handleStep = (delta: number) => {
+    setSelectedDate((prev) => addDays(prev, viewMode === 'daily' ? delta : delta * 7));
   };
 
   const handleGoToday = () => {
@@ -1037,38 +1114,44 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   ) => {
     const dirty = tempNote.trim() !== savedNote;
     return (
-      <div className="space-y-3 p-3 rounded-2xl bg-surface">
-        <div className="space-y-1.5">
-          <span className="block text-[11px] font-semibold text-slate-600">
-            {tr(lang, '빠른 표시 (다시 누르면 해제)', 'Quick mark (tap again to clear)', '快速标记（再次点击取消）')}
-          </span>
-          <div className="flex gap-1.5">
+      <div className="space-y-3.5 p-3.5 rounded-2xl bg-surface">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[13px] font-bold text-ink">
+              {tr(lang, '오늘 이 수업은', 'This class today', '今天这节课')}
+            </span>
+            <span className="text-[11px] font-semibold text-slate-600">
+              {tr(lang, '다시 누르면 해제', 'Tap again to clear', '再次点击取消')}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
             {STATUS_OPTIONS.map((opt) => {
               const active = currentStatus === opt;
               const activeCls =
                 opt === 'cancelled'
-                  ? 'bg-slate-500 text-paper border-transparent'
+                  ? 'bg-slate-600 text-paper border-transparent'
                   : opt === 'absent'
                   ? 'bg-accent-800 text-paper border-transparent'
-                  : 'bg-sage text-paper border-transparent';
+                  : 'bg-sage-700 text-paper border-transparent';
+              const Icon = opt === 'cancelled' ? Ban : opt === 'absent' ? UserX : BookOpen;
               return (
                 <button
                   key={opt}
                   type="button"
                   aria-pressed={active}
                   onClick={() => onToggle(opt)}
-                  className={`flex-1 h-9 rounded-full text-xs font-bold border transition-all active:scale-95 inline-flex items-center justify-center gap-1 ${
-                    active ? activeCls : 'bg-paper text-ink border-divider hover:bg-slate-200'
+                  className={`h-10 rounded-full text-[13px] font-bold border transition-all active:scale-95 inline-flex items-center justify-center gap-1.5 ${
+                    active ? activeCls : 'bg-paper text-ink border-divider hover:bg-slate-100'
                   }`}
                 >
-                  {opt === 'cancelled' && <Ban className="w-3.5 h-3.5" />}
+                  {active ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <Icon className="w-3.5 h-3.5" />}
                   {statusLabel(opt, lang)}
                 </button>
               );
             })}
           </div>
           {currentStatus === 'absent' && onUpdateAttendance && (
-            <p className="text-[10px] text-slate-600">
+            <p className="text-[11px] font-semibold text-accent-800">
               {tr(
                 lang,
                 '출결 기록에도 결석으로 저장돼요.',
@@ -1079,7 +1162,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           )}
         </div>
         <div className="space-y-1.5">
-          <label className="block text-[11px] font-semibold text-slate-600">
+          <label className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+            <StickyNote className="w-3.5 h-3.5 text-slate-600" />
             {tr(lang, '메모', 'Note', '备注')}
           </label>
           <div className="flex items-center gap-2">
@@ -1097,13 +1181,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 'e.g. Homework check, room change',
                 '例如：检查作业、换教室'
               )}
-              className="flex-1 min-w-0 h-10 px-4 rounded-full border border-divider bg-paper text-[13px] text-ink outline-none focus:border-accent"
+              className="flex-1 min-w-0 h-10 px-4 rounded-full border border-divider bg-paper text-[13px] text-ink placeholder:text-slate-500 outline-none focus:border-accent"
             />
             <button
               type="button"
               onClick={onSaveNote}
               disabled={!dirty}
-              className="h-10 px-3.5 rounded-full bg-accent text-paper text-xs font-bold whitespace-nowrap hover:bg-accent-600 disabled:opacity-40 disabled:cursor-default"
+              className="h-10 px-4 rounded-full bg-accent-700 text-paper text-[13px] font-bold whitespace-nowrap hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-default"
             >
               {dirty ? tr(lang, '저장', 'Save', '保存') : tr(lang, '저장됨', 'Saved', '已保存')}
             </button>
@@ -1129,6 +1213,345 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     }
     return ticks;
   }, [startHour, endHour, totalHours]);
+
+  // ---- Week strip markers (makeups / day changes / schedules) ----
+  const weekMarkers = useMemo(() => {
+    const map: Record<string, { makeup: boolean; changed: boolean; schedule: boolean }> = {};
+    weekDays.forEach((wd) => {
+      const ov = dailyOverrides[wd.dateStr];
+      const academyOv = ov?.academy || [];
+      const makeup = academyOv.some((a) => a.isAdded);
+      const changed =
+        Object.keys(ov?.school || {}).length > 0 || academyOv.some((a) => !a.isAdded);
+      const schedule = getSchedulesForDate(schedules, wd.dateStr).length > 0;
+      map[wd.dateStr] = { makeup, changed, schedule };
+    });
+    return map;
+  }, [weekDays, dailyOverrides, schedules]);
+
+  // ---- Weekly school grid rows: every period that exists Mon–Fri, with its usual time ----
+  const weeklyPeriods = useMemo(() => {
+    const byPeriod = new Map<number, { startTime: string; endTime: string }>();
+    weeklyData.slice(0, 5).forEach((wd) => {
+      wd.resolved.school.forEach((s) => {
+        if (!byPeriod.has(s.period)) byPeriod.set(s.period, { startTime: s.startTime, endTime: s.endTime });
+      });
+    });
+    return Array.from(byPeriod.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([period, t]) => ({ period, ...t }));
+  }, [weeklyData]);
+
+  const weekRangeLabel = useMemo(() => {
+    const mon = weekDays[0]?.dateObj;
+    const sun = weekDays[6]?.dateObj;
+    if (!mon || !sun) return '';
+    const f = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+    return `${f(mon)} – ${f(sun)}`;
+  }, [weekDays]);
+
+  const navBtn =
+    'w-[34px] h-[34px] rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100 active:scale-95 transition-transform shrink-0';
+
+  /** Small date tile used in sheet headers and the weekly academy list. */
+  const renderDateBlock = (dateStr: string, tone: 'sage' | 'accent' | 'plain', size: 'sm' | 'md' = 'md') => {
+    const d = parseDateKey(dateStr);
+    const dayKor = getDayOfWeekKor(d);
+    const filled = tone !== 'plain';
+    return (
+      <span
+        aria-hidden="true"
+        className={`shrink-0 rounded-xl flex flex-col items-center justify-center gap-0.5 ${
+          size === 'md' ? 'w-[52px] py-2' : 'w-11 py-1.5'
+        } ${
+          tone === 'sage'
+            ? 'bg-sage-700 text-paper'
+            : tone === 'accent'
+            ? 'bg-accent-700 text-paper'
+            : 'bg-paper text-ink'
+        }`}
+      >
+        <span
+          className={`text-[11px] font-bold leading-none ${
+            filled ? 'text-paper/90' : weekendTint(dayKor) || 'text-slate-600'
+          }`}
+        >
+          {translateDay(dayKor, lang)}
+        </span>
+        <span className={`font-mono leading-none tabular-nums ${size === 'md' ? 'text-[22px]' : 'text-[17px]'}`}>
+          {d.getDate()}
+        </span>
+      </span>
+    );
+  };
+
+  /** One timeline block (school period or academy class). Compact single-row layout when short. */
+  const renderTimelineBlock = (opts: {
+    key: string;
+    kind: 'school' | 'academy';
+    topPx: number;
+    heightPx: number;
+    totalCols: number;
+    colIndex: number;
+    title: string;
+    startTime: string;
+    endTime: string;
+    badge: string;
+    status?: SlotStatus;
+    note?: string;
+    isCurrent: boolean;
+    isCancelled: boolean;
+    isOverlapping: boolean;
+    modifiedFrom?: string;
+    isMakeup?: boolean;
+    onClick: () => void;
+  }) => {
+    const h = Math.max(36, opts.heightPx - 3);
+    const compact = h < 60;
+    const widthPercent = 100 / opts.totalCols;
+    const leftPercent = opts.colIndex * widthPercent;
+    const isSchool = opts.kind === 'school';
+
+    let shell: string;
+    let strip: string;
+    let titleCls: string;
+    let metaCls: string;
+    let badgeCls: string;
+    if (opts.isCurrent) {
+      shell = isSchool
+        ? 'bg-sage-700 shadow-md hover:bg-sage-800'
+        : 'bg-accent-700 shadow-md hover:bg-accent-800';
+      strip = isSchool ? 'bg-sage-300' : 'bg-accent-300';
+      titleCls = 'text-paper';
+      metaCls = 'text-paper/90';
+      badgeCls = 'bg-paper/20 text-paper';
+    } else if (opts.isCancelled) {
+      shell = 'bg-paper/80 border border-dashed border-slate-400 hover:bg-paper';
+      strip = 'bg-slate-300';
+      titleCls = 'text-slate-600 line-through';
+      metaCls = 'text-slate-600';
+      badgeCls = 'bg-slate-200 text-slate-700';
+    } else if (opts.status === 'selfStudy') {
+      shell = 'bg-slate-200 hover:bg-slate-300';
+      strip = 'bg-slate-500';
+      titleCls = 'text-ink';
+      metaCls = 'text-slate-700';
+      badgeCls = 'bg-paper text-slate-700';
+    } else if (isSchool) {
+      shell = 'bg-sage-100 hover:bg-sage-200';
+      strip = opts.status === 'absent' ? 'bg-accent-800' : 'bg-sage-600';
+      titleCls = 'text-sage-900';
+      metaCls = 'text-sage-800';
+      badgeCls = 'bg-sage-200 text-sage-900';
+    } else {
+      shell = 'bg-accent-100 hover:bg-accent-200';
+      strip = opts.status === 'absent' ? 'bg-accent-800' : 'bg-accent';
+      titleCls = 'text-accent-900';
+      metaCls = 'text-accent-800';
+      badgeCls = opts.isMakeup ? 'bg-accent-700 text-paper' : 'bg-accent-200 text-accent-900';
+    }
+    const conflictRing =
+      opts.isOverlapping && !opts.isCancelled ? 'ring-2 ring-accent-800 ring-offset-1 ring-offset-surface' : '';
+
+    const liveChip = opts.isCurrent && (
+      <span className="px-1.5 py-px rounded-full bg-paper text-ink text-[11px] leading-tight font-bold whitespace-nowrap shrink-0">
+        {tr(lang, '수업 중', 'LIVE', '上课中')}
+      </span>
+    );
+    const cancelledChip = opts.isCancelled && (
+      <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[11px] leading-tight font-bold whitespace-nowrap shrink-0">
+        {statusLabel('cancelled', lang)}
+      </span>
+    );
+    const conflictIcon = opts.isOverlapping && !opts.isCancelled && (
+      <AlertTriangle
+        className={`w-3.5 h-3.5 shrink-0 ${opts.isCurrent ? 'text-paper' : 'text-accent-800'}`}
+        aria-label={overlapBadgeLabel}
+      />
+    );
+
+    return (
+      <button
+        key={opts.key}
+        type="button"
+        onClick={opts.onClick}
+        style={{
+          top: `${opts.topPx + 1.5}px`,
+          height: `${h}px`,
+          left: `calc(${leftPercent}% + 3px)`,
+          width: `calc(${widthPercent}% - 6px)`,
+        }}
+        className={`absolute z-10 rounded-xl text-left transition-colors overflow-hidden flex ${shell} ${conflictRing}`}
+      >
+        <span className={`w-1.5 shrink-0 ${strip}`} aria-hidden="true" />
+        {compact ? (
+          <span className="min-w-0 flex-1 flex items-center gap-1.5 px-2.5">
+            {conflictIcon}
+            <span className={`min-w-0 truncate text-[14px] font-bold ${titleCls}`}>{opts.title}</span>
+            <span className={`font-mono text-[11px] tabular-nums whitespace-nowrap shrink-0 ${metaCls}`}>
+              {opts.startTime}
+            </span>
+            <StatusTag status={opts.status} lang={lang} />
+            {cancelledChip}
+            {liveChip}
+            <span className="flex-1" />
+            {opts.totalCols === 1 && (
+              <span className={`px-1.5 py-px rounded-full text-[11px] leading-tight font-bold whitespace-nowrap shrink-0 ${badgeCls}`}>
+                {opts.badge}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 flex flex-col gap-0.5 px-2.5 py-1.5">
+            <span className="flex items-center gap-1.5 min-w-0">
+              {conflictIcon}
+              <span className={`min-w-0 truncate text-[14px] leading-tight font-bold ${titleCls}`}>{opts.title}</span>
+              <StatusTag status={opts.status} lang={lang} />
+              {cancelledChip}
+              {liveChip}
+            </span>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className={`font-mono text-[11px] tabular-nums whitespace-nowrap ${metaCls}`}>
+                {opts.startTime} – {opts.endTime}
+              </span>
+              <span className={`px-1.5 py-px rounded-full text-[11px] leading-tight font-bold whitespace-nowrap shrink-0 ${badgeCls}`}>
+                {opts.badge}
+              </span>
+              {opts.modifiedFrom && h >= 76 && opts.totalCols === 1 && (
+                <span
+                  className={`min-w-0 truncate text-[11px] font-semibold ${opts.isCurrent ? 'text-paper/90' : 'text-slate-700'}`}
+                >
+                  {tr(
+                    lang,
+                    `변경됨 · 기존 ${opts.modifiedFrom}`,
+                    `Changed · was ${opts.modifiedFrom}`,
+                    `已调整 · 原 ${opts.modifiedFrom}`
+                  )}
+                </span>
+              )}
+            </span>
+            {opts.note && h >= 64 && (
+              <span
+                className={`flex items-center gap-1 min-w-0 text-[11px] font-medium ${
+                  opts.isCurrent ? 'text-paper/90' : 'text-slate-700'
+                }`}
+              >
+                <StickyNote className="w-3 h-3 shrink-0" />
+                <span className="truncate">{opts.note}</span>
+              </span>
+            )}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  /** One row in the list mode (school + academy sections). */
+  const renderListRow = (opts: {
+    key: string;
+    kind: 'school' | 'academy';
+    startTime: string;
+    endTime: string;
+    title: string;
+    badge: string;
+    status?: SlotStatus;
+    note?: string;
+    isCurrent: boolean;
+    isCancelled: boolean;
+    isOverlapping: boolean;
+    modifiedFrom?: string;
+    isMakeup?: boolean;
+    onClick: () => void;
+  }) => {
+    const isSchool = opts.kind === 'school';
+    const strip = opts.isCancelled
+      ? 'bg-slate-300'
+      : opts.status === 'selfStudy'
+      ? 'bg-slate-500'
+      : opts.status === 'absent'
+      ? 'bg-accent-800'
+      : isSchool
+      ? 'bg-sage-600'
+      : 'bg-accent';
+    return (
+      <button
+        key={opts.key}
+        type="button"
+        onClick={opts.onClick}
+        className={`w-full flex items-stretch gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+          opts.isCurrent
+            ? isSchool
+              ? 'bg-sage-100 ring-2 ring-inset ring-sage-600'
+              : 'bg-accent-100 ring-2 ring-inset ring-accent'
+            : 'bg-paper hover:bg-slate-100'
+        }`}
+      >
+        <span className="w-12 shrink-0 flex flex-col justify-center">
+          <span
+            className={`font-mono text-[16px] leading-none tabular-nums ${
+              opts.isCancelled ? 'text-slate-500' : 'text-ink'
+            }`}
+          >
+            {opts.startTime}
+          </span>
+          <span className="mt-1 font-mono text-[11px] leading-none tabular-nums text-slate-600">
+            {opts.endTime}
+          </span>
+        </span>
+        <span className={`w-1 rounded-full shrink-0 ${strip}`} aria-hidden="true" />
+        <span className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+          <span className="flex items-center gap-1.5 min-w-0">
+            {opts.isOverlapping && !opts.isCancelled && (
+              <AlertTriangle className="w-3.5 h-3.5 text-accent-800 shrink-0" aria-label={overlapBadgeLabel} />
+            )}
+            <span
+              className={`min-w-0 truncate text-[14px] font-bold ${
+                opts.isCancelled ? 'line-through text-slate-500' : 'text-ink'
+              }`}
+            >
+              {opts.title}
+            </span>
+          </span>
+          <span className="flex items-center gap-1 flex-wrap">
+            <span
+              className={`px-1.5 py-px rounded-full text-[11px] leading-tight font-bold whitespace-nowrap ${
+                isSchool
+                  ? 'bg-sage-200 text-sage-900'
+                  : opts.isMakeup
+                  ? 'bg-accent-700 text-paper'
+                  : 'bg-accent-200 text-accent-900'
+              }`}
+            >
+              {opts.badge}
+            </span>
+            {opts.isCurrent && (
+              <span className="px-1.5 py-px rounded-full bg-ink text-paper text-[11px] leading-tight font-bold whitespace-nowrap">
+                {tr(lang, '수업 중', 'LIVE', '上课中')}
+              </span>
+            )}
+            <StatusTag status={opts.status} lang={lang} />
+            {opts.isCancelled && (
+              <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[11px] leading-tight font-bold whitespace-nowrap">
+                {statusLabel('cancelled', lang)}
+              </span>
+            )}
+            {opts.modifiedFrom && (
+              <span className="text-[11px] font-semibold text-slate-600 truncate">
+                {tr(lang, `기존 ${opts.modifiedFrom}`, `was ${opts.modifiedFrom}`, `原 ${opts.modifiedFrom}`)}
+              </span>
+            )}
+          </span>
+          {opts.note && (
+            <span className="flex items-center gap-1 min-w-0 text-[11px] font-medium text-slate-700">
+              <StickyNote className="w-3 h-3 shrink-0" />
+              <span className="truncate">{opts.note}</span>
+            </span>
+          )}
+        </span>
+        <ChevronRight className="w-4 h-4 text-slate-500 shrink-0 self-center" />
+      </button>
+    );
+  };
 
   const showLiveNowLine =
     isSelectedToday && nowMinutes >= timelineStartMin && nowMinutes <= timelineEndMin;
@@ -1343,283 +1766,302 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         </div>
       </section>
 
-      {/* Top Controls Card: View Switch + Week Navigation + 7 Day Tabs */}
-      <div className="bg-surface rounded-2xl p-3 shadow-xs space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex rounded-full border border-divider overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setViewMode('daily')}
-              className={`h-[30px] px-2.5 text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 ${
-                viewMode === 'daily'
-                  ? 'bg-accent text-paper'
-                  : 'text-ink hover:bg-slate-100'
-              }`}
-            >
-              {tr(lang, '일별 상세 보기', 'Daily Detail', '每日详情')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('weekly')}
-              className={`h-[30px] px-2.5 text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 ${
-                viewMode === 'weekly'
-                  ? 'bg-accent text-paper'
-                  : 'text-ink hover:bg-slate-100'
-              }`}
-            >
-              {tr(lang, '주간 한눈에 보기', 'Weekly Grid', '每周总览')}
-            </button>
+      {/* CONTROLS: view segment + date row + week strip */}
+      <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3.5">
+        <div
+          className="grid grid-cols-2 p-1 rounded-full bg-paper"
+          role="tablist"
+          aria-label={tr(lang, '보기 방식', 'View', '视图')}
+        >
+          {(
+            [
+              { key: 'daily', icon: CalendarDays, label: tr(lang, '일별', 'Daily', '每日') },
+              { key: 'weekly', icon: LayoutGrid, label: tr(lang, '주간', 'Weekly', '每周') },
+            ] as const
+          ).map(({ key, icon: Icon, label }) => {
+            const active = viewMode === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setViewMode(key)}
+                className={`h-9 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                  active ? 'bg-accent-700 text-paper shadow-xs' : 'text-slate-700 hover:text-ink'
+                }`}
+              >
+                <Icon className="w-4 h-4" strokeWidth={2.5} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Date row */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="font-mono text-[44px] leading-none tabular-nums text-ink">
+              {selectedDate.getDate()}
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[15px] font-bold text-ink truncate">{monthLabel(selectedDate, lang)}</span>
+                {isSelectedToday && (
+                  <span className="px-2 py-px rounded-full text-[11px] font-bold bg-accent-700 text-paper">
+                    {tr(lang, '오늘', 'TODAY', '今天')}
+                  </span>
+                )}
+              </div>
+              <div className="text-[12px] font-semibold text-slate-600 truncate tabular-nums">
+                {viewMode === 'daily'
+                  ? (() => {
+                      const w = FULL_WEEKDAYS[selectedDate.getDay()];
+                      return `${tr(lang, w.ko, w.en, w.zh)} · ${selectedDate.getFullYear()}`;
+                    })()
+                  : `${tr(lang, '이번 주', 'Week', '本周')} · ${weekRangeLabel}`}
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => handleShiftWeek(-1)}
-              className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-200 active:scale-95 transition-transform"
-              aria-label={tr(lang, '이전 주', 'Previous week', '上一周')}
+              onClick={() => handleStep(-1)}
+              className={navBtn}
+              aria-label={
+                viewMode === 'daily'
+                  ? tr(lang, '이전 날짜', 'Previous day', '前一天')
+                  : tr(lang, '이전 주', 'Previous week', '上一周')
+              }
             >
               <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.75} />
             </button>
-            {!isSelectedToday && (
-              <button
-                type="button"
-                onClick={handleGoToday}
-                className="px-2.5 h-8 rounded-full bg-accent text-paper text-xs font-bold hover:bg-accent-600 transition-colors whitespace-nowrap shrink-0"
-              >
-                {tr(lang, '오늘', 'Today', '今天')}
-              </button>
-            )}
             <button
               type="button"
-              onClick={() => handleShiftWeek(1)}
-              className="w-8 h-8 rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-200 active:scale-95 transition-transform"
-              aria-label={tr(lang, '다음 주', 'Next week', '下一周')}
+              onClick={handleGoToday}
+              disabled={isSelectedToday}
+              className={`px-3 h-[34px] rounded-full text-[12px] font-bold whitespace-nowrap transition-colors ${
+                isSelectedToday
+                  ? 'bg-paper/60 text-slate-500 cursor-default'
+                  : 'bg-accent-700 text-paper hover:bg-accent-800'
+              }`}
+            >
+              {tr(lang, '오늘', 'Today', '今天')}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleStep(1)}
+              className={navBtn}
+              aria-label={
+                viewMode === 'daily'
+                  ? tr(lang, '다음 날짜', 'Next day', '后一天')
+                  : tr(lang, '다음 주', 'Next week', '下一周')
+              }
             >
               <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.75} />
             </button>
           </div>
         </div>
 
-        {/* Selected Date Caption */}
-        <div className="flex items-center justify-between px-1">
-          <div className="text-xs font-bold text-ink tabular-nums">
-            {formatDateLabel(selectedDateStr, lang)}
-          </div>
-          <div className="text-[11px] text-slate-600 tabular-nums">
-            {startHourFormatted}~{endHourFormatted} ·{' '}
-            {tr(lang, '터치 시 수정', 'Tap to edit', '点击修改')}
-          </div>
-        </div>
-
-        {/* Mon ~ Sun 7 Day Tabs */}
-        <div className="grid grid-cols-7 gap-1">
+        {/* Week strip (Mon–Sun) */}
+        <div className="grid grid-cols-7 gap-1" role="group" aria-label={tr(lang, '이번 주', 'This week', '本周')}>
           {weekDays.map((wd) => {
-            const hasOverride =
-              Boolean(
-                dailyOverrides[wd.dateStr]?.school &&
-                  Object.keys(dailyOverrides[wd.dateStr]?.school || {}).length > 0
-              ) ||
-              Boolean(
-                dailyOverrides[wd.dateStr]?.academy &&
-                  (dailyOverrides[wd.dateStr]?.academy || []).length > 0
-              );
-
+            const mk = weekMarkers[wd.dateStr] || { makeup: false, changed: false, schedule: false };
+            const tone = wd.isSelected
+              ? 'bg-accent-700 text-paper'
+              : wd.isToday
+              ? 'bg-paper ring-[1.5px] ring-inset ring-accent text-accent-800'
+              : 'bg-paper/70 text-ink hover:bg-paper';
+            const extra = [
+              mk.makeup ? tr(lang, '보강 있음', 'makeup', '有补课') : '',
+              mk.changed ? tr(lang, '변경 있음', 'changed', '有调整') : '',
+              mk.schedule ? tr(lang, '일정 있음', 'schedule', '有日程') : '',
+            ].filter(Boolean);
             return (
               <button
                 key={wd.dateStr}
                 type="button"
                 onClick={() => setSelectedDate(wd.dateObj)}
-                className={`relative flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full border transition-all min-h-[48px] ${
-                  wd.isSelected
-                    ? 'bg-accent text-paper border-transparent'
-                    : wd.isToday
-                    ? 'bg-paper text-ink border-accent'
-                    : 'bg-paper text-ink border-transparent hover:bg-slate-200'
-                }`}
+                aria-pressed={wd.isSelected}
+                aria-label={`${formatDateLabel(wd.dateStr, lang)}${extra.length ? ` · ${extra.join(', ')}` : ''}`}
+                className={`flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-colors min-w-0 ${tone}`}
               >
-                {wd.isToday && (
-                  <span
-                    className={`text-[9px] font-bold tracking-tight px-1.5 py-0.2 rounded-full mb-0.5 whitespace-nowrap ${
-                      wd.isSelected
-                        ? 'bg-paper text-accent-800'
-                        : 'bg-accent text-paper'
-                    }`}
-                  >
-                    {tr(lang, '오늘', 'TODAY', '今天')}
-                  </span>
-                )}
                 <span
-                  className={`text-[10px] font-semibold ${
+                  className={`text-[11px] font-semibold leading-tight ${
                     wd.isSelected
-                      ? 'text-paper/80'
-                      : wd.dayLabel === '일'
-                      ? 'text-accent-700'
-                      : wd.dayLabel === '토'
-                      ? 'text-sage-700'
-                      : 'text-ink/80'
+                      ? 'text-paper/90'
+                      : wd.isToday
+                      ? 'text-accent-800'
+                      : weekendTint(wd.dayLabel) || 'text-slate-600'
                   }`}
                 >
                   {translateDay(wd.dayLabel, lang)}
                 </span>
-                <span
-                  className={`text-[15px] leading-none font-mono tabular-nums ${
-                    wd.isSelected ? 'text-paper' : 'text-ink'
-                  }`}
-                >
-                  {wd.dayNumber}
+                <span className="font-mono text-[16px] leading-none tabular-nums">{wd.dayNumber}</span>
+                <span className="h-1.5 flex items-center gap-0.5" aria-hidden="true">
+                  {mk.makeup && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${wd.isSelected ? 'bg-paper' : 'bg-accent'}`} />
+                  )}
+                  {mk.changed && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${wd.isSelected ? 'bg-paper/70' : 'bg-slate-500'}`} />
+                  )}
+                  {mk.schedule && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${wd.isSelected ? 'bg-other-200' : 'bg-other'}`} />
+                  )}
                 </span>
-                {hasOverride && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                      wd.isSelected ? 'bg-accent-100' : 'bg-accent'
-                    }`}
-                  />
-                )}
               </button>
             );
           })}
         </div>
-      </div>
+        <div className="flex items-center justify-center gap-3 text-[11px] font-semibold text-slate-600 flex-wrap">
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+            {tr(lang, '보강/특강', 'Makeup', '补课/特讲')}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+            {tr(lang, '변경', 'Changed', '调整')}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-other" />
+            {tr(lang, '일정', 'Schedule', '日程')}
+          </span>
+        </div>
+      </section>
 
       {/* VIEW MODE 1: DAILY DETAILED VIEW */}
       {viewMode === 'daily' ? (
         <div className="space-y-4">
-          {/* Visual Time Spectrum & Free-Time Summary Card */}
-          <div className="bg-surface rounded-2xl p-3.5 shadow-xs space-y-3">
+          {/* Day summary: spectrum + stat tiles + conflicts */}
+          <section className="bg-surface rounded-2xl p-4 shadow-xs space-y-3.5">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-accent" strokeWidth={2.75} />
-                <span className="text-[13px] font-bold text-ink tabular-nums">
-                  {startHourFormatted} ~ {endHourFormatted}{' '}
-                  {tr(lang, '시간 밀도 및 공강 현황', 'Time Density & Free Slots', '时间分布与空档概况')}
-                </span>
-              </div>
-
-              <div className="inline-flex shrink-0 rounded-full border border-divider overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setDailySubMode('timeline')}
-                  className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-[11px] font-semibold whitespace-nowrap transition-colors ${
-                    dailySubMode === 'timeline'
-                      ? 'bg-accent text-paper'
-                      : 'text-ink hover:bg-slate-100'
-                  }`}
-                >
-                  <CalendarRange className="w-3 h-3" />
-                  {tr(
-                    lang,
-                    `${String(startHour).padStart(2, '0')}~${String(endHour).padStart(2, '0')}시 표`,
-                    'Timeline',
-                    '时间轴'
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDailySubMode('list')}
-                  className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-[11px] font-semibold whitespace-nowrap transition-colors ${
-                    dailySubMode === 'list'
-                      ? 'bg-accent text-paper'
-                      : 'text-ink hover:bg-slate-100'
-                  }`}
-                >
-                  <AlignJustify className="w-3 h-3" />
-                  {tr(lang, '목록형', 'List', '列表')}
-                </button>
-              </div>
+              <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink min-w-0">
+                <Clock className="w-4 h-4 text-accent-700 shrink-0" strokeWidth={2.5} />
+                <span className="truncate">{tr(lang, '하루 한눈에', 'Day at a glance', '一天概览')}</span>
+              </h2>
+              <span className="text-[11px] font-mono text-slate-600 tabular-nums whitespace-nowrap">
+                {startHourFormatted} – {endHourFormatted}
+              </span>
             </div>
 
-            {/* Horizontal Visual Spectrum Bar */}
-            <div className="space-y-1">
-              <div className="relative h-3.5 w-full rounded-full bg-slate-200 overflow-hidden">
-                {timelineLayout.spectrumSegments.map((seg, i) => (
+            {/* Spectrum bar with hour ticks */}
+            <div>
+              <div className="relative h-3 w-full rounded-full bg-paper overflow-hidden">
+                {timelineLayout.spectrumSegments
+                  .filter((seg) => seg.type !== 'free')
+                  .map((seg, i) => (
+                    <div
+                      key={i}
+                      title={seg.label}
+                      style={{ left: `${seg.leftPercent}%`, width: `${seg.widthPercent}%` }}
+                      className={`absolute top-0 bottom-0 ${
+                        seg.type === 'conflict'
+                          ? 'bg-accent-800 z-10'
+                          : seg.type === 'school'
+                          ? 'bg-sage-600'
+                          : 'bg-accent'
+                      }`}
+                    />
+                  ))}
+                {showLiveNowLine && (
                   <div
-                    key={i}
-                    title={seg.label}
-                    style={{
-                      left: `${seg.leftPercent}%`,
-                      width: `${seg.widthPercent}%`,
-                    }}
-                    className={`absolute top-0 bottom-0 ${
-                      seg.type === 'conflict'
-                        ? 'bg-accent-800 z-10'
-                        : seg.type === 'school'
-                        ? 'bg-sage'
-                        : seg.type === 'academy'
-                        ? 'bg-accent'
-                        : 'bg-slate-200'
-                    }`}
+                    className="absolute -top-px -bottom-px w-0.5 bg-ink z-20"
+                    style={{ left: `${((nowMinutes - timelineStartMin) / totalTimelineMinutes) * 100}%` }}
+                    aria-hidden="true"
                   />
-                ))}
+                )}
               </div>
-              <div className="flex items-center justify-between text-[10px] font-mono text-slate-600 tabular-nums px-0.5">
-                {spectrumTickHours.map((h) => (
-                  <span key={h}>{String(h).padStart(2, '0')}:00</span>
-                ))}
-              </div>
-            </div>
-
-            {/* 3 Summary Metric Boxes */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2.5 rounded-xl bg-sage-100">
-                <div className="text-[11px] font-semibold text-sage-800 flex items-center justify-center gap-1">
-                  <GraduationCap className="w-3.5 h-3.5" />{' '}
-                  {tr(lang, '학교 수업', 'School', '学校课程')}
-                </div>
-                <div className="text-[15px] leading-tight text-sage-900 font-mono tabular-nums mt-0.5">
-                  {formatDurationLocalized(timelineLayout.schoolMinutesTotal, lang)}
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-accent-100">
-                <div className="text-[11px] font-semibold text-accent-800 flex items-center justify-center gap-1">
-                  <Building2 className="w-3.5 h-3.5" />{' '}
-                  {tr(lang, '학원 수업', 'Academy', '补习班')}
-                </div>
-                <div className="text-[15px] leading-tight text-accent-900 font-mono tabular-nums mt-0.5">
-                  {formatDurationLocalized(timelineLayout.academyMinutesTotal, lang)}
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-200">
-                <div className="text-[11px] font-semibold text-slate-700 flex items-center justify-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" />{' '}
-                  {tr(lang, '비어있는 시간', 'Free Time', '空闲时间')}
-                </div>
-                <div className="text-[15px] leading-tight text-slate-900 font-mono tabular-nums mt-0.5">
-                  {formatDurationLocalized(timelineLayout.totalFreeMin, lang)}
-                </div>
-              </div>
-            </div>
-
-            {/* CONFLICT ALERT BANNER */}
-            {timelineLayout.conflictZones.length > 0 && (
-              <div className="px-3 py-2.5 rounded-xl bg-accent-800 text-accent-100 space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent-100">
-                    <AlertTriangle className="w-4 h-4 text-accent-100 shrink-0" />
-                    <span>
-                      {tr(
-                        lang,
-                        `[시간 겹침] 충돌 구간이 ${timelineLayout.conflictZones.length}곳 감지되었습니다`,
-                        `${overlapBadgeLabel} ${timelineLayout.conflictZones.length} conflict(s) detected`,
-                        `检测到 ${timelineLayout.conflictZones.length} 处 ${overlapBadgeLabel} 时段`
-                      )}
+              <div className="relative h-5 mt-1" aria-hidden="true">
+                {spectrumTickHours.map((h, idx) => {
+                  const pct = ((h - startHour) / totalHours) * 100;
+                  const isFirst = idx === 0;
+                  const isLast = idx === spectrumTickHours.length - 1;
+                  return (
+                    <span
+                      key={h}
+                      className={`absolute top-0 flex flex-col ${
+                        isFirst ? 'items-start' : isLast ? 'items-end -translate-x-full' : 'items-center -translate-x-1/2'
+                      }`}
+                      style={{ left: `${pct}%` }}
+                    >
+                      <span className="w-px h-1 bg-slate-400" />
+                      <span className="font-mono text-[11px] leading-none text-slate-600 tabular-nums mt-0.5">{h}</span>
                     </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stat tiles */}
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  {
+                    key: 'school',
+                    icon: GraduationCap,
+                    label: tr(lang, '학교', 'School', '学校'),
+                    min: timelineLayout.schoolMinutesTotal,
+                    iconCls: 'bg-sage-700 text-paper',
+                    numCls: 'text-sage-900',
+                  },
+                  {
+                    key: 'academy',
+                    icon: Building2,
+                    label: tr(lang, '학원', 'Academy', '补习班'),
+                    min: timelineLayout.academyMinutesTotal,
+                    iconCls: 'bg-accent-700 text-paper',
+                    numCls: 'text-accent-900',
+                  },
+                  {
+                    key: 'free',
+                    icon: Sparkles,
+                    label: tr(lang, '빈 시간', 'Free', '空闲'),
+                    min: timelineLayout.totalFreeMin,
+                    iconCls: 'bg-slate-200 text-slate-700',
+                    numCls: 'text-ink',
+                  },
+                ] as const
+              ).map(({ key, icon: Icon, label, min, iconCls, numCls }) => (
+                <div key={key} className="p-2.5 rounded-xl bg-paper min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${iconCls}`}>
+                      <Icon className="w-3.5 h-3.5" strokeWidth={2.5} />
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-700 truncate">{label}</span>
+                  </div>
+                  <div className={`mt-2 ${numCls}`}>
+                    <DurationNum minutes={min} lang={lang} />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+              ))}
+            </div>
+
+            {/* Conflict warning */}
+            {timelineLayout.conflictZones.length > 0 && (
+              <div className="rounded-xl bg-accent-800 text-paper p-3 space-y-2" role="alert">
+                <div className="flex items-center gap-2 text-[13px] font-bold">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>
+                    {tr(
+                      lang,
+                      `시간이 겹치는 구간 ${timelineLayout.conflictZones.length}곳`,
+                      `${timelineLayout.conflictZones.length} overlapping time range(s)`,
+                      `${timelineLayout.conflictZones.length} 处时间冲突`
+                    )}
+                  </span>
+                </div>
+                <div className="space-y-1">
                   {timelineLayout.conflictZones.map((cz) => (
                     <div
                       key={cz.id}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-100 text-[11px] text-accent-900"
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-paper/15 text-[12px] min-w-0"
                     >
-                      <AlertTriangle className="w-3 h-3 text-accent-800 shrink-0" />
-                      <span className="font-bold text-accent-800">{overlapBadgeLabel}</span>
-                      <span className="font-mono font-bold tabular-nums">
-                        {cz.startTime}~{cz.endTime}
+                      <span className="font-mono tabular-nums whitespace-nowrap shrink-0">
+                        {cz.startTime}–{cz.endTime}
                       </span>
-                      <span className="text-accent-800 font-semibold">
-                        ({cz.involvedSubjects.join(' · ')})
+                      <span className="font-semibold truncate text-paper/90">
+                        {cz.involvedSubjects.join(' · ')}
                       </span>
                     </div>
                   ))}
@@ -1627,70 +2069,89 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </div>
             )}
 
-            {/* Quick add action */}
-            <button
-              type="button"
-              onClick={() => openAddAcademyModal('18:00', '20:00')}
-              className="w-full h-11 rounded-full border-2 border-dashed border-accent bg-accent-100/60 text-accent-800 text-[14px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-100"
-            >
-              <Plus className="w-4 h-4" strokeWidth={2.75} />
-              {tr(lang, '당일 보강/특강 추가', 'Add makeup / special class', '添加当天补课/特讲')}
-            </button>
-          </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="flex-1 grid grid-cols-2 p-1 rounded-full bg-paper"
+                role="tablist"
+                aria-label={tr(lang, '표시 방식', 'Display', '显示方式')}
+              >
+                {(
+                  [
+                    { key: 'timeline', icon: CalendarRange, label: tr(lang, '타임라인', 'Timeline', '时间轴') },
+                    { key: 'list', icon: AlignJustify, label: tr(lang, '목록형', 'List', '列表') },
+                  ] as const
+                ).map(({ key, icon: Icon, label }) => {
+                  const active = dailySubMode === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setDailySubMode(key)}
+                      className={`h-8 rounded-full text-[12px] font-bold inline-flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
+                        active ? 'bg-ink text-paper' : 'text-slate-700 hover:text-ink'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => openAddAcademyModal('18:00', '20:00')}
+                className="h-10 px-3.5 rounded-full border border-divider bg-paper text-accent-800 text-[12px] font-bold inline-flex items-center gap-1 hover:bg-accent-100 whitespace-nowrap shrink-0"
+              >
+                <Plus className="w-4 h-4" strokeWidth={2.75} />
+                {tr(lang, '보강 추가', 'Makeup', '加补课')}
+              </button>
+            </div>
+          </section>
 
           {dailySubMode === 'timeline' ? (
             /* VERTICAL TIMELINE VIEW */
             <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-              <div className="px-4 py-3 border-b border-divider flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-700 flex-wrap">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-sage" />
+              <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2 flex-wrap">
+                <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <CalendarRange className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
+                  {tr(lang, '타임라인', 'Timeline', '时间轴')}
+                </h2>
+                <div className="flex items-center gap-2.5 text-[11px] font-semibold text-slate-700">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-sage-600" />
                     {tr(lang, '학교', 'School', '学校')}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-accent" />
                     {tr(lang, '학원', 'Academy', '补习班')}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-slate-300" />
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full border border-dashed border-slate-500" />
                     {tr(lang, '빈 시간', 'Free', '空闲')}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-accent-800">
-                    <AlertTriangle className="w-3 h-3 text-accent-800" />
-                    {overlapBadgeLabel}
-                  </span>
                 </div>
-                <span className="text-[11px] text-slate-600 font-mono tabular-nums">
-                  {startHourFormatted} ~ {endHourFormatted}
-                </span>
               </div>
 
-              <div className="relative select-none px-2.5 py-4">
-                <div
-                  className="relative flex"
-                  style={{ height: `${totalHours * HOUR_HEIGHT_PX}px` }}
-                >
-                  {/* Left Time Axis Column */}
-                  <div className="w-14 shrink-0 relative border-r border-divider pr-2">
-                    {hoursArray.map((hour) => {
-                      const topPx = (hour - startHour) * HOUR_HEIGHT_PX;
-                      return (
-                        <div
-                          key={hour}
-                          className="absolute right-2 -translate-y-1/2 flex items-center gap-1"
-                          style={{ top: `${topPx}px` }}
-                        >
-                          <span className="text-[11px] font-mono text-slate-600 tabular-nums">
-                            {String(hour).padStart(2, '0')}:00
-                          </span>
-                        </div>
-                      );
-                    })}
+              <div className="relative select-none pl-1 pr-3 pt-3 pb-4">
+                <div className="relative flex" style={{ height: `${totalHours * HOUR_HEIGHT_PX}px` }}>
+                  {/* Hour gutter */}
+                  <div className="w-11 shrink-0 relative" aria-hidden="true">
+                    {hoursArray.map((hour) => (
+                      <span
+                        key={hour}
+                        className="absolute right-2 -translate-y-1/2 font-mono text-[12px] leading-none text-slate-600 tabular-nums"
+                        style={{ top: `${(hour - startHour) * HOUR_HEIGHT_PX}px` }}
+                      >
+                        {String(hour).padStart(2, '0')}
+                      </span>
+                    ))}
                   </div>
 
-                  {/* Right Schedule Canvas Column */}
+                  {/* Canvas */}
                   <div
-                    className="flex-1 relative ml-1.5 cursor-pointer"
+                    className="flex-1 relative cursor-pointer min-w-0"
                     onClick={handleCanvasClick}
                     title={tr(lang, '빈 곳을 눌러 추가', 'Tap empty space to add', '点击空白处添加')}
                   >
@@ -1699,22 +2160,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       const isLast = hour === endHour;
                       return (
                         <React.Fragment key={hour}>
-                          {!isLast && idx % 2 === 1 && (
-                            <div
-                              className="absolute left-0 right-0 bg-slate-50/40 pointer-events-none"
-                              style={{
-                                top: `${topPx}px`,
-                                height: `${HOUR_HEIGHT_PX}px`,
-                              }}
-                            />
-                          )}
                           <div
                             className="absolute left-0 right-0 border-t border-divider pointer-events-none"
                             style={{ top: `${topPx}px` }}
                           />
                           {!isLast && (
                             <div
-                              className="absolute left-0 right-0 border-t border-dashed border-slate-200/50 pointer-events-none"
+                              className="absolute left-0 right-0 border-t border-dashed border-slate-300/50 pointer-events-none"
                               style={{ top: `${topPx + HOUR_HEIGHT_PX / 2}px` }}
                             />
                           )}
@@ -1722,609 +2174,322 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       );
                     })}
 
-                    {/* CONFLICT ZONE OVERLAY BAND */}
+                    {/* Conflict bands */}
                     {timelineLayout.conflictZones.map((cz) => (
                       <div
                         key={cz.id}
-                        style={{
-                          top: `${cz.topPx}px`,
-                          height: `${cz.heightPx}px`,
-                        }}
-                        className="absolute -left-1.5 right-0 z-20 pointer-events-none border-y-2 border-accent-800 bg-accent-800/10 flex items-start justify-center"
+                        style={{ top: `${cz.topPx}px`, height: `${cz.heightPx}px` }}
+                        className="absolute left-0 right-0 z-20 pointer-events-none rounded-xl border-2 border-dashed border-accent-800 bg-accent-800/10 flex items-start justify-end"
                       >
-                        <div className="-mt-2.5 px-2 py-0.5 rounded-full bg-accent-800 text-accent-100 text-[10px] font-bold shadow-sm inline-flex items-center gap-1 whitespace-nowrap">
-                          <AlertTriangle className="w-3 h-3 text-accent-100 shrink-0" />
-                          <span>{overlapBadgeLabel}</span>
+                        <span className="-mt-2.5 mr-2 px-2 py-px rounded-full bg-accent-800 text-paper text-[11px] font-bold shadow-xs inline-flex items-center gap-1 whitespace-nowrap">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
                           <span className="font-mono tabular-nums">
-                            {cz.startTime}~{cz.endTime}
+                            {cz.startTime}–{cz.endTime}
                           </span>
-                        </div>
+                        </span>
                       </div>
                     ))}
 
-                    {/* FREE TIME SLOTS */}
+                    {/* Free slots */}
                     {timelineLayout.freeSlots.map((slot) => {
-                      const topPx =
-                        ((slot.startMin - timelineStartMin) / 60) * HOUR_HEIGHT_PX;
-                      const heightPx = (slot.durationMin / 60) * HOUR_HEIGHT_PX;
-
+                      const topPx = ((slot.startMin - timelineStartMin) / 60) * HOUR_HEIGHT_PX;
+                      const heightPx = Math.max(26, (slot.durationMin / 60) * HOUR_HEIGHT_PX - 6);
+                      const roomy = heightPx >= 52;
                       return (
                         <button
                           key={`free-${slot.startTime}-${slot.endTime}`}
                           type="button"
                           onClick={() => openAddAcademyModal(slot.startTime, slot.endTime)}
-                          style={{
-                            top: `${topPx + 2}px`,
-                            height: `${Math.max(26, heightPx - 4)}px`,
-                          }}
-                          className="group absolute left-0.5 right-0.5 rounded border border-dashed border-slate-300 bg-[image:repeating-linear-gradient(135deg,var(--color-slate-200)_0_6px,transparent_6px_12px)] hover:bg-slate-100 hover:border-slate-400 transition-colors px-3 py-1.5 flex items-center justify-between text-left overflow-hidden"
+                          aria-label={`${slot.startTime}–${slot.endTime} ${tr(lang, '빈 시간에 추가', 'Add in free time', '在空闲时间添加')}`}
+                          style={{ top: `${topPx + 3}px`, height: `${heightPx}px` }}
+                          className="group absolute left-[3px] right-[3px] rounded-xl border border-dashed border-slate-400/70 bg-[image:repeating-linear-gradient(135deg,color-mix(in_srgb,var(--color-slate-300)_35%,transparent)_0_5px,transparent_5px_11px)] hover:bg-paper/60 hover:border-accent transition-colors px-3 flex items-center justify-between gap-2 text-left overflow-hidden"
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                              <span className="text-[11px] font-mono text-slate-800 tabular-nums whitespace-nowrap">
-                                {slot.startTime} ~ {slot.endTime}
+                          <span className="min-w-0 flex-1 flex flex-col">
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-mono text-[11px] text-slate-700 tabular-nums whitespace-nowrap">
+                                {slot.startTime} – {slot.endTime}
                               </span>
-                              <span className="px-1.5 py-0.2 rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 whitespace-nowrap">
-                                {tr(lang, '빈 시간', 'Free', '空闲')} ·{' '}
-                                {formatDurationLocalized(slot.durationMin, lang)}
+                              <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap">
+                                · {formatDurationLocalized(slot.durationMin, lang)}
                               </span>
-                            </div>
-                            {slot.durationMin >= 45 && (
-                              <p className="text-[11px] font-medium text-slate-600 mt-0.5 truncate">
+                            </span>
+                            {roomy && (
+                              <span className="text-[11px] font-medium text-slate-600 truncate mt-0.5">
                                 {slot.contextLabel}
-                              </p>
+                              </span>
                             )}
-                          </div>
-                          <span className="text-[10px] font-bold text-accent-700 group-hover:text-accent-800 shrink-0 ml-2 px-2 py-1 rounded-full bg-paper border border-divider">
-                            {tr(lang, '+ 추가', '+ Add', '+ 添加')}
+                          </span>
+                          <span className="shrink-0 inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full bg-paper border border-divider text-[11px] font-bold text-accent-800 group-hover:bg-accent-700 group-hover:text-paper group-hover:border-transparent transition-colors">
+                            <Plus className="w-3 h-3" strokeWidth={3} />
+                            {tr(lang, '추가', 'Add', '添加')}
                           </span>
                         </button>
                       );
                     })}
 
-                    {/* SCHOOL PERIOD BLOCKS */}
-                    {timelineLayout.schoolLayout.map(
-                      ({ item, topPx, heightPx, totalCols, colIndex }) => {
-                        const isCurrentClass =
+                    {/* School blocks */}
+                    {timelineLayout.schoolLayout.map(({ item, topPx, heightPx, totalCols, colIndex }) =>
+                      renderTimelineBlock({
+                        key: `school-${item.period}`,
+                        kind: 'school',
+                        topPx,
+                        heightPx,
+                        totalCols,
+                        colIndex,
+                        title: item.isCancelled
+                          ? translateSubject(item.subject, lang)
+                          : slotTitle(item.subject, item.status, lang),
+                        startTime: item.startTime,
+                        endTime: item.endTime,
+                        badge: periodLabel(item.period, lang),
+                        status: item.status,
+                        note: item.note,
+                        isCurrent:
                           isSelectedToday &&
                           !item.isCancelled &&
-                          isTimeInRange(nowMinutes, item.startTime, item.endTime);
-
-                        const widthPercent = 100 / totalCols;
-                        const leftPercent = colIndex * widthPercent;
-
-                        return (
-                          <button
-                            key={`school-${item.period}`}
-                            type="button"
-                            onClick={() => openSchoolEdit(item)}
-                            style={{
-                              top: `${topPx + 1}px`,
-                              height: `${Math.max(36, heightPx - 2)}px`,
-                              left: `calc(${leftPercent}% + 2px)`,
-                              width: `calc(${widthPercent}% - 4px)`,
-                            }}
-                            className={`absolute z-10 rounded px-3 py-1.5 text-left transition-all flex items-center justify-between gap-2 overflow-hidden border ${
-                              isCurrentClass
-                                ? 'bg-sage text-paper border-transparent shadow-md'
-                                : item.isCancelled
-                                ? 'bg-paper text-slate-500 border-dashed border-slate-400 line-through'
-                                : item.isOverlapping
-                                ? 'bg-orange-50/95 text-ink border-orange-500 ring-1 ring-orange-400 hover:bg-orange-100/80'
-                                : item.status === 'selfStudy'
-                                ? 'bg-slate-200 text-ink border-transparent hover:bg-slate-300'
-                                : item.isModified
-                                ? 'bg-sage-100 text-sage-900 border-amber-400 hover:bg-sage-200'
-                                : 'bg-sage-100 text-sage-900 border-transparent hover:bg-sage-200'
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1 flex flex-col justify-center">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span
-                                  className={`text-[11px] font-mono font-bold tabular-nums whitespace-nowrap ${
-                                    isCurrentClass
-                                      ? 'text-paper/80'
-                                      : item.isCancelled
-                                      ? 'text-slate-500'
-                                      : item.isOverlapping
-                                      ? 'text-orange-900'
-                                      : 'text-sage-800'
-                                  }`}
-                                >
-                                  {tr(lang, `${item.period}교시`, `P${item.period}`, `第${item.period}节`)} ·{' '}
-                                  {item.startTime} ~ {item.endTime}
-                                </span>
-
-                                {item.isOverlapping && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold bg-orange-500 text-paper rounded-md whitespace-nowrap shadow-2xs">
-                                    <AlertTriangle className="w-3 h-3 shrink-0" />
-                                    {overlapBadgeLabel}
-                                  </span>
-                                )}
-
-                                {isCurrentClass && (
-                                  <span className="px-1.5 py-0.2 text-[10px] font-bold bg-ink text-paper rounded-full whitespace-nowrap">
-                                    {tr(lang, '수업 중', 'LIVE', '上课中')}
-                                  </span>
-                                )}
-
-                                {item.isModified && (
-                                  <span
-                                    className={`px-1.5 py-0.2 text-[10px] font-bold rounded whitespace-nowrap ${
-                                      isCurrentClass
-                                        ? 'bg-amber-300 text-slate-950'
-                                        : 'bg-amber-200/90 text-amber-950'
-                                    }`}
-                                  >
-                                    {tr(
-                                      lang,
-                                      `변경됨 (기존: ${translateSubject(item.originalSubject, lang)})`,
-                                      `Modified (${translateSubject(item.originalSubject, lang)})`,
-                                      `已调课 (原: ${translateSubject(item.originalSubject, lang)})`
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="mt-0.5 flex items-center gap-2">
-                                <span
-                                  className={`text-sm font-bold truncate ${
-                                    isCurrentClass
-                                      ? 'text-paper'
-                                      : item.isCancelled
-                                      ? 'text-slate-500 line-through'
-                                      : 'text-sage-900'
-                                  }`}
-                                >
-                                  {slotTitle(item.subject, item.status, lang)}
-                                </span>
-                                <StatusTag status={item.status} lang={lang} />
-                              </div>
-                              {item.note && (
-                                <p
-                                  className={`mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 ${
-                                    isCurrentClass ? 'text-paper/85' : 'text-slate-700'
-                                  }`}
-                                >
-                                  <StickyNote className="w-3 h-3 shrink-0" />
-                                  <span className="truncate">{item.note}</span>
-                                </p>
-                              )}
-                            </div>
-
-                            <span
-                              className={`text-[11px] font-semibold shrink-0 ${
-                                isCurrentClass ? 'text-paper/80' : 'text-sage-700'
-                              }`}
-                            >
-                              {tr(lang, '변경', 'Edit', '修改')}
-                            </span>
-                          </button>
-                        );
-                      }
+                          isTimeInRange(nowMinutes, item.startTime, item.endTime),
+                        isCancelled: item.isCancelled,
+                        isOverlapping: item.isOverlapping,
+                        modifiedFrom:
+                          item.isModified && item.originalSubject !== item.subject
+                            ? translateSubject(item.originalSubject, lang)
+                            : undefined,
+                        onClick: () => openSchoolEdit(item),
+                      })
                     )}
 
-                    {/* ACADEMY SCHEDULE BLOCKS */}
-                    {timelineLayout.academyLayout.map(
-                      ({ item, topPx, heightPx, totalCols, colIndex }) => {
-                        const isCurrentAcademy =
+                    {/* Academy blocks */}
+                    {timelineLayout.academyLayout.map(({ item, topPx, heightPx, totalCols, colIndex }) =>
+                      renderTimelineBlock({
+                        key: `academy-${item.id}`,
+                        kind: 'academy',
+                        topPx,
+                        heightPx,
+                        totalCols,
+                        colIndex,
+                        title: item.isCancelled
+                          ? translateSubject(item.subject, lang)
+                          : slotTitle(item.subject, item.status, lang),
+                        startTime: item.startTime,
+                        endTime: item.endTime,
+                        badge: item.isAdded
+                          ? tr(lang, '보강', 'Makeup', '补课')
+                          : tr(lang, '학원', 'Academy', '补习班'),
+                        status: item.status,
+                        note: item.note,
+                        isCurrent:
                           isSelectedToday &&
                           !item.isCancelled &&
-                          isTimeInRange(nowMinutes, item.startTime, item.endTime);
-
-                        const widthPercent = 100 / totalCols;
-                        const leftPercent = colIndex * widthPercent;
-
-                        return (
-                          <button
-                            key={`academy-${item.id}`}
-                            type="button"
-                            onClick={() => openEditAcademyModal(item)}
-                            style={{
-                              top: `${topPx + 1}px`,
-                              height: `${Math.max(40, heightPx - 2)}px`,
-                              left: `calc(${leftPercent}% + 2px)`,
-                              width: `calc(${widthPercent}% - 4px)`,
-                            }}
-                            className={`absolute z-10 rounded px-2.5 py-2 text-left transition-all flex flex-col justify-between overflow-hidden border ${
-                              isCurrentAcademy
-                                ? 'bg-accent text-paper border-transparent shadow-md'
-                                : item.isCancelled
-                                ? 'bg-paper text-slate-500 border-dashed border-slate-400 line-through'
-                                : item.isOverlapping
-                                ? 'bg-orange-50/95 text-ink border-orange-500 ring-1 ring-orange-400 hover:bg-orange-100/85'
-                                : item.status === 'selfStudy'
-                                ? 'bg-slate-200 text-ink border-transparent hover:bg-slate-300'
-                                : 'bg-accent-100 text-accent-900 border-transparent hover:bg-accent-200'
-                            }`}
-                          >
-                            <div className="min-w-0 w-full">
-                              <div className="flex items-center justify-between gap-1 flex-wrap">
-                                <span
-                                  className={`inline-flex items-center gap-1 text-[11px] font-mono font-bold tabular-nums whitespace-nowrap ${
-                                    isCurrentAcademy
-                                      ? 'text-paper/80'
-                                      : item.isCancelled
-                                      ? 'text-slate-500'
-                                      : item.isOverlapping
-                                      ? 'text-orange-900'
-                                      : 'text-accent-800'
-                                  }`}
-                                >
-                                  <Clock className="w-3 h-3 shrink-0" />
-                                  {item.startTime} ~ {item.endTime}
-                                </span>
-
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  {item.isOverlapping && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold bg-orange-500 text-paper rounded-md whitespace-nowrap shadow-2xs">
-                                      <AlertTriangle className="w-3 h-3 shrink-0" />
-                                      {overlapBadgeLabel}
-                                    </span>
-                                  )}
-                                  {isCurrentAcademy && (
-                                    <span className="px-1.5 py-0.2 text-[10px] font-bold bg-ink text-paper rounded-full whitespace-nowrap">
-                                      {tr(lang, '수업 중', 'LIVE', '上课中')}
-                                    </span>
-                                  )}
-                                  {item.isAdded && (
-                                    <span className="px-1.5 py-0.2 text-[10px] font-bold bg-sage-100 text-sage-800 rounded-full whitespace-nowrap">
-                                      {tr(lang, '당일 보강', 'Makeup', '临时补课')}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                <span
-                                  className={`text-sm font-bold truncate ${
-                                    isCurrentAcademy
-                                      ? 'text-paper'
-                                      : item.isCancelled
-                                      ? 'text-slate-500 line-through'
-                                      : 'text-accent-900'
-                                  }`}
-                                >
-                                  {slotTitle(item.subject, item.status, lang)}
-                                </span>
-                                <StatusTag status={item.status} lang={lang} />
-
-                                {item.isModified && !item.isAdded && item.originalSubject && (
-                                  <span
-                                    className={`px-1.5 py-0.2 text-[10px] font-bold rounded whitespace-nowrap ${
-                                      isCurrentAcademy
-                                        ? 'bg-amber-300 text-slate-950'
-                                        : 'bg-amber-200/90 text-amber-950'
-                                    }`}
-                                  >
-                                    {tr(
-                                      lang,
-                                      `변경됨 (기존: ${translateSubject(item.originalSubject, lang)})`,
-                                      `Modified (${translateSubject(item.originalSubject, lang)})`,
-                                      `已调课 (原: ${translateSubject(item.originalSubject, lang)})`
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                              {item.note && (
-                                <p
-                                  className={`mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 ${
-                                    isCurrentAcademy ? 'text-paper/85' : 'text-slate-700'
-                                  }`}
-                                >
-                                  <StickyNote className="w-3 h-3 shrink-0" />
-                                  <span className="truncate">{item.note}</span>
-                                </p>
-                              )}
-                            </div>
-
-                            <div
-                              className={`text-[10px] font-semibold self-end ${
-                                isCurrentAcademy
-                                  ? 'text-paper/80'
-                                  : item.isOverlapping
-                                  ? 'text-orange-800'
-                                  : 'text-accent-700'
-                              }`}
-                            >
-                              {tr(lang, '터치하여 수정', 'Tap to edit', '点击修改')}
-                            </div>
-                          </button>
-                        );
-                      }
+                          isTimeInRange(nowMinutes, item.startTime, item.endTime),
+                        isCancelled: item.isCancelled,
+                        isOverlapping: item.isOverlapping,
+                        modifiedFrom:
+                          item.isModified && !item.isAdded && item.originalSubject && item.originalSubject !== item.subject
+                            ? translateSubject(item.originalSubject, lang)
+                            : undefined,
+                        isMakeup: item.isAdded,
+                        onClick: () => openEditAcademyModal(item),
+                      })
                     )}
 
-                    {/* SCHEDULE ITEM MARKERS (일정) */}
+                    {/* Schedule markers (일정) */}
                     {daySchedules
                       .filter((sch) => sch.time)
                       .map((sch) => {
                         const m = timeToMinutes(sch.time as string);
                         if (m < timelineStartMin || m > timelineEndMin) return null;
                         const topPx = ((m - timelineStartMin) / 60) * HOUR_HEIGHT_PX;
+                        const tone = SCHEDULE_CAT_TONE[sch.category] || SCHEDULE_CAT_TONE.other;
                         return (
                           <div
                             key={`sch-${sch.id}`}
-                            className="absolute right-1 z-20 pointer-events-none max-w-[55%] -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-paper border border-divider shadow-xs text-[10px] text-ink"
+                            className={`absolute right-1.5 z-20 pointer-events-none max-w-[58%] -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border shadow-xs text-[11px] ${tone.pill}`}
                             style={{ top: `${Math.max(10, topPx)}px` }}
                           >
-                            <span
-                              className={`w-2 h-2 rounded-full shrink-0 ${
-                                sch.category === 'school'
-                                  ? 'bg-sage'
-                                  : sch.category === 'academy'
-                                  ? 'bg-accent'
-                                  : 'bg-other'
-                              }`}
-                            />
-                            <span className="font-mono tabular-nums">{sch.time}</span>
-                            <span className="font-semibold truncate">{sch.title}</span>
+                            <CalendarClock className="w-3 h-3 shrink-0" />
+                            <span className="font-mono tabular-nums shrink-0">{sch.time}</span>
+                            <span className="font-bold truncate">{translateSampleText(sch.title, lang)}</span>
                           </div>
                         );
                       })}
-
-                    {/* CURRENT TIME LIVE INDICATOR LINE */}
-                    {showLiveNowLine && (
-                      <div
-                        className="absolute left-0 right-0 z-30 pointer-events-none flex items-center"
-                        style={{ top: `${liveNowTopPx}px` }}
-                      >
-                        <span className="-ml-1.5 px-1.5 py-0.5 rounded-full bg-ink text-paper text-[9px] font-mono tabular-nums shadow-xs">
-                          {tr(lang, '지금', 'NOW', '现在')} {minutesToTimeStr(nowMinutes)}
-                        </span>
-                        <div className="flex-1 border-t-2 border-ink" />
-                      </div>
-                    )}
                   </div>
+
+                  {/* Now line (spans gutter + canvas) */}
+                  {showLiveNowLine && (
+                    <div
+                      className="absolute left-0 right-0 z-30 pointer-events-none flex items-center -translate-y-1/2"
+                      style={{ top: `${liveNowTopPx}px` }}
+                      aria-label={`${tr(lang, '지금', 'Now', '现在')} ${minutesToTimeStr(nowMinutes)}`}
+                    >
+                      <span className="w-11 shrink-0 flex justify-end pr-0.5">
+                        <span className="px-1.5 py-0.5 rounded-full bg-accent-700 text-paper font-mono text-[11px] leading-none tabular-nums shadow-xs">
+                          {minutesToTimeStr(nowMinutes)}
+                        </span>
+                      </span>
+                      <span className="w-2 h-2 rounded-full bg-accent-700 shrink-0 -ml-0.5" />
+                      <span className="flex-1 border-t-2 border-accent-700" />
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
           ) : (
-            /* SUB-MODE: SECTION LIST VIEW */
+            /* LIST VIEW */
             <div className="space-y-4">
-              <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-                <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 text-sage" />
-                    <h2 className="text-[13px] font-bold text-ink">
-                      {tr(lang, '학교 시간표', 'School Schedule', '学校课表')}
-                    </h2>
-                    <span className="text-xs text-slate-600 tabular-nums">
-                      · {translateDay(dailyData.dayOfWeek, lang)} ({dailyData.school.length})
+              <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                    <GraduationCap className="w-4 h-4 text-sage-700" strokeWidth={2.5} />
+                    {tr(lang, '학교', 'School', '学校')}
+                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-sage-700 text-paper font-mono text-[11px] tabular-nums inline-flex items-center justify-center">
+                      {dailyData.school.length}
                     </span>
-                  </div>
-                  <span className="text-[11px] text-slate-600">
-                    {tr(lang, '터치하여 당일 변경', 'Tap to edit', '点击修改当天')}
+                  </h2>
+                  <span className="text-[11px] font-semibold text-slate-600">
+                    {tr(lang, '눌러서 이 날만 변경', 'Tap to edit this day', '点击修改当天')}
                   </span>
                 </div>
-
                 {dailyData.school.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-xs font-medium text-slate-600">
-                      {tr(
-                        lang,
-                        '등록된 정규 학교 수업이 없습니다.',
-                        'No regular school classes scheduled.',
-                        '当天没有登记常规学校课程。'
-                      )}
-                    </p>
-                  </div>
+                  <p className="py-6 text-center text-[13px] font-medium text-slate-600 rounded-xl bg-paper">
+                    {tr(
+                      lang,
+                      '등록된 정규 학교 수업이 없습니다.',
+                      'No regular school classes scheduled.',
+                      '当天没有登记常规学校课程。'
+                    )}
+                  </p>
                 ) : (
-                  <div className="divide-y divide-divider">
-                    {dailyData.school.map((item) => {
-                      const isCurrentClass =
-                        isSelectedToday &&
-                        !item.isCancelled &&
-                        isTimeInRange(nowMinutes, item.startTime, item.endTime);
-
-                      return (
-                        <button
-                          key={item.period}
-                          type="button"
-                          onClick={() => openSchoolEdit(item)}
-                          className={`w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left transition-colors min-h-[60px] ${
-                            isCurrentClass
-                              ? 'bg-sage-100 ring-2 ring-inset ring-sage'
-                              : item.isCancelled
-                              ? 'opacity-60'
-                              : item.isOverlapping
-                              ? 'bg-orange-50/60 hover:bg-orange-50'
-                              : 'hover:bg-slate-200'
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-xs text-sage-800 font-mono tabular-nums whitespace-nowrap">
-                                {tr(lang, `${item.period}교시`, `P${item.period}`, `第${item.period}节`)} ·{' '}
-                                {item.startTime} ~ {item.endTime}
-                              </span>
-                              {item.isOverlapping && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-900 border border-orange-300 rounded-full whitespace-nowrap">
-                                  <AlertTriangle className="w-3 h-3 text-orange-600" />
-                                  {overlapBadgeLabel}
-                                </span>
-                              )}
-                              {isCurrentClass && (
-                                <span className="px-2 py-0.5 text-[10px] font-bold bg-sage text-paper rounded-full whitespace-nowrap">
-                                  {tr(lang, '수업 중', 'LIVE', '上课中')}
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-1 flex items-center gap-2 flex-wrap">
-                              <span
-                                className={`text-[13px] font-bold ${
-                                  item.isCancelled
-                                    ? 'line-through text-slate-500'
-                                    : 'text-ink'
-                                }`}
-                              >
-                                {slotTitle(item.subject, item.status, lang)}
-                              </span>
-                              <StatusTag status={item.status} lang={lang} />
-                              {item.isModified && (
-                                <span className="px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-900 rounded-full whitespace-nowrap">
-                                  {tr(
-                                    lang,
-                                    `변경됨 (기존: ${translateSubject(item.originalSubject, lang)})`,
-                                    `Modified (${translateSubject(item.originalSubject, lang)})`,
-                                    `已调课 (原: ${translateSubject(item.originalSubject, lang)})`
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                            {item.note && (
-                              <p
-                                className="mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 text-slate-700"
-                              >
-                                <StickyNote className="w-3 h-3 shrink-0" />
-                                <span className="truncate">{item.note}</span>
-                              </p>
-                            )}
-                          </div>
-                          <span className="text-[11px] font-semibold text-accent-700 shrink-0">
-                            {tr(lang, '변경', 'Edit', '修改')}
-                          </span>
-                        </button>
-                      );
-                    })}
+                  <div className="space-y-1.5">
+                    {dailyData.school.map((item) =>
+                      renderListRow({
+                        key: `school-${item.period}`,
+                        kind: 'school',
+                        startTime: item.startTime,
+                        endTime: item.endTime,
+                        title: item.isCancelled
+                          ? translateSubject(item.subject, lang)
+                          : slotTitle(item.subject, item.status, lang),
+                        badge: periodLabel(item.period, lang),
+                        status: item.status,
+                        note: item.note,
+                        isCurrent:
+                          isSelectedToday &&
+                          !item.isCancelled &&
+                          isTimeInRange(nowMinutes, item.startTime, item.endTime),
+                        isCancelled: item.isCancelled,
+                        isOverlapping: item.isOverlapping,
+                        modifiedFrom:
+                          item.isModified && item.originalSubject !== item.subject
+                            ? translateSubject(item.originalSubject, lang)
+                            : undefined,
+                        onClick: () => openSchoolEdit(item),
+                      })
+                    )}
                   </div>
                 )}
               </section>
 
-              <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-                <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-accent" />
-                    <h2 className="text-[13px] font-bold text-ink">
-                      {tr(lang, '학원 시간표', 'Academy Schedule', '补习班课表')}
-                    </h2>
-                    <span className="text-xs text-slate-600 tabular-nums">
-                      · {dailyData.academy.length}
+              <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                    <Building2 className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
+                    {tr(lang, '학원', 'Academy', '补习班')}
+                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-accent-700 text-paper font-mono text-[11px] tabular-nums inline-flex items-center justify-center">
+                      {dailyData.academy.length}
                     </span>
-                  </div>
+                  </h2>
                   <button
                     type="button"
                     onClick={() => openAddAcademyModal('18:00', '20:00')}
-                    className="inline-flex items-center gap-1.5 px-4 h-10 rounded-full bg-accent text-paper text-[13px] font-bold hover:bg-accent-600 shadow-xs"
+                    className="inline-flex items-center gap-1 px-3 h-8 rounded-full bg-accent-700 text-paper text-[12px] font-bold hover:bg-accent-800 whitespace-nowrap"
                   >
-                    <Plus className="w-4 h-4" strokeWidth={2.75} />
-                    {tr(lang, '당일 보강/특강 추가', 'Add Makeup', '添加补课/特讲')}
+                    <Plus className="w-3.5 h-3.5" strokeWidth={2.75} />
+                    {tr(lang, '보강/특강', 'Makeup', '补课/特讲')}
                   </button>
                 </div>
-
                 {dailyData.academy.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-xs font-medium text-slate-600">
-                      {tr(
-                        lang,
-                        '이 날 예정된 학원 수업이 없습니다.',
-                        'No academy classes scheduled for this day.',
-                        '当天没有安排补习班课程。'
-                      )}
-                    </p>
-                  </div>
+                  <p className="py-6 text-center text-[13px] font-medium text-slate-600 rounded-xl bg-paper">
+                    {tr(
+                      lang,
+                      '이 날 예정된 학원 수업이 없습니다.',
+                      'No academy classes scheduled for this day.',
+                      '当天没有安排补习班课程。'
+                    )}
+                  </p>
                 ) : (
-                  <div className="divide-y divide-divider">
-                    {dailyData.academy.map((item) => {
-                      const isCurrentAcademy =
-                        isSelectedToday &&
-                        !item.isCancelled &&
-                        isTimeInRange(nowMinutes, item.startTime, item.endTime);
-
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => openEditAcademyModal(item)}
-                          className={`w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left transition-colors min-h-[64px] ${
-                            isCurrentAcademy
-                              ? 'bg-accent-100 ring-2 ring-inset ring-accent'
-                              : item.isCancelled
-                              ? 'opacity-60'
-                              : item.isOverlapping
-                              ? 'bg-orange-50/60 hover:bg-orange-50'
-                              : 'hover:bg-slate-200'
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-flex items-center gap-1 text-xs text-accent-800 font-mono tabular-nums whitespace-nowrap">
-                                <Clock className="w-3.5 h-3.5" />
-                                {item.startTime} ~ {item.endTime}
-                              </span>
-                              {item.isOverlapping && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-900 border border-orange-300 rounded-full whitespace-nowrap">
-                                  <AlertTriangle className="w-3 h-3 text-orange-600" />
-                                  {overlapBadgeLabel}
-                                </span>
-                              )}
-                            </div>
-                            <div className="mt-1 flex items-center gap-2 flex-wrap">
-                              <span
-                                className={`text-[13px] font-bold ${
-                                  item.isCancelled
-                                    ? 'line-through text-slate-500'
-                                    : 'text-ink'
-                                }`}
-                              >
-                                {slotTitle(item.subject, item.status, lang)}
-                              </span>
-                              <StatusTag status={item.status} lang={lang} />
-                            </div>
-                            {item.note && (
-                              <p
-                                className="mt-0.5 text-[10px] font-medium flex items-center gap-1 min-w-0 text-slate-700"
-                              >
-                                <StickyNote className="w-3 h-3 shrink-0" />
-                                <span className="truncate">{item.note}</span>
-                              </p>
-                            )}
-                          </div>
-                          <span className="text-[11px] font-semibold text-accent-700 shrink-0">
-                            {tr(lang, '수정', 'Edit', '修改')}
-                          </span>
-                        </button>
-                      );
-                    })}
+                  <div className="space-y-1.5">
+                    {dailyData.academy.map((item) =>
+                      renderListRow({
+                        key: `academy-${item.id}`,
+                        kind: 'academy',
+                        startTime: item.startTime,
+                        endTime: item.endTime,
+                        title: item.isCancelled
+                          ? translateSubject(item.subject, lang)
+                          : slotTitle(item.subject, item.status, lang),
+                        badge: item.isAdded
+                          ? tr(lang, '보강', 'Makeup', '补课')
+                          : tr(lang, '학원', 'Academy', '补习班'),
+                        status: item.status,
+                        note: item.note,
+                        isCurrent:
+                          isSelectedToday &&
+                          !item.isCancelled &&
+                          isTimeInRange(nowMinutes, item.startTime, item.endTime),
+                        isCancelled: item.isCancelled,
+                        isOverlapping: item.isOverlapping,
+                        modifiedFrom:
+                          item.isModified && !item.isAdded && item.originalSubject && item.originalSubject !== item.subject
+                            ? translateSubject(item.originalSubject, lang)
+                            : undefined,
+                        isMakeup: item.isAdded,
+                        onClick: () => openEditAcademyModal(item),
+                      })
+                    )}
                   </div>
                 )}
               </section>
 
               {daySchedules.length > 0 && (
-                <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-                  <div className="px-4 py-3 border-b border-divider flex items-center gap-2">
-                    <CalendarClock className="w-4 h-4 text-slate-600" />
-                    <h2 className="text-[13px] font-bold text-ink">
-                      {tr(lang, '이날의 일정', 'Schedules on this day', '当天日程')}
-                    </h2>
-                    <span className="text-xs text-slate-600 tabular-nums">· {daySchedules.length}</span>
-                  </div>
-                  <div className="divide-y divide-divider">
-                    {daySchedules.map((sch) => (
-                      <div key={sch.id} className="px-4 py-2.5 flex items-center gap-2.5">
-                        <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${
-                            sch.category === 'school'
-                              ? 'bg-sage'
-                              : sch.category === 'academy'
-                              ? 'bg-accent'
-                              : 'bg-other'
-                          }`}
-                        />
-                        <span className="w-12 shrink-0 text-xs font-mono text-slate-700 tabular-nums">
-                          {sch.time || tr(lang, '종일', 'All day', '全天')}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] font-bold text-ink truncate">{sch.title}</div>
-                          {sch.memo && (
-                            <div className="text-[11px] text-slate-600 truncate">{sch.memo}</div>
-                          )}
+                <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+                  <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                    <CalendarClock className="w-4 h-4 text-other-700" strokeWidth={2.5} />
+                    {tr(lang, '이날의 일정', 'Schedules on this day', '当天日程')}
+                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-other-700 text-paper font-mono text-[11px] tabular-nums inline-flex items-center justify-center">
+                      {daySchedules.length}
+                    </span>
+                  </h2>
+                  <div className="space-y-1.5">
+                    {daySchedules.map((sch) => {
+                      const tone = SCHEDULE_CAT_TONE[sch.category] || SCHEDULE_CAT_TONE.other;
+                      return (
+                        <div key={sch.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-paper">
+                          <span className="w-12 shrink-0 font-mono text-[14px] leading-none text-ink tabular-nums">
+                            {sch.time || (
+                              <span className="font-sans text-[11px] font-bold text-slate-600">
+                                {tr(lang, '종일', 'All day', '全天')}
+                              </span>
+                            )}
+                          </span>
+                          <span className={`w-1 self-stretch rounded-full shrink-0 ${tone.dot}`} aria-hidden="true" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[14px] font-bold text-ink truncate">
+                              {translateSampleText(sch.title, lang)}
+                            </div>
+                            {sch.memo && (
+                              <div className="text-[11px] text-slate-600 truncate">
+                                {translateSampleText(sch.memo, lang)}
+                              </div>
+                            )}
+                          </div>
+                          <span
+                            className={`px-2 py-px rounded-full border text-[11px] font-bold shrink-0 ${tone.pill}`}
+                          >
+                            {categoryLabel(sch.category, lang)}
+                          </span>
                         </div>
-                        <span className="text-[10px] font-semibold text-slate-600 shrink-0">
-                          {categoryLabel(sch.category, lang)}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               )}
@@ -2332,174 +2497,193 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           )}
         </div>
       ) : (
-        /* VIEW MODE 2: WEEKLY OVERVIEW GRID */
+        /* VIEW MODE 2: WEEKLY OVERVIEW */
         <div className="space-y-4">
-          <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-sage" />
-                <h2 className="text-[13px] font-bold text-ink">
-                  {tr(lang, '주간 학교 시간표 (월~금)', 'Weekly School Timetable (Mon–Fri)', '每周学校课表 (周一至周五)')}
-                </h2>
-              </div>
-              <span className="text-[11px] text-slate-600">
+          <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink min-w-0">
+                <GraduationCap className="w-4 h-4 text-sage-700 shrink-0" strokeWidth={2.5} />
+                <span className="truncate">{tr(lang, '학교 시간표 · 월~금', 'School · Mon–Fri', '学校课表 · 周一至周五')}</span>
+              </h2>
+              <span className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">
                 {tr(lang, '칸을 눌러 수정', 'Tap a cell to edit', '点击单元格修改')}
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-center border-collapse">
-                <thead>
-                  <tr className="border-b border-divider">
-                    <th className="py-2 px-1.5 text-[10px] font-semibold text-slate-600 border-r border-divider w-12">
-                      {tr(lang, '교시', 'Per', '课时')}
-                    </th>
-                    {weeklyData.slice(0, 5).map((wd) => (
-                      <th
-                        key={wd.dateStr}
-                        onClick={() => {
-                          setSelectedDate(wd.dateObj);
-                          setViewMode('daily');
-                        }}
-                        className={`py-2 px-1 text-xs font-bold cursor-pointer transition-colors ${
-                          wd.isToday
-                            ? 'bg-accent-100 text-accent-800'
-                            : 'text-ink hover:bg-slate-200'
-                        }`}
-                      >
-                        <div>{translateDay(wd.dayLabel, lang)}</div>
-                        <div className="text-[10px] font-mono font-normal text-slate-600 tabular-nums">
-                          {wd.dayNumber}
-                        </div>
+            {weeklyPeriods.length === 0 ? (
+              <p className="py-6 text-center text-[13px] font-medium text-slate-600 rounded-xl bg-paper">
+                {tr(lang, '이번 주 학교 수업이 없어요.', 'No school classes this week.', '本周没有学校课程。')}
+              </p>
+            ) : (
+              <div className="rounded-xl bg-paper overflow-x-auto">
+                <table className="w-full text-center border-collapse table-fixed min-w-[320px]">
+                  <thead>
+                    <tr className="border-b border-divider">
+                      <th className="sticky left-0 z-10 bg-paper w-[54px] py-2 px-1 text-[11px] font-semibold text-slate-600 border-r border-divider">
+                        {tr(lang, '교시', 'Per', '课时')}
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-divider text-xs">
-                  {[1, 2, 3, 4, 5, 6, 7].map((periodNum) => (
-                    <tr key={periodNum}>
-                      <td className="py-2.5 px-1 font-mono text-[11px] text-slate-600 border-r border-divider tabular-nums">
-                        {tr(lang, `${periodNum}교시`, `P${periodNum}`, `第${periodNum}节`)}
-                      </td>
-                      {weeklyData.slice(0, 5).map((wd) => {
-                        const cell = wd.resolved.school.find((s) => s.period === periodNum);
-                        if (!cell) {
-                          return (
-                            <td key={wd.dateStr} className="py-2.5 px-1 text-slate-400">
-                              -
-                            </td>
-                          );
-                        }
-                        return (
-                          <td
-                            key={wd.dateStr}
-                            onClick={() => openItemOnDate({ kind: 'school', item: cell }, wd.dateObj)}
-                            className={`py-2.5 px-1 cursor-pointer transition-colors ${
-                              cell.isCancelled
-                                ? 'text-slate-500 line-through bg-paper'
-                                : cell.status === 'absent'
-                                ? 'bg-accent-100 text-accent-900 font-semibold'
-                                : cell.status === 'selfStudy'
-                                ? 'bg-slate-200 text-ink'
-                                : cell.isModified
-                                ? 'bg-amber-50/80 text-amber-900 font-bold'
-                                : wd.isToday
-                                ? 'bg-sage-100 font-semibold text-sage-900'
-                                : 'bg-sage-100/50 text-sage-900 hover:bg-sage-100'
+                      {weeklyData.slice(0, 5).map((wd) => (
+                        <th key={wd.dateStr} className="p-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDate(wd.dateObj);
+                              setViewMode('daily');
+                            }}
+                            aria-label={formatDateLabel(wd.dateStr, lang)}
+                            className={`w-full py-1 rounded-lg flex flex-col items-center gap-0.5 transition-colors ${
+                              wd.isToday
+                                ? 'bg-accent-700 text-paper'
+                                : wd.isSelected
+                                ? 'bg-surface text-ink ring-[1.5px] ring-inset ring-accent'
+                                : 'text-ink hover:bg-surface'
                             }`}
                           >
-                            <div className="truncate max-w-[54px] mx-auto">
-                              {cell.status === 'selfStudy'
-                                ? tr(lang, '자습', 'Self-Study', '自习')
-                                : translateSubject(cell.subject, lang)}
-                            </div>
-                            {(cell.status === 'absent' || cell.note) && (
-                              <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                                {cell.status === 'absent' && (
-                                  <span className="px-1 rounded-full bg-accent-800 text-paper text-[9px] font-bold no-underline">
-                                    {statusLabel('absent', lang)}
+                            <span className={`text-[11px] font-bold ${wd.isToday ? 'text-paper/90' : 'text-slate-600'}`}>
+                              {translateDay(wd.dayLabel, lang)}
+                            </span>
+                            <span className="font-mono text-[14px] leading-none tabular-nums">{wd.dayNumber}</span>
+                          </button>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeklyPeriods.map(({ period, startTime }) => (
+                      <tr key={period} className="border-b border-divider last:border-b-0">
+                        <td className="sticky left-0 z-10 bg-paper px-1 py-1 border-r border-divider">
+                          <div className="flex flex-col items-center leading-tight">
+                            <span className="text-[11px] font-bold text-sage-800">{periodLabel(period, lang)}</span>
+                            <span className="font-mono text-[11px] text-slate-600 tabular-nums">{startTime}</span>
+                          </div>
+                        </td>
+                        {weeklyData.slice(0, 5).map((wd) => {
+                          const cell = wd.resolved.school.find((s) => s.period === period);
+                          if (!cell) {
+                            return (
+                              <td key={wd.dateStr} className={`p-0.5 ${wd.isToday ? 'bg-accent-100/60' : ''}`}>
+                                <span className="block py-2 text-[11px] text-slate-400">–</span>
+                              </td>
+                            );
+                          }
+                          const cellTone = cell.isCancelled
+                            ? 'bg-paper border border-dashed border-slate-400 text-slate-600 line-through'
+                            : cell.status === 'absent'
+                            ? 'bg-accent-100 text-accent-900'
+                            : cell.status === 'selfStudy'
+                            ? 'bg-slate-200 text-ink'
+                            : wd.isToday
+                            ? 'bg-sage-200 text-sage-900'
+                            : 'bg-sage-100 text-sage-900';
+                          return (
+                            <td key={wd.dateStr} className={`p-0.5 ${wd.isToday ? 'bg-accent-100/60' : ''}`}>
+                              <button
+                                type="button"
+                                onClick={() => openItemOnDate({ kind: 'school', item: cell }, wd.dateObj)}
+                                aria-label={`${formatDateLabel(wd.dateStr, lang)} ${periodLabel(period, lang)} ${translateSubject(cell.subject, lang)}`}
+                                className={`relative w-full min-h-[40px] px-0.5 py-1 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:brightness-95 active:scale-95 transition ${cellTone}`}
+                              >
+                                <span className="w-full truncate text-[11px] font-bold leading-tight">
+                                  {cell.status === 'selfStudy'
+                                    ? tr(lang, '자습', 'Study', '自习')
+                                    : translateSubject(cell.subject, lang)}
+                                </span>
+                                {(cell.status === 'absent' || cell.isCancelled) && (
+                                  <span
+                                    className={`px-1 rounded-full text-[11px] leading-tight font-bold no-underline ${
+                                      cell.isCancelled ? 'bg-slate-200 text-slate-700' : 'bg-accent-800 text-paper'
+                                    }`}
+                                  >
+                                    {statusLabel(cell.isCancelled ? 'cancelled' : 'absent', lang)}
                                   </span>
                                 )}
-                                {cell.note && <StickyNote className="w-2.5 h-2.5 text-slate-600" />}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                                {(cell.note || (cell.isModified && !cell.isCancelled)) && (
+                                  <span className="absolute top-0.5 right-0.5 flex gap-0.5" aria-hidden="true">
+                                    {cell.isModified && !cell.isCancelled && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                                    )}
+                                    {cell.note && <span className="w-1.5 h-1.5 rounded-full bg-other" />}
+                                  </span>
+                                )}
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-600 flex-wrap">
+              <span className="inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                {tr(lang, '과목 변경', 'Changed', '已调课')}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-other" />
+                {tr(lang, '메모', 'Note', '备注')}
+              </span>
             </div>
           </section>
 
-          <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-accent" />
-                <h2 className="text-[13px] font-bold text-ink">
-                  {tr(lang, '주간 학원 시간표 (월~일)', 'Weekly Academies (Mon–Sun)', '每周补习班课表 (周一至周日)')}
-                </h2>
-              </div>
-            </div>
-            <div className="divide-y divide-divider">
+          <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+            <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+              <Building2 className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
+              {tr(lang, '학원 · 월~일', 'Academies · Mon–Sun', '补习班 · 周一至周日')}
+            </h2>
+            <div className="space-y-1.5">
               {weeklyData.map((wd) => (
                 <div
                   key={wd.dateStr}
-                  onClick={() => {
-                    setSelectedDate(wd.dateObj);
-                    setViewMode('daily');
-                  }}
-                  className={`px-4 py-2.5 flex items-start gap-3 cursor-pointer hover:bg-slate-200 transition-colors ${
-                    wd.isToday ? 'bg-accent-100/60' : ''
+                  className={`flex items-center gap-3 p-2 rounded-xl ${
+                    wd.isToday ? 'bg-accent-100 ring-[1.5px] ring-inset ring-accent' : 'bg-paper'
                   }`}
                 >
-                  <div className="w-14 shrink-0 pt-0.5">
-                    <span className="text-[13px] font-mono text-ink">
-                      {translateDay(wd.dayLabel, lang)}
-                    </span>
-                    <span className="block text-[10px] font-mono text-slate-600 tabular-nums">
-                      {wd.dayNumber}
-                    </span>
-                  </div>
-                  <div className="flex-1 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(wd.dateObj);
+                      setViewMode('daily');
+                    }}
+                    aria-label={formatDateLabel(wd.dateStr, lang)}
+                    className="shrink-0 rounded-xl hover:brightness-95 active:scale-95 transition"
+                  >
+                    {renderDateBlock(wd.dateStr, wd.isToday ? 'accent' : 'plain', 'sm')}
+                  </button>
+                  <div className="flex-1 min-w-0 flex flex-wrap gap-1.5">
                     {wd.resolved.academy.length === 0 ? (
-                      <span className="text-[11px] text-slate-500 py-0.5">
-                        {tr(lang, '등록된 학원 없음', 'None', '无补习班')}
+                      <span className="text-[12px] font-medium text-slate-500">
+                        {tr(lang, '학원 없음', 'No academy', '无补习班')}
                       </span>
                     ) : (
                       wd.resolved.academy.map((ac) => (
                         <button
                           key={ac.id}
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openItemOnDate({ kind: 'academy', item: ac }, wd.dateObj);
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] border inline-flex items-center gap-1 hover:brightness-95 active:scale-95 transition-transform ${
+                          onClick={() => openItemOnDate({ kind: 'academy', item: ac }, wd.dateObj)}
+                          className={`max-w-full px-2.5 py-1 rounded-full text-[12px] inline-flex items-center gap-1.5 active:scale-95 transition ${
                             ac.isCancelled
-                              ? 'bg-paper border-dashed border-slate-400 text-slate-500 line-through'
+                              ? 'bg-paper border border-dashed border-slate-400 text-slate-600'
                               : ac.status === 'selfStudy'
-                              ? 'bg-slate-200 border-transparent text-ink'
-                              : ac.isOverlapping
-                              ? 'bg-orange-50 border-orange-300 text-orange-900'
-                              : 'bg-accent-100 border-transparent text-accent-800'
-                          }`}
+                              ? 'bg-slate-200 text-ink'
+                              : ac.isAdded
+                              ? 'bg-accent-700 text-paper hover:bg-accent-800'
+                              : 'bg-accent-100 text-accent-900 hover:bg-accent-200 border border-accent-200'
+                          } ${ac.isOverlapping && !ac.isCancelled ? 'ring-2 ring-accent-800' : ''}`}
                         >
-                          {ac.isOverlapping && (
-                            <AlertTriangle className="w-3 h-3 text-orange-600 shrink-0" />
+                          {ac.isOverlapping && !ac.isCancelled && (
+                            <AlertTriangle className="w-3 h-3 shrink-0" aria-label={overlapBadgeLabel} />
                           )}
-                          <span className="font-mono text-[11px] font-semibold tabular-nums">
-                            {ac.startTime}~{ac.endTime}
+                          <span className="font-mono text-[11px] tabular-nums shrink-0">{ac.startTime}</span>
+                          <span className={`font-bold truncate ${ac.isCancelled ? 'line-through' : ''}`}>
+                            {ac.isCancelled ? translateSubject(ac.subject, lang) : slotTitle(ac.subject, ac.status, lang)}
                           </span>
-                          <span className="font-bold">{slotTitle(ac.subject, ac.status, lang)}</span>
-                          <StatusTag status={ac.status} lang={lang} />
-                          {ac.note && <StickyNote className="w-3 h-3 shrink-0 opacity-70" />}
-                          {ac.isOverlapping && (
-                            <span className="text-[10px] font-bold text-orange-700">
-                              {overlapBadgeLabel}
-                            </span>
+                          {ac.isCancelled && (
+                            <span className="text-[11px] font-bold">{statusLabel('cancelled', lang)}</span>
                           )}
+                          <StatusTag status={ac.status} lang={lang} />
+                          {ac.note && <StickyNote className="w-3 h-3 shrink-0" />}
                         </button>
                       ))
                     )}
@@ -2511,7 +2695,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         </div>
       )}
 
-      {/* MODAL 1: SCHOOL PERIOD EDIT BOTTOM SHEET */}
+      {/* SHEET 1: SCHOOL PERIOD EDIT */}
       {editingSchoolPeriod && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
@@ -2521,34 +2705,29 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           }}
         >
           <div
-            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto"
+            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 pb-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1" />
+            <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1" />
 
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="text-xs text-sage-700 font-mono tabular-nums">
-                  {formatDateLabel(editDateStr, lang)} ·{' '}
-                  {tr(
-                    lang,
-                    `${editingSchoolPeriod.period}교시`,
-                    `P${editingSchoolPeriod.period}`,
-                    `第${editingSchoolPeriod.period}节`
-                  )}{' '}
-                  ({editingSchoolPeriod.startTime} ~ {editingSchoolPeriod.endTime})
-                </span>
-                <h3 className="text-[15px] font-bold text-ink mt-0.5">
-                  {tr(lang, '이 날 수업 변경', 'Edit this class for the day', '修改当天课程')}
-                </h3>
-                <p className="text-xs text-slate-700 mt-0.5">
-                  {tr(
-                    lang,
-                    '여기서 바꾼 내용은 이 날짜에만 적용됩니다.',
-                    'Changes here apply to this date only.',
-                    '此处的修改仅适用于当天。'
-                  )}
-                </p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                {renderDateBlock(editDateStr, 'sage')}
+                <div className="min-w-0">
+                  <h3 className="text-[16px] font-bold text-ink truncate">
+                    {translateSubject(editingSchoolPeriod.subject, lang)}
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span className="px-2 py-px rounded-full bg-sage-200 text-sage-900 text-[11px] font-bold">
+                      {periodLabel(editingSchoolPeriod.period, lang)}
+                    </span>
+                    <span className="font-mono text-[12px] text-slate-700 tabular-nums">
+                      {editingSchoolPeriod.startTime} – {editingSchoolPeriod.endTime}
+                    </span>
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
@@ -2562,6 +2741,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+            <p className="text-[12px] font-medium text-slate-600 -mt-1">
+              {formatDateLabel(editDateStr, lang)} ·{' '}
+              {tr(
+                lang,
+                '여기서 바꾼 내용은 이 날짜에만 적용됩니다.',
+                'Changes here apply to this date only.',
+                '此处的修改仅适用于当天。'
+              )}
+            </p>
 
             {renderStatusAndNote(
               editingSchoolPeriod.status,
@@ -2570,35 +2758,36 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               editingSchoolPeriod.note ?? ''
             )}
 
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-slate-600">
-                {tr(lang, '과목 바꾸기 (터치 시 즉시 적용)', 'Change subject (applies instantly)', '更换科目（点击立即生效）')}
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <GraduationCap className="w-4 h-4 text-sage-700" />
+                  {tr(lang, '과목 바꾸기', 'Change subject', '更换科目')}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600">
+                  {tr(lang, '누르면 바로 적용', 'Applies instantly', '点击立即生效')}
+                </span>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 {subjectPool.school.map((subj) => {
-                  const isCurrent =
-                    !editingSchoolPeriod.isCancelled && editingSchoolPeriod.subject === subj;
+                  const isCurrent = !editingSchoolPeriod.isCancelled && editingSchoolPeriod.subject === subj;
                   const isOriginal = editingSchoolPeriod.originalSubject === subj;
-
                   return (
                     <button
                       key={subj}
                       type="button"
+                      aria-pressed={isCurrent}
                       onClick={() => handleSelectSchoolSubject(subj)}
-                      className={`min-h-[44px] px-3 py-2 rounded-full text-xs font-semibold border transition-all flex flex-col items-center justify-center ${
+                      className={`min-h-[44px] px-2 py-1.5 rounded-full text-[13px] font-semibold border transition-all flex flex-col items-center justify-center leading-tight ${
                         isCurrent
-                          ? 'bg-sage text-paper border-transparent'
-                          : 'bg-surface text-ink border-divider hover:bg-sage-100 active:scale-95'
+                          ? 'bg-sage-700 text-paper border-transparent'
+                          : 'bg-surface text-ink border-transparent hover:bg-sage-100 active:scale-95'
                       }`}
                     >
-                      <span>{translateSubject(subj, lang)}</span>
+                      <span className="truncate max-w-full">{translateSubject(subj, lang)}</span>
                       {isOriginal && (
-                        <span
-                          className={`text-[10px] font-medium ${
-                            isCurrent ? 'text-paper/70' : 'text-slate-600'
-                          }`}
-                        >
-                          {tr(lang, '기본 과목', 'Default', '默认科目')}
+                        <span className={`text-[11px] font-medium ${isCurrent ? 'text-paper/85' : 'text-slate-600'}`}>
+                          {tr(lang, '기본', 'Default', '默认')}
                         </span>
                       )}
                     </button>
@@ -2607,21 +2796,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-divider">
-              <button
-                type="button"
-                onClick={handleRestoreSchoolPeriod}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 active:scale-98 transition-all"
-              >
-                <RotateCcw className="w-4 h-4 text-slate-600" />
-                {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleRestoreSchoolPeriod}
+              className="w-full h-11 rounded-full border border-divider text-ink text-[13px] font-bold flex items-center justify-center gap-1.5 hover:bg-slate-100 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4 text-slate-600" />
+              {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
+            </button>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: ACADEMY EDIT BOTTOM SHEET */}
+      {/* SHEET 2: ACADEMY EDIT */}
       {editingAcademyItem && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
@@ -2631,33 +2818,35 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           }}
         >
           <div
-            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto"
+            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 pb-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1" />
+            <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1" />
 
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="text-xs text-accent-700 font-mono tabular-nums">
-                  {formatDateLabel(editDateStr, lang)} · {editingAcademyItem.startTime} ~{' '}
-                  {editingAcademyItem.endTime}
-                </span>
-                <h3 className="text-[15px] font-bold text-ink mt-0.5">
-                  {translateSubject(editingAcademyItem.subject, lang)}
-                  {editingAcademyItem.isAdded && (
-                    <span className="ml-1.5 align-middle px-1.5 py-0.5 text-[10px] font-bold bg-sage-100 text-sage-800 rounded-full">
-                      {tr(lang, '당일 보강', 'Makeup', '临时补课')}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                {renderDateBlock(editDateStr, 'accent')}
+                <div className="min-w-0">
+                  <h3 className="text-[16px] font-bold text-ink truncate">
+                    {translateSubject(editingAcademyItem.subject, lang)}
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span
+                      className={`px-2 py-px rounded-full text-[11px] font-bold ${
+                        editingAcademyItem.isAdded ? 'bg-accent-700 text-paper' : 'bg-accent-200 text-accent-900'
+                      }`}
+                    >
+                      {editingAcademyItem.isAdded
+                        ? tr(lang, '당일 보강', 'Makeup', '临时补课')
+                        : tr(lang, '학원', 'Academy', '补习班')}
                     </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-700 mt-0.5">
-                  {tr(
-                    lang,
-                    '여기서 바꾼 내용은 이 날짜에만 적용됩니다.',
-                    'Changes here apply to this date only.',
-                    '此处的修改仅适用于当天。'
-                  )}
-                </p>
+                    <span className="font-mono text-[12px] text-slate-700 tabular-nums">
+                      {editingAcademyItem.startTime} – {editingAcademyItem.endTime}
+                    </span>
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
@@ -2671,6 +2860,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+            <p className="text-[12px] font-medium text-slate-600 -mt-1">
+              {formatDateLabel(editDateStr, lang)} ·{' '}
+              {tr(
+                lang,
+                '여기서 바꾼 내용은 이 날짜에만 적용됩니다.',
+                'Changes here apply to this date only.',
+                '此处的修改仅适用于当天。'
+              )}
+            </p>
 
             {renderStatusAndNote(
               editingAcademyItem.status,
@@ -2679,103 +2877,123 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               editingAcademyItem.note ?? ''
             )}
 
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-semibold text-slate-600">
-                {tr(lang, '수업 시간 설정', 'Class Time Range', '设置上课时间')}
-              </label>
+            <div className="space-y-2">
+              <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                <Clock className="w-4 h-4 text-accent-700" />
+                {tr(lang, '수업 시간', 'Class time', '上课时间')}
+              </span>
               <div className="flex items-center gap-2">
                 <input
                   type="time"
                   value={tempStartTime}
                   onChange={(e) => setTempStartTime(e.target.value)}
-                  className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                  aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
+                  className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
                 />
-                <span className="text-sm font-bold text-slate-400">~</span>
+                <span className="text-sm font-bold text-slate-500">–</span>
                 <input
                   type="time"
                   value={tempEndTime}
                   onChange={(e) => setTempEndTime(e.target.value)}
-                  className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                  aria-label={tr(lang, '종료 시간', 'End time', '结束时间')}
+                  className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
                 />
-                <button
-                  type="button"
-                  onClick={handleSaveAcademyTimeOnly}
-                  className="h-10 px-3 rounded-full bg-ink text-paper text-xs font-bold whitespace-nowrap hover:bg-slate-800"
-                >
-                  {tr(lang, '시간만 저장', 'Save Time', '仅保存时间')}
-                </button>
               </div>
+              <button
+                type="button"
+                onClick={handleSaveAcademyTimeOnly}
+                disabled={
+                  tempStartTime === editingAcademyItem.startTime && tempEndTime === editingAcademyItem.endTime
+                }
+                className="w-full h-11 rounded-full bg-accent-700 text-paper text-[13px] font-bold hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-default inline-flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" strokeWidth={2.75} />
+                {tr(lang, '시간 저장', 'Save time', '保存时间')}
+              </button>
             </div>
 
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-slate-600">
-                {tr(lang, '학원 바꾸기 (터치 시 즉시 적용)', 'Change academy (applies instantly)', '更换补习班（点击立即生效）')}
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <Building2 className="w-4 h-4 text-accent-700" />
+                  {tr(lang, '학원 바꾸기', 'Change academy', '更换补习班')}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600">
+                  {tr(lang, '누르면 바로 적용', 'Applies instantly', '点击立即生效')}
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {subjectPool.academy.map((acName) => {
-                  const isCurrent =
-                    !editingAcademyItem.isCancelled && editingAcademyItem.subject === acName;
+                  const isCurrent = !editingAcademyItem.isCancelled && editingAcademyItem.subject === acName;
                   return (
                     <button
                       key={acName}
                       type="button"
+                      aria-pressed={isCurrent}
                       onClick={() => handleSelectAcademySubject(acName)}
-                      className={`min-h-[40px] px-3 py-2 rounded-full text-xs font-semibold border transition-all flex items-center justify-center ${
+                      className={`min-h-[42px] px-3 py-2 rounded-full text-[13px] font-semibold transition-all flex items-center justify-center ${
                         isCurrent
-                          ? 'bg-accent text-paper border-transparent'
-                          : 'bg-transparent text-ink border-divider hover:bg-accent-100 active:scale-95'
+                          ? 'bg-accent-700 text-paper'
+                          : 'bg-surface text-ink hover:bg-accent-100 active:scale-95'
                       }`}
                     >
-                      {translateSubject(acName, lang)}
+                      <span className="truncate">{translateSubject(acName, lang)}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-divider">
-              <button
-                type="button"
-                onClick={handleRestoreOrDeleteAcademyItem}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 active:scale-98 transition-all"
-              >
-                {editingAcademyItem.isAdded ? (
-                  <>
-                    <Trash2 className="w-4 h-4 text-accent-800" />
-                    {tr(lang, '추가 보강 삭제', 'Delete Makeup', '删除补课')}
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="w-4 h-4 text-slate-600" />
-                    {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleRestoreOrDeleteAcademyItem}
+              className={`w-full h-11 rounded-full border text-[13px] font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                editingAcademyItem.isAdded
+                  ? 'border-accent-300 text-accent-800 hover:bg-accent-100'
+                  : 'border-divider text-ink hover:bg-slate-100'
+              }`}
+            >
+              {editingAcademyItem.isAdded ? (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  {tr(lang, '추가 보강 삭제', 'Delete Makeup', '删除补课')}
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="w-4 h-4 text-slate-600" />
+                  {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: ADD SHEET (academy makeup/special class OR schedule item) */}
+      {/* SHEET 3: ADD (academy makeup/special class OR schedule item) */}
       {isAddingAcademy && addTarget && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
           onClick={closeAddSheet}
         >
           <div
-            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto"
+            className="w-full max-w-md bg-paper rounded-t-[28px] p-5 pb-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1 mb-1" />
+            <div className="w-10 h-1.5 bg-slate-300 rounded-full mx-auto -mt-1" />
 
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="text-xs text-accent-700 font-mono tabular-nums">
-                  {formatDateLabel(addTarget.date, lang)}
-                </span>
-                <h3 className="text-[15px] font-bold text-ink mt-0.5">
-                  {tr(lang, '이 시간에 추가하기', 'Add at this time', '在此时间添加')}
-                </h3>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                {renderDateBlock(addTarget.date, 'accent')}
+                <div className="min-w-0">
+                  <h3 className="text-[16px] font-bold text-ink truncate">
+                    {tr(lang, '이 시간에 추가하기', 'Add at this time', '在此时间添加')}
+                  </h3>
+                  <div className="text-[12px] font-semibold text-slate-600 truncate">
+                    {formatDateLabel(addTarget.date, lang)}
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
@@ -2788,57 +3006,71 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             </div>
 
             {onUpdateSchedules && (
-              <div className="grid grid-cols-2 rounded-full border border-divider overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setAddKind('academy')}
-                  className={`h-9 text-xs font-semibold transition-colors ${
-                    addKind === 'academy' ? 'bg-accent text-paper' : 'text-ink hover:bg-slate-200'
-                  }`}
-                >
-                  {tr(lang, '학원 보강/특강', 'Academy makeup / special', '补习班补课/特讲')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAddKind('schedule')}
-                  className={`h-9 text-xs font-semibold transition-colors ${
-                    addKind === 'schedule' ? 'bg-accent text-paper' : 'text-ink hover:bg-slate-200'
-                  }`}
-                >
-                  {tr(lang, '일정', 'Schedule', '日程')}
-                </button>
+              <div className="grid grid-cols-2 p-1 rounded-full bg-surface" role="tablist">
+                {(
+                  [
+                    { key: 'academy', icon: Building2, label: tr(lang, '학원 보강/특강', 'Academy makeup', '补习班补课/特讲') },
+                    { key: 'schedule', icon: CalendarClock, label: tr(lang, '일정', 'Schedule', '日程') },
+                  ] as const
+                ).map(({ key, icon: Icon, label }) => {
+                  const active = addKind === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setAddKind(key)}
+                      className={`h-9 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors min-w-0 ${
+                        active ? 'bg-accent-700 text-paper shadow-xs' : 'text-slate-700 hover:text-ink'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
             {addKind === 'academy' || !onUpdateSchedules ? (
               <>
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-600">
-                    {tr(lang, '수업 시간 설정', 'Class Time Range', '设置上课时间')}
-                  </label>
+                <div className="space-y-2">
+                  <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                    <Clock className="w-4 h-4 text-accent-700" />
+                    {tr(lang, '수업 시간', 'Class time', '上课时间')}
+                  </span>
                   <div className="flex items-center gap-2">
                     <input
                       type="time"
                       value={tempStartTime}
                       onChange={(e) => setTempStartTime(e.target.value)}
-                      className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                      aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
+                      className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
                     />
-                    <span className="text-sm font-bold text-slate-400">~</span>
+                    <span className="text-sm font-bold text-slate-500">–</span>
                     <input
                       type="time"
                       value={tempEndTime}
                       onChange={(e) => setTempEndTime(e.target.value)}
-                      className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                      aria-label={tr(lang, '종료 시간', 'End time', '结束时间')}
+                      className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-semibold text-slate-600">
-                    {tr(lang, '학원 선택 (터치 시 바로 추가)', 'Pick an academy (adds instantly)', '选择补习班（点击立即添加）')}
-                  </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                      <Building2 className="w-4 h-4 text-accent-700" />
+                      {tr(lang, '학원 선택', 'Pick an academy', '选择补习班')}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-600">
+                      {tr(lang, '누르면 바로 추가', 'Adds instantly', '点击立即添加')}
+                    </span>
+                  </div>
                   {subjectPool.academy.length === 0 ? (
-                    <p className="text-xs text-slate-600">
+                    <p className="px-4 py-3 rounded-2xl bg-surface text-[13px] text-slate-700">
                       {tr(
                         lang,
                         '설정에서 학원 후보를 먼저 추가해 주세요.',
@@ -2853,9 +3085,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           key={acName}
                           type="button"
                           onClick={() => handleSelectAcademySubject(acName)}
-                          className="min-h-[40px] px-3 py-2 rounded-full text-xs font-semibold border transition-all flex items-center justify-center bg-transparent text-ink border-divider hover:bg-accent-100 active:scale-95"
+                          className="min-h-[44px] px-3 py-2 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1 bg-surface text-ink hover:bg-accent-700 hover:text-paper active:scale-95 transition-all"
                         >
-                          {translateSubject(acName, lang)}
+                          <Plus className="w-3.5 h-3.5 shrink-0" strokeWidth={2.75} />
+                          <span className="truncate">{translateSubject(acName, lang)}</span>
                         </button>
                       ))}
                     </div>
@@ -2864,72 +3097,67 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </>
             ) : (
               <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-600">
-                    {tr(lang, '시작 시간', 'Start time', '开始时间')}
-                  </label>
+                <div className="grid grid-cols-[auto_1fr] gap-2 items-center">
                   <input
                     type="time"
                     value={tempStartTime}
                     onChange={(e) => setTempStartTime(e.target.value)}
-                    className="w-full h-10 px-3 rounded-full border border-divider bg-surface text-[13px] font-mono text-ink outline-none focus:border-accent"
+                    aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
+                    className="w-[118px] h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-600">
-                    {tr(lang, '제목', 'Title', '标题')}
-                  </label>
                   <input
                     type="text"
                     value={newScheduleTitle}
                     onChange={(e) => setNewScheduleTitle(e.target.value)}
-                    placeholder={tr(lang, '예: 수행평가 준비', 'e.g. Prepare for quiz', '例如：准备测验')}
-                    className="w-full h-10 px-4 rounded-full border border-divider bg-surface text-[13px] text-ink outline-none focus:border-accent"
+                    aria-label={tr(lang, '제목', 'Title', '标题')}
+                    placeholder={tr(lang, '제목 (예: 수행평가 준비)', 'Title (e.g. Prepare for quiz)', '标题（例如：准备测验）')}
+                    className="min-w-0 h-11 px-4 rounded-full border border-divider bg-surface text-[14px] text-ink placeholder:text-slate-500 outline-none focus:border-accent"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <span className="block text-[11px] font-semibold text-slate-600">
-                    {tr(lang, '분류', 'Category', '分类')}
-                  </span>
-                  <div className="flex gap-1.5">
-                    {(['school', 'academy', 'other'] as ScheduleCategory[]).map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setNewScheduleCategory(cat)}
-                        className={`h-8 px-3.5 rounded-full text-xs font-semibold border transition-colors ${
-                          newScheduleCategory === cat
-                            ? cat === 'school'
-                              ? 'bg-sage text-paper border-transparent'
-                              : cat === 'academy'
-                              ? 'bg-accent text-paper border-transparent'
-                              : 'bg-other-600 text-paper border-transparent'
-                            : 'border-divider text-ink hover:bg-slate-200'
-                        }`}
-                      >
-                        {categoryLabel(cat, lang)}
-                      </button>
-                    ))}
+                  <span className="block text-[13px] font-bold text-ink">{tr(lang, '분류', 'Category', '分类')}</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['school', 'academy', 'other'] as ScheduleCategory[]).map((cat) => {
+                      const active = newScheduleCategory === cat;
+                      const Icon = cat === 'school' ? GraduationCap : cat === 'academy' ? Building2 : CalendarClock;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setNewScheduleCategory(cat)}
+                          className={`h-10 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                            active
+                              ? cat === 'school'
+                                ? 'bg-sage-700 text-paper'
+                                : cat === 'academy'
+                                ? 'bg-accent-700 text-paper'
+                                : 'bg-other-700 text-paper'
+                              : 'bg-surface text-ink hover:bg-slate-200'
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          {categoryLabel(cat, lang)}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-600">
-                    {tr(lang, '메모', 'Memo', '备注')}
-                  </label>
-                  <textarea
-                    value={newScheduleMemo}
-                    onChange={(e) => setNewScheduleMemo(e.target.value)}
-                    rows={2}
-                    placeholder={tr(lang, '선택 사항', 'Optional', '可选')}
-                    className="w-full px-4 py-2.5 rounded-2xl border border-divider bg-surface text-[13px] text-ink outline-none focus:border-accent resize-none"
-                  />
-                </div>
+                <textarea
+                  value={newScheduleMemo}
+                  onChange={(e) => setNewScheduleMemo(e.target.value)}
+                  rows={2}
+                  aria-label={tr(lang, '메모', 'Memo', '备注')}
+                  placeholder={tr(lang, '메모 (선택)', 'Memo (optional)', '备注（可选）')}
+                  className="w-full px-4 py-2.5 rounded-2xl border border-divider bg-surface text-[14px] text-ink placeholder:text-slate-500 outline-none focus:border-accent resize-none"
+                />
                 <button
                   type="button"
                   onClick={handleAddScheduleItem}
                   disabled={!newScheduleTitle.trim()}
-                  className="w-full min-h-[44px] rounded-full bg-accent text-paper text-[13px] font-bold hover:bg-accent-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-full h-12 rounded-full bg-accent-700 text-paper text-[14px] font-bold hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-1.5"
                 >
+                  <Plus className="w-4 h-4" strokeWidth={2.75} />
                   {tr(lang, '일정 추가', 'Add schedule', '添加日程')}
                 </button>
               </div>
