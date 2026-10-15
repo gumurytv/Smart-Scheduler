@@ -333,6 +333,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
   const [widgetSyncToast, setWidgetSyncToast] = useState<string | null>(null);
+  const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
+
+  // 위젯 선택 시트: Esc로 닫기 + 열려 있는 동안 뒤 화면 스크롤 잠금
+  useEffect(() => {
+    if (!isWidgetSheetOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsWidgetSheetOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isWidgetSheetOpen]);
   const [widgetNow, setWidgetNow] = useState<Date>(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setWidgetNow(new Date()), 30000);
@@ -2959,167 +2975,274 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         )}
       </section>
 
-      {/* SECTION 7: 홈 화면 위젯 (Home-screen widget gallery: pick widgets + preview) */}
-      <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
-        <div className="px-3.5 py-3 border-b border-divider flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-accent-100 text-accent-700 flex items-center justify-center shrink-0">
-              <Smartphone className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-[13px] font-bold text-ink">
-                {tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
-              </h2>
-              <p className="text-[11px] text-slate-600">
-                {tr(
-                  lang,
-                  '홈 화면에 둘 위젯을 골라 보세요 (자동 동기화됨)',
-                  'Pick the widgets for your home screen (auto-synced)',
-                  '选择要放在主屏幕上的小组件（自动同步）'
-                )}
-              </p>
-            </div>
+      {/* SECTION 7: 홈 화면 위젯 — 설정 화면에는 요약 + 버튼만, 갤러리는 시트에서 */}
+      <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-full bg-accent-100 text-accent-700 flex items-center justify-center shrink-0">
+            <Smartphone className="w-4 h-4" />
           </div>
-
-          {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) — widgetConfig.theme */}
-          <div
-            className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
-            role="group"
-            aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
-          >
-            {(['light', 'dark'] as const).map((th) => (
-              <button
-                key={th}
-                type="button"
-                aria-pressed={widgetTheme === th}
-                onClick={() => updateWidgetConfig({ theme: th })}
-                className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                  widgetTheme === th ? 'bg-accent text-paper' : 'text-ink hover:bg-slate-100'
-                }`}
-              >
-                {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
-                {th === 'light'
-                  ? tr(lang, '밝은 테마', 'Light', '浅色')
-                  : tr(lang, '어두운 테마', 'Dark', '深色')}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-4 space-y-3">
-          {/* 선택 요약 */}
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-accent-100 text-accent-900 text-xs font-bold">
+          <div className="min-w-0">
+            <h2 className="text-[13px] font-bold text-ink">
+              {tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
+            </h2>
+            <p className="text-[11px] text-slate-600">
               {tr(
                 lang,
-                `선택한 위젯 ${widgetConfig.enabled.length}개`,
-                `${widgetConfig.enabled.length} widget${widgetConfig.enabled.length === 1 ? '' : 's'} selected`,
-                `已选择 ${widgetConfig.enabled.length} 个小组件`
+                `위젯 ${HOME_WIDGET_IDS.length}종 중 ${widgetConfig.enabled.length}개 추가됨`,
+                `${widgetConfig.enabled.length} of ${HOME_WIDGET_IDS.length} widgets added`,
+                `${HOME_WIDGET_IDS.length} 种小组件中已添加 ${widgetConfig.enabled.length} 个`
               )}
-            </span>
-            <span className="text-[11px] text-slate-600 truncate">
-              {widgetConfig.enabled.length > 0
-                ? widgetConfig.enabled.map((id) => HOME_WIDGET_META[id].name(lang)).join(' · ')
-                : tr(lang, '아직 선택한 위젯이 없어요', 'No widgets selected yet', '尚未选择小组件')}
-            </span>
-          </div>
-
-          {/* 위젯 갤러리 */}
-          <div className="space-y-3">
-            {HOME_WIDGET_IDS.map((id) => {
-              const meta = HOME_WIDGET_META[id];
-              const isOn = widgetConfig.enabled.includes(id);
-              return (
-                <div
-                  key={id}
-                  className={`rounded-2xl p-3 space-y-3 transition-colors ${
-                    isOn ? 'bg-paper ring-2 ring-accent' : 'bg-paper/60'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[13px] font-bold text-ink">{meta.name(lang)}</span>
-                        <span className="px-2 py-0.5 rounded-full bg-surface text-[10px] font-mono text-slate-700">
-                          {meta.sizeLabel(lang)}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {tr(lang, `${meta.source(lang)} 메뉴`, `from ${meta.source(lang)}`, `来自${meta.source(lang)}`)}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-slate-600">{meta.description(lang)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      aria-pressed={isOn}
-                      onClick={() => toggleWidget(id)}
-                      className={`h-8 px-3 rounded-full text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
-                        isOn
-                          ? 'bg-sage-100 text-sage-800 hover:bg-sage-200'
-                          : 'bg-accent text-paper hover:bg-accent-600'
-                      }`}
-                    >
-                      {isOn ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                      {isOn
-                        ? tr(lang, '추가됨', 'Added', '已添加')
-                        : tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
-                    </button>
-                  </div>
-
-                  {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
-                  <div
-                    className={`p-3 rounded-2xl transition-colors ${
-                      widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'
-                    } ${isOn ? '' : 'opacity-80'}`}
-                  >
-                    <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <p className="text-[11px] text-slate-600 leading-relaxed px-1">
-            {tr(
-              lang,
-              '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
-              'In the Android/iOS app, the selected widgets appear as real home-screen widgets. The web app shows a preview and syncs the widget data.',
-              '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
-            )}
-          </p>
-
-          {/* 위젯 브릿지 동기화 상태 및 수동 새로고침 버튼 */}
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <span className="text-[11px] text-slate-600">
-              {widgetSyncToast ||
-                tr(
-                  lang,
-                  '시간표·일정·출석 변경 시 WIDGET_SYNC_DATA 및 안드로이드 위젯에 즉시 반영됩니다.',
-                  'Automatically syncs to WIDGET_SYNC_DATA & AndroidWidgetBridge on any change.',
-                  '修改课表、日程或考勤时会自动同步至 WIDGET_SYNC_DATA 与安卓桌面小组件。'
-                )}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                syncWidgetData(state);
-                setWidgetSyncToast(
-                  tr(
-                    lang,
-                    '✓ 방금 위젯 데이터가 동기화되었습니다.',
-                    '✓ Widget data synced just now.',
-                    '✓ 小组件数据刚刚已同步。'
-                  )
-                );
-                setTimeout(() => setWidgetSyncToast(null), 2500);
-              }}
-              className="h-9 px-3 rounded-full border border-divider bg-transparent hover:bg-slate-100 text-ink text-xs font-semibold shrink-0 transition-colors"
-            >
-              {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
-            </button>
+            </p>
           </div>
         </div>
+
+        {widgetConfig.enabled.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {widgetConfig.enabled.map((id) => (
+              <span
+                key={id}
+                className="inline-flex items-center gap-1 pl-3 pr-1 h-8 rounded-full bg-paper border border-divider text-xs font-semibold text-ink"
+              >
+                {HOME_WIDGET_META[id].name(lang)}
+                <button
+                  type="button"
+                  onClick={() => toggleWidget(id)}
+                  aria-label={tr(lang, `${HOME_WIDGET_META[id].name(lang)} 위젯 빼기`, `Remove ${HOME_WIDGET_META[id].name(lang)}`, `移除 ${HOME_WIDGET_META[id].name(lang)}`)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setIsWidgetSheetOpen(true)}
+          className="w-full h-12 rounded-full bg-accent text-paper text-[14px] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-600 shadow-xs"
+        >
+          <Smartphone className="w-4 h-4" strokeWidth={2.75} />
+          {tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')}
+        </button>
       </section>
+
+      {/* 위젯 선택 시트 (전체 화면) */}
+      {isWidgetSheetOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
+          onClick={() => setIsWidgetSheetOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr(lang, '홈 화면 위젯 고르기', 'Choose home screen widgets', '选择主屏幕小组件')}
+        >
+          <div
+            className="w-full max-w-md max-h-[92vh] bg-paper rounded-t-[28px] shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 pt-2.5 pb-3 border-b border-divider space-y-2.5 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-[16px] font-bold text-ink">
+                    {tr(lang, '홈 화면 위젯 고르기', 'Choose widgets', '选择小组件')}
+                  </h3>
+                  <p className="text-[11px] text-slate-600">
+                    {tr(
+                      lang,
+                      `원하는 위젯의 "홈 화면에 추가"를 누르세요 · ${widgetConfig.enabled.length}개 추가됨`,
+                      `Tap "Add to Home" on the widgets you want · ${widgetConfig.enabled.length} added`,
+                      `点击想要的小组件的"添加到主屏幕" · 已添加 ${widgetConfig.enabled.length} 个`
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsWidgetSheetOpen(false)}
+                  aria-label={tr(lang, '닫기', 'Close', '关闭')}
+                  className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink hover:bg-slate-200 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-slate-600">
+                  {tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
+                </span>
+              {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) — widgetConfig.theme */}
+              <div
+                className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+                role="group"
+                aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
+              >
+                {(['light', 'dark'] as const).map((th) => (
+                  <button
+                    key={th}
+                    type="button"
+                    aria-pressed={widgetTheme === th}
+                    onClick={() => updateWidgetConfig({ theme: th })}
+                    className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
+                      widgetTheme === th ? 'bg-accent text-paper' : 'text-ink hover:bg-slate-100'
+                    }`}
+                  >
+                    {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+                    {th === 'light'
+                      ? tr(lang, '밝은 테마', 'Light', '浅色')
+                      : tr(lang, '어두운 테마', 'Dark', '深色')}
+                  </button>
+                ))}
+              </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              {/* 위젯 갤러리 */}
+              <div className="space-y-3">
+                {HOME_WIDGET_IDS.map((id) => {
+                  const meta = HOME_WIDGET_META[id];
+                  const isOn = widgetConfig.enabled.includes(id);
+                  return (
+                    <div
+                      key={id}
+                      className={`rounded-2xl p-3 space-y-3 transition-colors ${
+                        isOn ? 'bg-paper ring-2 ring-accent' : 'bg-paper/60'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[13px] font-bold text-ink">{meta.name(lang)}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-surface text-[10px] font-mono text-slate-700">
+                              {meta.sizeLabel(lang)}
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              {tr(lang, `${meta.source(lang)} 메뉴`, `from ${meta.source(lang)}`, `来自${meta.source(lang)}`)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-slate-600">{meta.description(lang)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          aria-pressed={isOn}
+                          onClick={() => toggleWidget(id)}
+                          className={`h-8 px-3 rounded-full text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
+                            isOn
+                              ? 'bg-sage-100 text-sage-800 hover:bg-sage-200'
+                              : 'bg-accent text-paper hover:bg-accent-600'
+                          }`}
+                        >
+                          {isOn ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                          {isOn
+                            ? tr(lang, '추가됨', 'Added', '已添加')
+                            : tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
+                        </button>
+                      </div>
+
+                      {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
+                      <div
+                        className={`p-3 rounded-2xl transition-colors ${
+                          widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'
+                        } ${isOn ? '' : 'opacity-80'}`}
+                      >
+                        <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-[11px] text-slate-600 leading-relaxed px-1">
+                {tr(
+                  lang,
+                  '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
+                  'In the Android/iOS app, the selected widgets appear as real home-screen widgets. The web app shows a preview and syncs the widget data.',
+                  '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
+                )}
+              </p>
+
+              {/* 위젯 브릿지 동기화 상태 및 수동 새로고침 버튼 */}
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] text-slate-600">
+                  {widgetSyncToast ||
+                    tr(
+                      lang,
+                      '시간표·일정·출석 변경 시 WIDGET_SYNC_DATA 및 안드로이드 위젯에 즉시 반영됩니다.',
+                      'Automatically syncs to WIDGET_SYNC_DATA & AndroidWidgetBridge on any change.',
+                      '修改课表、日程或考勤时会自动同步至 WIDGET_SYNC_DATA 与安卓桌面小组件。'
+                    )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    syncWidgetData(state);
+                    setWidgetSyncToast(
+                      tr(
+                        lang,
+                        '✓ 방금 위젯 데이터가 동기화되었습니다.',
+                        '✓ Widget data synced just now.',
+                        '✓ 小组件数据刚刚已同步。'
+                      )
+                    );
+                    setTimeout(() => setWidgetSyncToast(null), 2500);
+                  }}
+                  className="h-9 px-3 rounded-full border border-divider bg-transparent hover:bg-slate-100 text-ink text-xs font-semibold shrink-0 transition-colors"
+                >
+                  {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
+                </button>
+              </div>
+
+              <p className="text-[11px] text-slate-600 leading-relaxed px-1">
+                {tr(
+                  lang,
+                  '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
+                  'In the Android/iOS app, the selected widgets appear as real home-screen widgets. The web app shows a preview and syncs the widget data.',
+                  '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
+                )}
+              </p>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] text-slate-600">
+                  {widgetSyncToast ||
+                    tr(
+                      lang,
+                      '시간표·일정·출석이 바뀌면 위젯 데이터도 자동으로 동기화돼요.',
+                      'Widget data syncs automatically whenever your plans change.',
+                      '课表、日程或考勤变化时，小组件数据会自动同步。'
+                    )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    syncWidgetData(state);
+                    setWidgetSyncToast(
+                      tr(lang, '✓ 방금 위젯 데이터가 동기화되었습니다.', '✓ Widget data synced just now.', '✓ 小组件数据刚刚已同步。')
+                    );
+                    setTimeout(() => setWidgetSyncToast(null), 2500);
+                  }}
+                  className="h-9 px-3 rounded-full border border-divider bg-transparent hover:bg-slate-100 text-ink text-xs font-semibold shrink-0 transition-colors"
+                >
+                  {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
+                </button>
+              </div>
+            </div>
+
+            <div className="px-4 pt-3 pb-5 border-t border-divider shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsWidgetSheetOpen(false)}
+                className="w-full h-12 rounded-full bg-ink text-paper text-[14px] font-bold hover:bg-slate-800"
+              >
+                {tr(
+                  lang,
+                  `완료 · ${widgetConfig.enabled.length}개 추가됨`,
+                  `Done · ${widgetConfig.enabled.length} added`,
+                  `完成 · 已添加 ${widgetConfig.enabled.length} 个`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
