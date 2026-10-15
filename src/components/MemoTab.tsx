@@ -95,25 +95,34 @@ function getNowTimestampStr(): string {
   return `${datePart} ${h}:${m}`;
 }
 
-type MemoCardId = 'recent' | 'search';
-const MEMO_CARD_IDS: MemoCardId[] = ['recent', 'search'];
+type MemoCardId = 'calendar' | 'recent' | 'search';
+const MEMO_CARD_IDS: MemoCardId[] = ['calendar', 'recent', 'search'];
 const MEMO_OPEN_CARDS_KEY = 'smart-planner.memo.openCards.v1';
 
-/** Accordion state per device; 최근 메모 starts expanded the first time. */
+/** Accordion state per device; 메모 달력 + 최근 메모 start expanded the first time. */
+const MEMO_OPEN_DEFAULTS: Partial<Record<MemoCardId, boolean>> = { calendar: true, recent: true, search: true };
 function loadMemoOpenCards(): Partial<Record<MemoCardId, boolean>> {
   try {
     const raw = window.localStorage.getItem(MEMO_OPEN_CARDS_KEY);
-    if (!raw) return { recent: true, search: true };
+    if (!raw) return { ...MEMO_OPEN_DEFAULTS };
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return { recent: true, search: true };
+    if (!parsed || typeof parsed !== 'object') return { ...MEMO_OPEN_DEFAULTS };
     const out: Partial<Record<MemoCardId, boolean>> = {};
     MEMO_CARD_IDS.forEach((id) => {
       if (parsed[id] === true) out[id] = true;
     });
+    // The calendar card is newer than the stored state: open it until the user closes it once.
+    if (typeof parsed.calendar !== 'boolean') out.calendar = true;
     return out;
   } catch {
-    return { recent: true, search: true };
+    return { ...MEMO_OPEN_DEFAULTS };
   }
+}
+
+/** First non-empty line of a memo, for the tiny in-cell snippet. */
+function memoSnippet(text: string): string {
+  const line = text.split('\n').map((l) => l.trim()).find((l) => l.length > 0) || '';
+  return line.replace(/^[☐☑✓✔•\-*]\s*/, '');
 }
 
 interface MemoCardProps {
@@ -200,9 +209,17 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
       document.getElementById(`memo-card-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 30);
   };
-  const scrollToNotebook = () => {
+  const scrollToNotebook = (focusEditor = false) => {
     window.setTimeout(() => {
       document.getElementById('memo-notebook')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (focusEditor) {
+        const t = textareaRef.current;
+        if (t) {
+          t.focus({ preventScroll: true });
+          const end = t.value.length;
+          t.setSelectionRange(end, end);
+        }
+      }
     }, 30);
   };
 
@@ -281,10 +298,64 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
     setSearchKeyword(value);
   };
 
-  const jumpToDate = (dateStr: string) => {
+  const jumpToDate = (dateStr: string, focusEditor = false) => {
     setSelectedDateStr(dateStr);
-    scrollToNotebook();
+    scrollToNotebook(focusEditor);
   };
+
+  // ----- Memo calendar (month grid, synced with the notebook's selected date) -----
+  const [calMonth, setCalMonth] = useState<Date>(
+    () => new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1)
+  );
+  useEffect(() => {
+    setCalMonth((prev) =>
+      prev.getFullYear() === selectedDateObj.getFullYear() && prev.getMonth() === selectedDateObj.getMonth()
+        ? prev
+        : new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1)
+    );
+  }, [selectedDateObj]);
+  const isCalCurrentMonth =
+    calMonth.getFullYear() === today.getFullYear() && calMonth.getMonth() === today.getMonth();
+  const stepCalMonth = (delta: number) =>
+    setCalMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+
+  const calendarCells = useMemo(() => {
+    const y = calMonth.getFullYear();
+    const m = calMonth.getMonth();
+    const lead = new Date(y, m, 1).getDay(); // Sunday-start
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const rows = Math.ceil((lead + daysInMonth) / 7);
+    return Array.from({ length: rows * 7 }, (_, i) => {
+      const dayNum = i - lead + 1;
+      if (dayNum < 1 || dayNum > daysInMonth) return null;
+      const date = new Date(y, m, dayNum);
+      const key = formatDateKey(date);
+      const content = memos[key]?.content || '';
+      const hasMemo = content.trim().length > 0;
+      return {
+        key,
+        date,
+        dow: date.getDay(),
+        hasMemo,
+        snippet: hasMemo ? memoSnippet(translateSampleText(content, lang)) : '',
+        isToday: key === todayStr,
+        isSelected: key === selectedDateStr,
+      };
+    });
+  }, [calMonth, memos, lang, todayStr, selectedDateStr]);
+  const calMonthMemoDays = calendarCells.filter((c) => c?.hasMemo).length;
+
+  const calendarWeekHeader = KO_WEEKDAYS.map((ko) => translateDay(ko, lang).replace('周', ''));
+  /** Sun = terracotta, Sat = dusty blue (same convention as the schedule calendar). */
+  const weekdayTint = (dow: number) =>
+    dow === 0 ? 'text-accent-700' : dow === 6 ? 'text-other-700' : 'text-slate-600';
+
+  const calendarSummary = (() => {
+    const n = calMonthMemoDays;
+    if (isCalCurrentMonth) return tr(lang, `이번 달 메모 ${n}일`, `${n} memo days this month`, `本月备忘 ${n} 天`);
+    const ml = formatYearMonthLabel(calMonth, lang);
+    return tr(lang, `${ml} 메모 ${n}일`, `${ml} · ${n} memo days`, `${ml}备忘 ${n} 天`);
+  })();
 
   const weekDays = useMemo(() => {
     const offset = (selectedDateObj.getDay() + 6) % 7; // Monday-start
@@ -689,6 +760,199 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
       {/* ===== GROUP: 기록 ===== */}
       <div className="space-y-2">
         <GroupHeader label={tr(lang, '기록', 'History', '记录')} />
+
+        <MemoCard
+          id="calendar"
+          open={!!openCards.calendar}
+          onToggle={toggleCard}
+          icon={CalendarDays}
+          title={tr(lang, '메모 달력', 'Memo calendar', '备忘日历')}
+          summary={calendarSummary}
+        >
+          <div className="space-y-3">
+            {/* Month navigation */}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => stepCalMonth(-1)}
+                className={navBtn}
+                aria-label={tr(lang, '이전 달', 'Previous month', '上个月')}
+              >
+                <ChevronLeft strokeWidth={2.75} className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-mono text-[17px] text-ink tabular-nums truncate" aria-live="polite">
+                  {formatYearMonthLabel(calMonth, lang)}
+                </span>
+                {!isCalCurrentMonth && (
+                  <button
+                    type="button"
+                    onClick={() => setCalMonth(new Date(today.getFullYear(), today.getMonth(), 1))}
+                    className="h-[26px] px-2.5 rounded-full border border-divider bg-paper text-[11px] font-bold text-accent-800 hover:bg-slate-100 whitespace-nowrap"
+                  >
+                    {tr(lang, '이번 달', 'This month', '本月')}
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => stepCalMonth(1)}
+                className={navBtn}
+                aria-label={tr(lang, '다음 달', 'Next month', '下个月')}
+              >
+                <ChevronRight strokeWidth={2.75} className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Weekday header + month grid (Sunday-start) */}
+            <div>
+              <div className="grid grid-cols-7 gap-1 mb-1" aria-hidden="true">
+                {calendarWeekHeader.map((label, i) => (
+                  <span key={i} className={`text-center text-[11px] font-bold ${weekdayTint(i)}`}>
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <div
+                className="grid grid-cols-7 gap-1"
+                role="group"
+                aria-label={tr(
+                  lang,
+                  `${formatYearMonthLabel(calMonth, lang)} 메모 달력`,
+                  `Memo calendar · ${formatYearMonthLabel(calMonth, lang)}`,
+                  `${formatYearMonthLabel(calMonth, lang)} 备忘日历`
+                )}
+              >
+                {calendarCells.map((cell, i) => {
+                  if (!cell) return <span key={`blank-${i}`} aria-hidden="true" className="h-[54px]" />;
+                  const tone = cell.isSelected
+                    ? 'bg-accent-700 text-paper'
+                    : cell.hasMemo
+                    ? 'bg-accent-100 text-accent-900 hover:bg-accent-200'
+                    : 'bg-paper/40 text-ink hover:bg-paper';
+                  const ring = cell.isToday && !cell.isSelected ? 'ring-2 ring-inset ring-accent' : '';
+                  const numTone =
+                    cell.isSelected || cell.hasMemo || cell.dow === 0 || cell.dow === 6 ? '' : 'text-ink';
+                  const weekendNum =
+                    !cell.isSelected && !cell.hasMemo && (cell.dow === 0 || cell.dow === 6) ? weekdayTint(cell.dow) : '';
+                  return (
+                    <button
+                      key={cell.key}
+                      type="button"
+                      onClick={() => setSelectedDateStr(cell.key)}
+                      aria-pressed={cell.isSelected}
+                      aria-current={cell.isToday ? 'date' : undefined}
+                      aria-label={`${formatFullDateLabel(cell.date, lang)}${
+                        cell.isToday ? tr(lang, ' · 오늘', ' · today', ' · 今天') : ''
+                      }${
+                        cell.hasMemo
+                          ? tr(
+                              lang,
+                              ` · 메모 있음: ${cell.snippet}`,
+                              ` · has memo: ${cell.snippet}`,
+                              ` · 有备忘：${cell.snippet}`
+                            )
+                          : tr(lang, ' · 메모 없음', ' · no memo', ' · 无备忘')
+                      }`}
+                      className={`relative h-[54px] min-w-0 rounded-xl px-1 pt-1.5 pb-0.5 flex flex-col items-center gap-1 transition-colors ${tone} ${ring}`}
+                    >
+                      <span className={`font-mono text-[15px] leading-none tabular-nums ${numTone} ${weekendNum}`}>
+                        {cell.date.getDate()}
+                      </span>
+                      {cell.hasMemo && (
+                        <>
+                          <span
+                            className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${
+                              cell.isSelected ? 'bg-paper' : 'bg-accent-700'
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span
+                            className={`block w-full text-center text-[11px] leading-tight font-semibold truncate ${
+                              cell.isSelected ? 'text-paper' : 'text-accent-800'
+                            }`}
+                            aria-hidden="true"
+                          >
+                            {cell.snippet}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-600">
+              <span className="inline-flex items-center gap-1">
+                <span className="w-3.5 h-3.5 rounded-[5px] bg-accent-100 grid place-items-center" aria-hidden="true">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-700" />
+                </span>
+                {tr(lang, '메모 있음', 'Has memo', '有备忘')}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-3.5 h-3.5 rounded-[5px] ring-2 ring-inset ring-accent" aria-hidden="true" />
+                {tr(lang, '오늘', 'Today', '今天')}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-3.5 h-3.5 rounded-[5px] bg-accent-700" aria-hidden="true" />
+                {tr(lang, '선택', 'Selected', '已选')}
+              </span>
+            </div>
+
+            {/* Preview of the selected date */}
+            <div className="rounded-xl bg-paper p-3 space-y-2" aria-live="polite">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[13px] font-bold text-ink truncate">
+                  {formatFullDateLabel(selectedDateObj, lang)}
+                  {isSelectedToday && (
+                    <span className="ml-1.5 px-1.5 py-px rounded-full text-[11px] font-bold bg-accent-200 text-accent-900 align-middle">
+                      {tr(lang, '오늘', 'TODAY', '今天')}
+                    </span>
+                  )}
+                </span>
+                {currentUpdatedAt && displayedCurrentMemo.trim().length > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sage-200 text-sage-800 text-[11px] font-semibold shrink-0">
+                    <Clock strokeWidth={2.75} className="w-3 h-3" aria-hidden="true" />
+                    <span className="font-mono tabular-nums">{formatTimestampLabel(currentUpdatedAt, lang)}</span>
+                  </span>
+                )}
+              </div>
+              {displayedCurrentMemo.trim().length > 0 ? (
+                <>
+                  <p className="text-[13px] text-ink whitespace-pre-wrap leading-snug break-words line-clamp-5 border-l-2 border-accent-300 pl-2.5">
+                    {displayedCurrentMemo}
+                  </p>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => scrollToNotebook()}
+                      className="h-[32px] px-3.5 rounded-full bg-accent text-paper text-[12px] font-bold hover:bg-accent-600 inline-flex items-center gap-1.5"
+                    >
+                      <StickyNote strokeWidth={2.5} className="w-3.5 h-3.5" aria-hidden="true" />
+                      {tr(lang, '노트에서 열기', 'Open in notebook', '在笔记中打开')}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-2 space-y-2">
+                  <p className="text-[12px] text-slate-600">
+                    {tr(lang, '이 날은 메모가 없어요', 'No memo on this day', '这一天没有备忘')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => jumpToDate(selectedDateStr, true)}
+                    className="h-[32px] px-3.5 rounded-full border border-divider bg-surface text-[12px] font-bold text-accent-800 hover:bg-slate-100 inline-flex items-center gap-1.5"
+                  >
+                    <PencilLine strokeWidth={2.5} className="w-3.5 h-3.5" aria-hidden="true" />
+                    {tr(lang, '이 날짜에 메모 쓰기', 'Write a memo for this day', '为这一天写备忘')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </MemoCard>
 
         {isSearching && (
           <MemoCard
