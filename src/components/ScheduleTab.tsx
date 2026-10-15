@@ -9,6 +9,10 @@ import {
   Trash2,
   Edit3,
   ListChecks,
+  GraduationCap,
+  Building2,
+  Sparkles,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   ScheduleItem,
@@ -43,10 +47,18 @@ const CATEGORY_META: Record<
     shortKo: string;
     shortEn: string;
     shortZh: string;
+    /** Category icon — redundant encoding so categories never rely on colour alone. */
+    Icon: LucideIcon;
+    /** Tinted tag: light ramp fill + dark ramp text (AA ≥ 9:1). */
     badgeBg: string;
     badgeText: string;
+    /** Solid fill for text-bearing chips / selected pills (paper text ≥ 5:1). */
+    solidBg: string;
+    /** Left colour bars, dots & swatches (no text on top). */
     barBg: string;
     dotBg: string;
+    /** Ring used on solid chips when they sit on a coloured (selected) cell. */
+    ring: string;
     exampleKo: string;
     exampleEn: string;
     exampleZh: string;
@@ -59,10 +71,13 @@ const CATEGORY_META: Record<
     shortKo: '학교',
     shortEn: 'School',
     shortZh: '学校',
+    Icon: GraduationCap,
     badgeBg: 'bg-sage-100',
     badgeText: 'text-sage-800',
+    solidBg: 'bg-sage-700',
     barBg: 'bg-sage',
     dotBg: 'bg-sage',
+    ring: 'ring-sage-200',
     exampleKo: '중간고사, 수행평가, 방학식',
     exampleEn: 'Midterm exams, school assessment, ceremony',
     exampleZh: '期中考试、随堂测评、放假仪式',
@@ -74,10 +89,13 @@ const CATEGORY_META: Record<
     shortKo: '학원',
     shortEn: 'Academy',
     shortZh: '补习班',
+    Icon: Building2,
     badgeBg: 'bg-accent-100',
     badgeText: 'text-accent-800',
+    solidBg: 'bg-accent-700',
     barBg: 'bg-accent',
     dotBg: 'bg-accent',
+    ring: 'ring-accent-200',
     exampleKo: '학원 레벨테스트, 보강 수업, 단어 시험',
     exampleEn: 'Academy level test, makeup class, vocab quiz',
     exampleZh: '补习班水平测试、补课、单词测验',
@@ -89,10 +107,13 @@ const CATEGORY_META: Record<
     shortKo: '기타',
     shortEn: 'Other',
     shortZh: '其他',
-    badgeBg: 'bg-slate-100',
-    badgeText: 'text-slate-800',
-    barBg: 'bg-slate-500',
-    dotBg: 'bg-slate-500',
+    Icon: Sparkles,
+    badgeBg: 'bg-other-100',
+    badgeText: 'text-other-800',
+    solidBg: 'bg-other-600',
+    barBg: 'bg-other',
+    dotBg: 'bg-other',
+    ring: 'ring-other-200',
     exampleKo: '병원 진료, 가족 행사, 동아리 모임',
     exampleEn: 'Clinic visit, family event, club gathering',
     exampleZh: '医院就诊、家庭聚会、社团活动',
@@ -100,6 +121,26 @@ const CATEGORY_META: Record<
 };
 
 const CATEGORIES: ScheduleCategory[] = ['school', 'academy', 'other'];
+
+/** Tinted category tag: icon + short label (colour + icon + text = triple encoding). */
+const CategoryTag: React.FC<{ cat: ScheduleCategory; label: string; solid?: boolean }> = ({
+  cat,
+  label,
+  solid = false,
+}) => {
+  const meta = CATEGORY_META[cat];
+  const Icon = meta.Icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+        solid ? `${meta.solidBg} text-paper` : `${meta.badgeBg} ${meta.badgeText}`
+      }`}
+    >
+      <Icon className="w-3 h-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+      {label}
+    </span>
+  );
+};
 const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function parseDateKey(dateStr: string): Date {
@@ -476,25 +517,30 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') openEditSheet(ev);
                   }}
-                  className={`flex items-center justify-between gap-2 rounded-xl cursor-pointer transition-colors ${
+                  className={`relative overflow-hidden flex items-center justify-between gap-2 rounded-xl cursor-pointer transition-colors ${
                     isTodayEvent
-                      ? 'p-3 bg-accent text-paper shadow-md ring-2 ring-accent-300'
-                      : `p-2.5 ${meta.badgeBg} ${meta.badgeText} hover:opacity-90`
+                      ? 'p-3 pl-4 bg-accent text-paper shadow-md ring-2 ring-accent-300'
+                      : `p-2.5 pl-3.5 ${meta.badgeBg} ${meta.badgeText} hover:opacity-90`
                   }`}
                 >
+                  <span
+                    aria-hidden="true"
+                    className={`absolute left-0 top-0 bottom-0 w-1.5 ${isTodayEvent ? 'bg-paper/70' : meta.barBg}`}
+                  />
                   <div className="flex items-center gap-2 min-w-0">
                     {isTodayEvent && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-paper text-accent-800">
                         {tr(lang, '오늘', 'Today', '今天')}
                       </span>
                     )}
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                        isTodayEvent ? 'bg-accent-800 text-paper' : `text-paper ${meta.barBg}`
-                      }`}
-                    >
-                      {categoryLabel(ev.category)}
-                    </span>
+                    {isTodayEvent ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-paper text-ink">
+                        <meta.Icon className="w-3 h-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+                        {categoryLabel(ev.category)}
+                      </span>
+                    ) : (
+                      <CategoryTag cat={ev.category} label={categoryLabel(ev.category)} solid />
+                    )}
                     <span className={`font-bold truncate ${isTodayEvent ? 'text-[14px]' : 'text-xs'}`}>
                       {translateSampleText(ev.title, lang)}
                     </span>
@@ -598,15 +644,37 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 key={cat}
                 type="button"
                 onClick={() => setCategoryFilter(cat)}
+                aria-pressed={isActive}
                 className={`inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                   isActive
-                    ? `${meta.barBg} text-paper border-transparent`
-                    : 'bg-transparent text-ink border-divider hover:bg-slate-100'
+                    ? `${meta.solidBg} text-paper border-transparent`
+                    : `${meta.badgeBg} ${meta.badgeText} border-transparent hover:opacity-85`
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-paper' : meta.dotBg}`} />
+                <meta.Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
                 {tr(lang, meta.ko, meta.en, meta.zh)}
               </button>
+            );
+          })}
+        </div>
+
+        {/* Category legend: swatch + icon + label */}
+        <div
+          className="flex items-center gap-3 flex-wrap px-1 pt-0.5"
+          aria-label={tr(lang, '일정 구분 범례', 'Category legend', '日程分类图例')}
+        >
+          {CATEGORIES.map((cat) => {
+            const meta = CATEGORY_META[cat];
+            return (
+              <span key={cat} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+                <span
+                  aria-hidden="true"
+                  className={`w-4 h-4 rounded-[5px] flex items-center justify-center ${meta.solidBg}`}
+                >
+                  <meta.Icon className="w-2.5 h-2.5 text-paper" strokeWidth={2.75} />
+                </span>
+                {categoryLabel(cat)}
+              </span>
             );
           })}
         </div>
@@ -676,9 +744,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                     return (
                       <div
                         key={ev.id}
-                        className={`w-full px-1 py-0.5 rounded text-[10px] font-semibold truncate ${meta.badgeBg} ${meta.badgeText}`}
+                        title={`${categoryLabel(ev.category)} · ${translateSampleText(ev.title, lang)}`}
+                        className={`w-full flex items-center gap-0.5 px-[3px] py-[2px] rounded-[5px] text-[10px] leading-tight font-bold text-paper ${meta.solidBg} ${
+                          cell.isSelected ? `ring-1 ${meta.ring}` : ''
+                        }`}
                       >
-                        {translateSampleText(ev.title, lang)}
+                        <meta.Icon className="w-2.5 h-2.5 shrink-0" strokeWidth={2.75} aria-hidden="true" />
+                        <span className="truncate min-w-0">{translateSampleText(ev.title, lang)}</span>
                       </div>
                     );
                   })}
@@ -747,15 +819,12 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                           e.stopPropagation();
                           openEditSheet(ev, wd.dateStr);
                         }}
-                        className="p-2.5 rounded-xl bg-paper flex items-center justify-between gap-2 hover:bg-slate-100"
+                        className="p-2.5 rounded-xl bg-paper flex items-stretch justify-between gap-2.5 hover:bg-slate-100"
                       >
-                        <div className="min-w-0">
+                        <span aria-hidden="true" className={`w-1 rounded-full shrink-0 ${meta.barBg}`} />
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${meta.badgeBg} ${meta.badgeText}`}
-                            >
-                              {categoryLabel(ev.category)}
-                            </span>
+                            <CategoryTag cat={ev.category} label={categoryLabel(ev.category)} />
                             {ev.time && (
                               <span className="text-[11px] font-mono text-slate-600 tabular-nums">{ev.time}</span>
                             )}
@@ -769,7 +838,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                             {translateSampleText(ev.title, lang)}
                           </p>
                         </div>
-                        <Edit3 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <Edit3 className="w-3.5 h-3.5 text-slate-400 shrink-0 self-center" />
                       </div>
                     );
                   })
@@ -805,11 +874,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   {translateDay(wd.dayLabel, lang).replace('周', '')}
                 </span>
                 <span className="text-sm font-mono tabular-nums">{wd.dayNum}</span>
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    wd.events.length > 0 ? (wd.isSelected ? 'bg-paper' : 'bg-accent') : 'bg-transparent'
-                  }`}
-                />
+                <span className="h-2 flex items-center gap-[3px]" aria-hidden="true">
+                  {CATEGORIES.filter((cat) => wd.events.some((ev) => ev.category === cat)).map((cat) => (
+                    <span
+                      key={cat}
+                      className={`w-2 h-2 rounded-full ${CATEGORY_META[cat].dotBg} ${
+                        wd.isSelected ? 'ring-1 ring-paper' : ''
+                      }`}
+                    />
+                  ))}
+                </span>
               </button>
             ))}
           </div>
@@ -969,14 +1043,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                             onClick={() => openEditSheet(ev, group.dateStr)}
                             className="w-full px-3 py-2 text-left flex items-start gap-2.5 hover:bg-slate-100/60 transition-colors"
                           >
-                            <span className={`w-1 self-stretch rounded-full shrink-0 ${meta.barBg}`} />
+                            <span aria-hidden="true" className={`w-1.5 self-stretch rounded-full shrink-0 ${meta.barBg}`} />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${meta.badgeBg} ${meta.badgeText}`}
-                                >
-                                  {categoryLabel(ev.category)}
-                                </span>
+                                <CategoryTag cat={ev.category} label={categoryLabel(ev.category)} />
                                 <span className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-600 tabular-nums">
                                   <Clock className="w-3 h-3" />
                                   {ev.time || tr(lang, '종일', 'All day', '全天')}
@@ -1074,14 +1144,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                         key={ev.id}
                         className={`px-3 py-2.5 flex items-start gap-2.5 ${isEditing ? 'bg-accent-100' : ''}`}
                       >
-                        <span className={`w-1 self-stretch rounded-full shrink-0 ${meta.barBg}`} />
+                        <span aria-hidden="true" className={`w-1.5 self-stretch rounded-full shrink-0 ${meta.barBg}`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${meta.badgeBg} ${meta.badgeText}`}
-                            >
-                              {categoryLabel(ev.category)}
-                            </span>
+                            <CategoryTag cat={ev.category} label={categoryLabel(ev.category)} />
                             <span className="text-[11px] font-mono text-slate-600 tabular-nums">
                               {ev.time || tr(lang, '종일', 'All day', '全天')}
                             </span>
@@ -1161,15 +1227,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                         key={cat}
                         type="button"
                         onClick={() => setFormCategory(cat)}
-                        className={`h-[34px] px-3 rounded-full border text-xs font-semibold flex items-center justify-center transition-all ${
+                        aria-pressed={selected}
+                        className={`h-[34px] px-2 rounded-full border text-xs font-semibold flex items-center justify-center transition-all ${
                           selected
-                            ? `${meta.barBg} text-paper border-transparent`
-                            : 'bg-transparent text-ink border-divider hover:bg-slate-100'
+                            ? `${meta.solidBg} text-paper border-transparent shadow-xs`
+                            : `${meta.badgeBg} ${meta.badgeText} border-transparent hover:opacity-85`
                         }`}
                       >
-                        <span className="flex items-center gap-1">
-                          <span className={`w-2 h-2 rounded-full ${selected ? 'bg-paper' : meta.dotBg}`} />
-                          {categoryLabel(cat)}
+                        <span className="flex items-center gap-1 min-w-0">
+                          <meta.Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+                          <span className="truncate">{categoryLabel(cat)}</span>
                         </span>
                       </button>
                     );

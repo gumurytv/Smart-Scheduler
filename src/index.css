@@ -40,6 +40,19 @@
   --color-sage-800: #3d472b;
   --color-sage-900: #272e1b;
 
+  /* other → dusty indigo-slate (기타 일정) — third category hue, distinct from sage & terracotta.
+     Text on solid: paper on other-600 = 5.1:1, on other-700 = 6.7:1; other-800 on other-100 = 10:1. */
+  --color-other: #5b7393;
+  --color-other-100: #eaf0f7;
+  --color-other-200: #d5e0ee;
+  --color-other-300: #b5c6dc;
+  --color-other-400: #8ea4c0;
+  --color-other-500: #6f87a7;
+  --color-other-600: #4d6483;
+  --color-other-700: #3e526d;
+  --color-other-800: #2c3a4f;
+  --color-other-900: #1d2635;
+
   /* slate → sand neutral */
   --color-slate-50: #f5ead8;
   --color-slate-100: #eee7db;

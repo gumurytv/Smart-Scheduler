@@ -2049,12 +2049,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                             style={{ top: `${Math.max(10, topPx)}px` }}
                           >
                             <span
-                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              className={`w-2 h-2 rounded-full shrink-0 ${
                                 sch.category === 'school'
                                   ? 'bg-sage'
                                   : sch.category === 'academy'
                                   ? 'bg-accent'
-                                  : 'bg-slate-500'
+                                  : 'bg-other'
                               }`}
                             />
                             <span className="font-mono tabular-nums">{sch.time}</span>
@@ -2308,7 +2308,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                               ? 'bg-sage'
                               : sch.category === 'academy'
                               ? 'bg-accent'
-                              : 'bg-slate-500'
+                              : 'bg-other'
                           }`}
                         />
                         <span className="w-12 shrink-0 text-xs font-mono text-slate-700 tabular-nums">
@@ -2903,7 +2903,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                               ? 'bg-sage text-paper border-transparent'
                               : cat === 'academy'
                               ? 'bg-accent text-paper border-transparent'
-                              : 'bg-ink text-paper border-transparent'
+                              : 'bg-other-600 text-paper border-transparent'
                             : 'border-divider text-ink hover:bg-slate-200'
                         }`}
                       >
