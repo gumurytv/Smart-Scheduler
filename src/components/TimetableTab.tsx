@@ -21,9 +21,12 @@ import {
   Check,
   UserX,
   BookOpen,
+  UserRound,
+  PenLine,
 } from 'lucide-react';
 import {
   DAYS_OF_WEEK,
+  UserProfile,
   MasterTimetable,
   DailyOverrides,
   SubjectPool,
@@ -62,6 +65,8 @@ interface TimetableTabProps {
   onUpdateSchedules?: (updater: (prev: ScheduleItem[]) => ScheduleItem[]) => void;
   attendance?: AttendanceMap;
   onUpdateAttendance?: (updater: (prev: AttendanceMap) => AttendanceMap) => void;
+  profile?: UserProfile;
+  onEditProfile?: () => void;
 }
 
 const HOUR_HEIGHT_PX = 84;
@@ -303,6 +308,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   schedules,
   onUpdateSchedules,
   onUpdateAttendance,
+  profile,
+  onEditProfile,
 }) => {
   const lang = language;
   const startHour = timelineConfig?.startHour ?? 8;
@@ -1564,6 +1571,120 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         aria-label={tr(lang, '지금', 'Now', '现在')}
         className="bg-ink text-paper rounded-[32px] p-5 shadow-md space-y-4"
       >
+        {/* Identity row: makes the planner feel like the student's own */}
+        {(() => {
+          const name = profile?.name?.trim() ?? '';
+          const school = profile?.school?.trim() ?? '';
+          const grade = profile?.grade?.trim() ?? '';
+          const hasProfile = !!(name || school || grade);
+          if (!hasProfile) {
+            return (
+              <div className="flex items-center gap-3 pb-4 border-b border-paper/15">
+                <span
+                  aria-hidden="true"
+                  className="w-11 h-11 rounded-full grid place-items-center shrink-0 border-2 border-dashed border-paper/45 text-paper/85"
+                >
+                  <Plus className="w-5 h-5" strokeWidth={2.5} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14px] font-bold text-paper leading-snug break-keep">
+                    {tr(lang, '나만의 플래너로 만들어 보세요', 'Make this planner your own', '打造专属于你的计划本')}
+                  </div>
+                  <div className="text-[11px] font-medium text-paper/75 leading-snug break-keep">
+                    {tr(
+                      lang,
+                      '이름과 학교를 넣으면 여기에 표시돼요',
+                      'Add your name and school to show them here',
+                      '填写姓名和学校后会显示在这里'
+                    )}
+                  </div>
+                </div>
+                {onEditProfile && (
+                  <button
+                    type="button"
+                    onClick={onEditProfile}
+                    className="h-8 px-3 rounded-full bg-paper text-ink text-[11px] font-bold inline-flex items-center gap-1 shrink-0 hover:bg-paper/90 transition-colors"
+                  >
+                    <UserRound className="w-3.5 h-3.5" strokeWidth={2.5} />
+                    {tr(lang, '이름·학교 입력', 'Add name & school', '填写姓名·学校')}
+                  </button>
+                )}
+              </div>
+            );
+          }
+          const hour = now.getHours();
+          const greeting =
+            hour < 12
+              ? tr(lang, '좋은 아침이에요', 'Good morning', '早上好')
+              : hour < 18
+                ? tr(lang, '좋은 오후예요', 'Good afternoon', '下午好')
+                : tr(lang, '좋은 저녁이에요', 'Good evening', '晚上好');
+          const words = name.split(/\s+/).filter(Boolean);
+          const initials =
+            words.length >= 2 && /^[A-Za-z]/.test(words[0])
+              ? (Array.from(words[0])[0] + Array.from(words[1])[0]).toUpperCase()
+              : (Array.from(name)[0] ?? '').toUpperCase();
+          const content = (
+            <>
+              <span
+                aria-hidden="true"
+                className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[18px] font-bold"
+              >
+                {initials || <UserRound className="w-5 h-5" strokeWidth={2.5} />}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[12px] font-semibold text-paper/80 truncate">
+                  {name
+                    ? tr(lang, `${greeting},`, `${greeting},`, `${greeting}，`)
+                    : greeting}
+                </span>
+                {name && (
+                  <span className="block text-[20px] leading-tight font-bold text-paper truncate">
+                    {tr(lang, `${name} 님`, name, name)}
+                  </span>
+                )}
+                {(school || grade) && (
+                  <span className="mt-1.5 flex items-center gap-1.5 min-w-0">
+                    {school && (
+                      <span className="inline-flex items-center gap-1 min-w-0 h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold">
+                        <GraduationCap className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{school}</span>
+                      </span>
+                    )}
+                    {grade && (
+                      <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold whitespace-nowrap shrink-0 max-w-[45%]">
+                        <span className="truncate">{grade}</span>
+                      </span>
+                    )}
+                  </span>
+                )}
+              </span>
+            </>
+          );
+          return onEditProfile ? (
+            <button
+              type="button"
+              onClick={onEditProfile}
+              aria-label={tr(
+                lang,
+                `내 정보 수정: ${[name, school, grade].filter(Boolean).join(', ')}`,
+                `Edit my profile: ${[name, school, grade].filter(Boolean).join(', ')}`,
+                `编辑我的信息：${[name, school, grade].filter(Boolean).join('，')}`
+              )}
+              className="group w-full flex items-center gap-3 pb-4 border-b border-paper/15 text-left rounded-t-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-paper"
+            >
+              {content}
+              <PenLine
+                aria-hidden="true"
+                className="w-4 h-4 text-paper/60 group-hover:text-paper shrink-0 self-start mt-1"
+                strokeWidth={2.5}
+              />
+            </button>
+          ) : (
+            <div className="flex items-center gap-3 pb-4 border-b border-paper/15">{content}</div>
+          );
+        })()}
+
         {/* Clock + date */}
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div className="min-w-0">

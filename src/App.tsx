@@ -62,6 +62,8 @@ function loadInitialState(): PlannerState {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('timetable');
+  // Settings section to open when arriving from another tab (e.g. "내 정보" from the 지금 card)
+  const [settingsFocus, setSettingsFocus] = useState<'profile' | null>(null);
   const [state, setState] = useState<PlannerState>(() => loadInitialState());
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
@@ -125,6 +127,7 @@ export default function App() {
       ...fresh,
       language: prev.language || 'ko',
       schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
+      profile: prev.profile,
     }));
   };
 
@@ -228,6 +231,11 @@ export default function App() {
             onUpdateSchedules={handleUpdateSchedules}
             attendance={state.attendance}
             onUpdateAttendance={handleUpdateAttendance}
+            profile={state.profile}
+            onEditProfile={() => {
+              setSettingsFocus('profile');
+              setActiveTab('settings');
+            }}
           />
         )}
 
@@ -265,6 +273,8 @@ export default function App() {
             state={state}
             onUpdateState={setState}
             onResetSampleData={handleResetSampleData}
+            focusSection={settingsFocus}
+            onFocusHandled={() => setSettingsFocus(null)}
           />
         )}
       </main>

@@ -146,6 +146,13 @@ export interface WidgetConfig {
 
 export const DEFAULT_WIDGET_CONFIG: WidgetConfig = { enabled: ['now'], theme: 'light' };
 
+// The student's own profile, shown on the timetable's "지금" card (Settings → 내 정보)
+export interface UserProfile {
+  name: string; // e.g. '김민준'
+  school: string; // e.g. '한빛중학교'
+  grade: string; // free text so any school system fits, e.g. '2학년 3반'
+}
+
 export interface PlannerState {
   language?: AppLanguage;
   subjectPool: SubjectPool;
@@ -158,6 +165,7 @@ export interface PlannerState {
   timelineConfig: TimelineConfig;
   schoolTimeConfig?: SchoolTimeConfig;
   widgetConfig?: WidgetConfig;
+  profile?: UserProfile;
 }
 
 export interface AIExtractedEntry {

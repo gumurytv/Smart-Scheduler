@@ -33,6 +33,9 @@ import {
   type LucideIcon,
   FlaskConical,
   Lock,
+  IdCard,
+  UserRound,
+  PenLine,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -49,6 +52,7 @@ import {
   HOME_WIDGET_IDS,
   HomeWidgetId,
   WidgetConfig,
+  UserProfile,
 } from '../types';
 import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
@@ -66,6 +70,8 @@ interface SettingsTabProps {
   state: PlannerState;
   onUpdateState: (updater: (prev: PlannerState) => PlannerState) => void;
   onResetSampleData: () => void;
+  focusSection?: 'profile' | null;
+  onFocusHandled?: () => void;
 }
 
 function minutesToTimeStr(total: number): string {
@@ -180,8 +186,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'widgets' | 'guide';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['range', 'school', 'academy', 'pool', 'ai', 'backup', 'widgets', 'guide'];
+type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'widgets' | 'guide';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'widgets', 'guide'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -259,10 +265,12 @@ interface SectionResetButtonProps {
   lang: AppLanguage;
   label: string;
   onConfirm: () => void;
+  confirmText?: string;
+  confirmLabel?: string;
 }
 
 /** Per-section "restore defaults" row with an inline (in-page) confirmation step. */
-const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, onConfirm }) => {
+const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, onConfirm, confirmText, confirmLabel }) => {
   const [confirming, setConfirming] = useState(false);
   return (
     <div className="pt-3 border-t border-divider">
@@ -278,12 +286,13 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
       ) : (
         <div role="alertdialog" className="flex flex-wrap items-center gap-2">
           <p className="flex-1 min-w-[180px] text-[11px] font-semibold text-accent-900 leading-snug">
-            {tr(
-              lang,
-              '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
-              'Restore defaults? Only this section’s settings will change.',
-              '确定要恢复吗？只有本部分的设置会恢复为默认值。'
-            )}
+            {confirmText ??
+              tr(
+                lang,
+                '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
+                'Restore defaults? Only this section’s settings will change.',
+                '确定要恢复吗？只有本部分的设置会恢复为默认值。'
+              )}
           </p>
           <div className="flex gap-1.5 shrink-0">
             <button
@@ -302,7 +311,7 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
               className="h-8 px-3 rounded-full bg-accent-800 text-paper text-[11px] font-bold inline-flex items-center gap-1 hover:bg-accent-900"
             >
               <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
-              {tr(lang, '되돌리기', 'Restore', '恢复')}
+              {confirmLabel ?? tr(lang, '되돌리기', 'Restore', '恢复')}
             </button>
           </div>
         </div>
@@ -310,6 +319,43 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
     </div>
   );
 };
+
+// Quick grade chips (초1…고3). The chip fills only the grade part; the user can keep typing 반.
+type SchoolLevel = 'e' | 'm' | 'h';
+interface GradeChip {
+  key: string;
+  level: SchoolLevel;
+  n: number;
+}
+const GRADE_CHIPS: GradeChip[] = [
+  ...[1, 2, 3, 4, 5, 6].map((n) => ({ key: `e${n}`, level: 'e' as SchoolLevel, n })),
+  ...[1, 2, 3].map((n) => ({ key: `m${n}`, level: 'm' as SchoolLevel, n })),
+  ...[1, 2, 3].map((n) => ({ key: `h${n}`, level: 'h' as SchoolLevel, n })),
+];
+const ZH_NUM = ['', '一', '二', '三', '四', '五', '六'];
+function gradeChipLabel(c: GradeChip, lang: AppLanguage): string {
+  const ko = `${{ e: '초', m: '중', h: '고' }[c.level]}${c.n}`;
+  const en = `${{ e: 'E', m: 'M', h: 'H' }[c.level]}${c.n}`;
+  const zh = `${{ e: '小', m: '初', h: '高' }[c.level]}${ZH_NUM[c.n]}`;
+  return tr(lang, ko, en, zh);
+}
+function gradeChipFill(c: GradeChip, lang: AppLanguage): string {
+  const usGrade = c.level === 'e' ? c.n : c.level === 'm' ? c.n + 6 : c.n + 9;
+  const zhLevel = { e: '小学', m: '初', h: '高' }[c.level];
+  return tr(lang, `${c.n}학년`, `Grade ${usGrade}`, c.level === 'e' ? `${zhLevel}${ZH_NUM[c.n]}年级` : `${zhLevel}${ZH_NUM[c.n]}`);
+}
+/** Every possible chip fill text (all languages), longest first — used to swap the grade part but keep 반. */
+const ALL_GRADE_FILLS: string[] = Array.from(
+  new Set(GRADE_CHIPS.flatMap((c) => (['ko', 'en', 'zh'] as AppLanguage[]).map((l) => gradeChipFill(c, l))))
+).sort((a, b) => b.length - a.length);
+
+function profileInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && /^[A-Za-z]/.test(words[0])) {
+    return (Array.from(words[0])[0] + Array.from(words[1])[0]).toUpperCase();
+  }
+  return (Array.from(name.trim())[0] ?? '').toUpperCase();
+}
 
 const GroupHeader: React.FC<{ label: string }> = ({ label }) => (
   <h3 className="px-1.5 pt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600">{label}</h3>
@@ -431,6 +477,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   state,
   onUpdateState,
   onResetSampleData,
+  focusSection,
+  onFocusHandled,
 }) => {
   const lang: AppLanguage = state.language || 'ko';
 
@@ -455,6 +503,77 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       document.getElementById(`settings-card-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 30);
   };
+
+  // --- SECTION 0: MY PROFILE (shown on the timetable's "지금" card) ---
+  const profile: UserProfile = {
+    name: state.profile?.name ?? '',
+    school: state.profile?.school ?? '',
+    grade: state.profile?.grade ?? '',
+  };
+  const profileNameRef = useRef<HTMLInputElement | null>(null);
+  const profileGradeRef = useRef<HTMLInputElement | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [lastGradeChip, setLastGradeChip] = useState<string | null>(null);
+  const profileSavedTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (profileSavedTimer.current) window.clearTimeout(profileSavedTimer.current);
+    },
+    []
+  );
+  const flashProfileSaved = () => {
+    setProfileSaved(true);
+    if (profileSavedTimer.current) window.clearTimeout(profileSavedTimer.current);
+    profileSavedTimer.current = window.setTimeout(() => setProfileSaved(false), 1600);
+  };
+  const updateProfile = (patch: Partial<UserProfile>) => {
+    onUpdateState((prev) => ({
+      ...prev,
+      profile: {
+        name: prev.profile?.name ?? '',
+        school: prev.profile?.school ?? '',
+        grade: prev.profile?.grade ?? '',
+        ...patch,
+      },
+    }));
+    flashProfileSaved();
+  };
+  const applyGradeChip = (chip: GradeChip) => {
+    const fill = gradeChipFill(chip, lang);
+    let rest = profile.grade.trim();
+    const prefix = ALL_GRADE_FILLS.find((f) => rest.startsWith(f));
+    if (prefix) rest = rest.slice(prefix.length).trim();
+    updateProfile({ grade: rest ? `${fill} ${rest}` : fill });
+    setLastGradeChip(chip.key);
+    window.setTimeout(() => {
+      const el = profileGradeRef.current;
+      if (el) {
+        el.focus();
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      }
+    }, 0);
+  };
+  const handleClearProfile = () => {
+    onUpdateState((prev) => ({ ...prev, profile: undefined }));
+    setLastGradeChip(null);
+  };
+
+  // App asks us to open "내 정보" (e.g. tapped from the timetable's 지금 card)
+  const onFocusHandledRef = useRef(onFocusHandled);
+  useEffect(() => {
+    onFocusHandledRef.current = onFocusHandled;
+  }, [onFocusHandled]);
+  useEffect(() => {
+    if (focusSection !== 'profile') return;
+    setOpenCards((prev) => ({ ...prev, profile: true }));
+    const timer = window.setTimeout(() => {
+      document.getElementById('settings-card-profile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      profileNameRef.current?.focus({ preventScroll: true });
+      onFocusHandledRef.current?.();
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [focusSection]);
 
   // In-page confirmations (no window.confirm)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -1492,6 +1611,178 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
       </section>
+
+      {/* ===== 내 정보 (profile shown on the timetable's 지금 card) ===== */}
+      <SettingsCard
+        id="profile"
+        open={!!openCards.profile}
+        onToggle={toggleCard}
+        tone="sage"
+        icon={IdCard}
+        title={tr(lang, '내 정보', 'My profile', '我的信息')}
+        summary={
+          [profile.name, profile.school, profile.grade].map((v) => v.trim()).filter(Boolean).join(' · ') ||
+          tr(lang, '이름·학교·학년을 입력해 주세요', 'Add your name, school and grade', '请填写姓名、学校和年级')
+        }
+      >
+        <div className="p-3.5 space-y-3.5">
+          {/* Live preview of the 지금 card identity row */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold text-slate-600">
+                {tr(lang, '시간표 「지금」 카드 미리보기', 'Preview on the timetable “Now” card', '课表「现在」卡片预览')}
+              </span>
+              <span
+                aria-live="polite"
+                className={`inline-flex items-center gap-1 text-[11px] font-bold text-sage-800 transition-opacity ${
+                  profileSaved ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <Check strokeWidth={3} className="w-3.5 h-3.5" />
+                {profileSaved ? tr(lang, '저장됨', 'Saved', '已保存') : ''}
+              </span>
+            </div>
+            {(() => {
+              const name = profile.name.trim();
+              const school = profile.school.trim();
+              const grade = profile.grade.trim();
+              const initials = profileInitials(name);
+              return (
+                <div className="bg-ink text-paper rounded-[24px] p-4 flex items-center gap-3" aria-hidden="true">
+                  <span className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[18px] font-bold">
+                    {initials || <UserRound className="w-5 h-5" strokeWidth={2.5} />}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[12px] font-semibold text-paper/80 truncate">
+                      {(() => {
+                        const hour = new Date().getHours();
+                        return hour < 12
+                          ? tr(lang, '좋은 아침이에요,', 'Good morning,', '早上好，')
+                          : hour < 18
+                          ? tr(lang, '좋은 오후예요,', 'Good afternoon,', '下午好，')
+                          : tr(lang, '좋은 저녁이에요,', 'Good evening,', '晚上好，');
+                      })()}
+                    </span>
+                    <span className="block text-[20px] leading-tight font-bold text-paper truncate">
+                      {name
+                        ? tr(lang, `${name} 님`, name, name)
+                        : tr(lang, '이름', 'Your name', '姓名')}
+                    </span>
+                    <span className="mt-1.5 flex items-center gap-1.5 min-w-0">
+                      <span className="inline-flex items-center gap-1 min-w-0 h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold">
+                        <GraduationCap className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{school || tr(lang, '학교', 'School', '学校')}</span>
+                      </span>
+                      <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold whitespace-nowrap shrink-0 max-w-[45%]">
+                        <span className="truncate">{grade || tr(lang, '학년', 'Grade', '年级')}</span>
+                      </span>
+                    </span>
+                  </span>
+                  <PenLine className="w-4 h-4 text-paper/60 shrink-0 self-start mt-1" strokeWidth={2.5} />
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Fields */}
+          <div className="space-y-2.5">
+            <label className="block space-y-1">
+              <span className="text-[12px] font-bold text-ink">{tr(lang, '이름', 'Name', '姓名')}</span>
+              <input
+                ref={profileNameRef}
+                type="text"
+                value={profile.name}
+                maxLength={30}
+                autoComplete="name"
+                onChange={(e) => updateProfile({ name: e.target.value })}
+                placeholder={tr(lang, '예: 김민준', 'e.g. Minjun Kim', '例如：金敏俊')}
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-[12px] font-bold text-ink">{tr(lang, '학교', 'School', '学校')}</span>
+              <input
+                type="text"
+                value={profile.school}
+                maxLength={40}
+                autoComplete="organization"
+                onChange={(e) => updateProfile({ school: e.target.value })}
+                placeholder={tr(lang, '예: 한빛중학교', 'e.g. Hanbit Middle School', '例如：韩光中学')}
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+              />
+            </label>
+            <div className="space-y-1">
+              <label htmlFor="settings-profile-grade" className="block text-[12px] font-bold text-ink">
+                {tr(lang, '학년·반', 'Grade & class', '年级·班级')}
+              </label>
+              <input
+                id="settings-profile-grade"
+                ref={profileGradeRef}
+                type="text"
+                value={profile.grade}
+                maxLength={30}
+                onChange={(e) => {
+                  setLastGradeChip(null);
+                  updateProfile({ grade: e.target.value });
+                }}
+                placeholder={tr(lang, '예: 2학년 3반', 'e.g. Grade 8, Class 3', '例如：初二 3班')}
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+              />
+              <div
+                role="group"
+                aria-label={tr(lang, '학년 빠른 선택', 'Quick grade pick', '快速选择年级')}
+                className="flex flex-wrap gap-1.5 pt-1"
+              >
+                {GRADE_CHIPS.map((chip) => {
+                  const active = lastGradeChip === chip.key;
+                  return (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => applyGradeChip(chip)}
+                      className={`h-7 min-w-[40px] px-2.5 rounded-full text-[11px] font-bold transition-colors ${
+                        active
+                          ? 'bg-sage-700 text-paper'
+                          : chip.level === 'e'
+                            ? 'bg-paper border border-divider text-ink hover:bg-slate-100'
+                            : chip.level === 'm'
+                              ? 'bg-paper border border-sage-300 text-sage-800 hover:bg-sage-100'
+                              : 'bg-paper border border-accent-300 text-accent-800 hover:bg-accent-100'
+                      }`}
+                    >
+                      {gradeChipLabel(chip, lang)}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-600 leading-snug">
+                {tr(
+                  lang,
+                  '학년을 고른 뒤 반을 이어서 입력할 수 있어요. 정보는 이 기기에만 저장돼요.',
+                  'Pick a grade, then type your class after it. Saved on this device only.',
+                  '选好年级后可以继续输入班级。信息只保存在本设备上。'
+                )}
+              </p>
+            </div>
+          </div>
+
+          {(profile.name || profile.school || profile.grade) && (
+            <SectionResetButton
+              lang={lang}
+              label={tr(lang, '내 정보 지우기', 'Clear my profile', '清除我的信息')}
+              confirmText={tr(
+                lang,
+                '이름·학교·학년을 모두 지울까요?',
+                'Clear your name, school and grade?',
+                '要清除姓名、学校和年级吗？'
+              )}
+              confirmLabel={tr(lang, '지우기', 'Clear', '清除')}
+              onConfirm={handleClearProfile}
+            />
+          )}
+        </div>
+      </SettingsCard>
 
       {/* ===== GROUP: 시간표 ===== */}
       <div className="space-y-2">
