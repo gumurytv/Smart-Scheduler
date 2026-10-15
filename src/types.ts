@@ -129,6 +129,23 @@ export const DEFAULT_SCHOOL_TIME_CONFIG: SchoolTimeConfig = {
   periodCount: 7,
 };
 
+// Home-screen widgets the user can pick from (Settings → 홈 화면 위젯)
+export type HomeWidgetId =
+  | 'weeklySchool' // 주간 학교 시간표 (월~금)
+  | 'weeklyAcademy' // 주간 학원 시간표 (월~일)
+  | 'now' // "지금" 카드
+  | 'timeline' // 오늘 타임라인
+  | 'monthCalendar'; // 일정표 월간 캘린더
+
+export const HOME_WIDGET_IDS: HomeWidgetId[] = ['weeklySchool', 'weeklyAcademy', 'now', 'timeline', 'monthCalendar'];
+
+export interface WidgetConfig {
+  enabled: HomeWidgetId[]; // widgets the user chose to add to the home screen (order = display order)
+  theme: 'light' | 'dark';
+}
+
+export const DEFAULT_WIDGET_CONFIG: WidgetConfig = { enabled: ['now'], theme: 'light' };
+
 export interface PlannerState {
   language?: AppLanguage;
   subjectPool: SubjectPool;
@@ -140,6 +157,7 @@ export interface PlannerState {
   backupMeta: BackupMeta;
   timelineConfig: TimelineConfig;
   schoolTimeConfig?: SchoolTimeConfig;
+  widgetConfig?: WidgetConfig;
 }
 
 export interface AIExtractedEntry {
