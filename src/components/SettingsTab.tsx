@@ -1322,7 +1322,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `smart_student_planner_backup_${ymd}.json`;
+    link.download = `teumteum_backup_${ymd}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1332,9 +1332,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       type: 'success',
       message: tr(
         lang,
-        `smart_student_planner_backup_${ymd}.json 파일이 저장되었습니다.`,
-        `Saved backup file: smart_student_planner_backup_${ymd}.json`,
-        `备份文件 smart_student_planner_backup_${ymd}.json 已保存。`
+        `teumteum_backup_${ymd}.json 파일이 저장되었습니다.`,
+        `Saved backup file: teumteum_backup_${ymd}.json`,
+        `备份文件 teumteum_backup_${ymd}.json 已保存。`
       ),
     });
   };
@@ -1362,9 +1362,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           throw new Error(
             tr(
               lang,
-              '유효한 스마트 플래너 백업 JSON 파일 형식이 아닙니다.',
-              'Invalid Smart Planner backup JSON file format.',
-              '无效的智能规划器备份 JSON 文件格式。'
+              '유효한 틈틈 백업 JSON 파일 형식이 아닙니다.',
+              'Invalid TeumTeum backup JSON file format.',
+              '无效的 TeumTeum 备份 JSON 文件格式。'
             )
           );
         }
