@@ -27,8 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      # No package-lock.json is committed, so install from package.json.
+      - run: npm install --no-audit --no-fund
       - run: npx vite build --base /Smart-Scheduler/app/
       - name: Assemble site
         run: |
