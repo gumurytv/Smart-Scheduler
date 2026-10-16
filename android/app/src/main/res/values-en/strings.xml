@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">틈틈</string>
+    <string name="title_activity_main">틈틈</string>
+    <string name="widget_now_name">TeumTeum · Now</string>
+    <string name="widget_now_description">Your current class, time left and what\'s next</string>
+    <string name="widget_now_label_default">● Now</string>
+    <string name="widget_now_title_default">P3 · Math</string>
+    <string name="widget_now_subtitle_default">School · P3 · 25m left</string>
+    <string name="widget_now_next_default">Next</string>
+    <string name="widget_now_empty_title">TeumTeum</string>
+    <string name="widget_now_empty_subtitle">Open the app once to show your timetable</string>
+</resources>

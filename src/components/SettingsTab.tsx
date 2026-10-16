@@ -58,7 +58,8 @@ import {
   TEXT_SCALES,
 } from '../types';
 import { isAiTimetableEnabled, HOME_WIDGETS_AVAILABLE } from '../utils/featureFlags';
-import { API_BASE_URL } from '../native/androidShell';
+import { API_BASE_URL, isNativeApp } from '../native/androidShell';
+import { pinNowWidget } from '../native/nowWidget';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
@@ -618,6 +619,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
   const [widgetSyncToast, setWidgetSyncToast] = useState<string | null>(null);
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
+  // Result of "홈 화면에 추가" for the native 「지금」 widget
+  const [nowPinMessage, setNowPinMessage] = useState<string | null>(null);
 
   // 위젯 선택 시트: Esc로 닫기 + 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
@@ -3562,12 +3565,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           title={tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
           summary={
             !HOME_WIDGETS_AVAILABLE
-              ? tr(
-                  lang,
-                  `곧 지원 예정 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
-                  `Coming soon · ${HOME_WIDGET_IDS.length} previews`,
-                  `即将推出 · ${HOME_WIDGET_IDS.length} 种预览`
-                )
+              ? isNativeApp
+                ? tr(
+                    lang,
+                    `「지금」 위젯 사용 가능 · ${HOME_WIDGET_IDS.length - 1}종 준비 중`,
+                    `"Now" widget ready · ${HOME_WIDGET_IDS.length - 1} coming soon`,
+                    `「现在」小组件可用 · ${HOME_WIDGET_IDS.length - 1} 种准备中`
+                  )
+                : tr(
+                    lang,
+                    `「지금」 위젯은 앱에서 사용 가능 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
+                    `"Now" widget in the Android app · ${HOME_WIDGET_IDS.length} previews`,
+                    `「现在」小组件可在安卓应用中使用 · ${HOME_WIDGET_IDS.length} 种预览`
+                  )
               : widgetConfig.enabled.length > 0
               ? tr(
                   lang,
@@ -3586,12 +3596,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <div className="p-4 space-y-3">
         {!HOME_WIDGETS_AVAILABLE && (
           <p className="rounded-2xl bg-other-100 text-other-800 px-3.5 py-3 text-[0.75rem] font-semibold leading-snug">
-            {tr(
-              lang,
-              '홈 화면 위젯은 준비 중이에요. 다음 업데이트에서 휴대폰 홈 화면에 추가할 수 있어요. 지금은 어떤 모양인지 미리 볼 수 있어요.',
-              'Home-screen widgets are coming soon. You will be able to add them in a future update — for now you can preview them.',
-              '主屏幕小组件正在准备中，将在后续更新中支持添加。现在可以先预览样式。'
-            )}
+            {isNativeApp
+              ? tr(
+                  lang,
+                  '「지금」 위젯을 홈 화면에 추가할 수 있어요. 나머지 위젯은 다음 업데이트에서 추가돼요.',
+                  'You can add the "Now" widget to your home screen. The other widgets are coming in a future update.',
+                  '「现在」小组件已可添加到主屏幕，其余小组件将在后续更新中推出。'
+                )
+              : tr(
+                  lang,
+                  '홈 화면 위젯은 안드로이드 앱에서 쓸 수 있어요. 지금은 「지금」 위젯을 지원하고, 나머지는 준비 중이에요.',
+                  'Home-screen widgets work in the Android app. The "Now" widget is available; the others are coming soon.',
+                  '主屏幕小组件需在安卓应用中使用。目前支持「现在」小组件，其余正在准备中。'
+                )}
           </p>
         )}
         {HOME_WIDGETS_AVAILABLE && widgetConfig.enabled.length > 0 && (
@@ -3623,7 +3640,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <Smartphone className="w-4 h-4" strokeWidth={2.75} />
           {HOME_WIDGETS_AVAILABLE
             ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
-            : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
+            : isNativeApp
+              ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
+              : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
         </button>
 
             {HOME_WIDGETS_AVAILABLE && (
@@ -3774,7 +3793,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </h3>
                   <p className="text-[0.6875rem] text-slate-600">
                     {!HOME_WIDGETS_AVAILABLE
-                      ? tr(lang, '곧 지원 예정이에요 · 모양을 미리 볼 수 있어요', 'Coming soon · preview how they look', '即将推出 · 可先预览样式')
+                      ? isNativeApp
+                        ? tr(lang, '「지금」 위젯을 추가할 수 있어요 · 나머지는 준비 중', 'Add the "Now" widget · others coming soon', '可添加「现在」小组件 · 其余准备中')
+                        : tr(lang, '곧 지원 예정이에요 · 모양을 미리 볼 수 있어요', 'Coming soon · preview how they look', '即将推出 · 可先预览样式')
                       : tr(
                       lang,
                       `원하는 위젯의 "홈 화면에 추가"를 누르세요 · ${widgetConfig.enabled.length}개 추가됨`,
@@ -3849,9 +3870,40 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
                         </div>
                         {!HOME_WIDGETS_AVAILABLE ? (
-                          <span className="h-8 px-3 rounded-full bg-other-100 text-other-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center whitespace-nowrap">
-                            {tr(lang, '준비 중', 'Coming soon', '准备中')}
-                          </span>
+                          id === 'now' && isNativeApp ? (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                syncWidgetData(state);
+                                const requested = await pinNowWidget();
+                                setNowPinMessage(
+                                  requested
+                                    ? tr(
+                                        lang,
+                                        '홈 화면에 추가할지 묻는 창이 뜨면 「추가」를 눌러 주세요.',
+                                        'When your phone asks, tap "Add" to place the widget.',
+                                        '手机询问时，请点击「添加」。'
+                                      )
+                                    : tr(
+                                        lang,
+                                        '홈 화면 빈 곳을 길게 누른 뒤 「위젯」에서 「틈틈 · 지금」을 찾아 추가해 주세요.',
+                                        'Long-press an empty spot on your home screen, open "Widgets" and add "TeumTeum · Now".',
+                                        '长按主屏幕空白处，打开「小组件」，找到「TeumTeum · 现在」并添加。'
+                                      )
+                                );
+                              }}
+                              className="h-8 px-3 rounded-full bg-accent-700 text-paper hover:bg-accent-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center gap-1 whitespace-nowrap"
+                            >
+                              <Plus className="w-3 h-3" />
+                              {tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
+                            </button>
+                          ) : (
+                            <span className="h-8 px-3 rounded-full bg-other-100 text-other-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center whitespace-nowrap">
+                              {id === 'now'
+                                ? tr(lang, '앱에서 가능', 'In the app', '应用内可用')
+                                : tr(lang, '준비 중', 'Coming soon', '准备中')}
+                            </span>
+                          )
                         ) : (
                         <button
                           type="button"
@@ -3879,6 +3931,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       >
                         <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
                       </div>
+                      {id === 'now' && nowPinMessage && (
+                        <p aria-live="polite" className="rounded-xl bg-sage-100 text-sage-800 px-3 py-2 text-[0.75rem] font-semibold leading-snug">
+                          {nowPinMessage}
+                        </p>
+                      )}
                     </div>
                   );
                 })}

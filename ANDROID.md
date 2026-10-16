@@ -67,7 +67,11 @@ npx @capacitor/assets generate --android --iconBackgroundColor '#b2622d' --splas
   - 빌드 전에 `.env`에 `VITE_API_BASE_URL=https://서버주소`를 넣습니다.
   - 서버 쪽에는 `AI_TIMETABLE_ENABLED=true`, `GEMINI_API_KEY`, `CORS_ALLOWED_ORIGINS=https://localhost`를 설정합니다.
   - 기본값은 꺼짐이라 1차 출시는 서버 없이 해도 됩니다.
-- **홈 화면 위젯:** 앱은 이미 `window.AndroidWidgetBridge.updateWidget(json)`으로 위젯 데이터를 넘기고 있습니다. 실제 위젯을 띄우려면 안드로이드 쪽 위젯 코드(AppWidgetProvider + JavascriptInterface)를 추가해야 하며, 이는 다음 단계 작업입니다.
+- **홈 화면 위젯:** 「지금」 위젯(지금 수업·남은 시간·다음 수업)을 지원해요.
+  - 앱이 바뀔 때마다 앞으로 8일치 수업을 위젯에 넘기고(`buildNativeNowWidget` → `src/native/nowWidget.ts` → `TeumWidgetPlugin`), 위젯은 시계를 보고 지금/다음을 스스로 계산해요. 그래서 앱을 닫아도 맞게 바뀌어요.
+  - 다음 수업 경계(최대 5분 간격)에 다시 그리며, 휴대폰을 깨우지 않는 알람을 써요.
+  - 코드: `android/app/src/main/java/.../widget/`, 레이아웃 `res/layout/widget_now.xml`, 정보 `res/xml/widget_now_info.xml`
+  - 나머지 4종(주간 학교·주간 학원·타임라인·월간 달력)은 아직 미리보기만 있어요.
 
 ## 7. Play Console 등록 체크리스트
 - [ ] 앱 만들기 (기본 언어: 한국어, 무료)

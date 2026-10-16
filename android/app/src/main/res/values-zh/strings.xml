@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">틈틈</string>
+    <string name="title_activity_main">틈틈</string>
+    <string name="widget_now_name">TeumTeum · 现在</string>
+    <string name="widget_now_description">显示当前课程、剩余时间和下一节课</string>
+    <string name="widget_now_label_default">● 现在</string>
+    <string name="widget_now_title_default">第3节 · 数学</string>
+    <string name="widget_now_subtitle_default">学校 第3节 · 剩余25分</string>
+    <string name="widget_now_next_default">下一节</string>
+    <string name="widget_now_empty_title">TeumTeum</string>
+    <string name="widget_now_empty_subtitle">打开一次应用即可显示课表</string>
+</resources>

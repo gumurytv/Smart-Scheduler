@@ -22,6 +22,7 @@ import {
   formatDateLabel,
   formatYearMonthLabel,
 } from '../i18n/translations';
+import { pushNowWidget } from '../native/nowWidget';
 
 export const WIDGET_STORAGE_KEY = 'WIDGET_SYNC_DATA';
 
@@ -671,6 +672,89 @@ export function buildWidgetSyncPayload(
   };
 }
 
+// ===================== Native 「지금」 widget =====================
+
+/**
+ * Payload for the Android 「지금」 widget. The widget runs while the app is closed, so instead
+ * of a snapshot of "now" it gets the classes of the next 8 days and works out the current and
+ * next class from the clock itself. Labels are pre-translated; `{d}` marks a duration.
+ */
+export interface NativeNowWidgetPayload {
+  v: 1;
+  lang: AppLanguage;
+  labels: Record<
+    | 'now'
+    | 'next'
+    | 'tomorrow'
+    | 'free'
+    | 'untilNextTpl'
+    | 'leftTpl'
+    | 'laterTpl'
+    | 'done'
+    | 'doneSub'
+    | 'none'
+    | 'noneSub',
+    string
+  >;
+  dur: { h: string; m: string; sep: string };
+  days: Array<{
+    date: string;
+    dateLabel: string;
+    /** Sorted by start. s/e = HH:MM, t = title, b = badge (e.g. 학교 3교시). */
+    items: Array<{ s: string; e: string; t: string; b: string }>;
+  }>;
+}
+
+export function buildNativeNowWidget(state: PlannerState, now: Date = new Date()): NativeNowWidgetPayload {
+  const lang: AppLanguage = state.language || 'ko';
+  const days = Array.from({ length: 8 }, (_, i) => {
+    const d = addDays(now, i);
+    const date = formatDateKey(d);
+    const resolved = resolveDailyTimetable(date, state.masterTimetable, state.dailyOverrides);
+    const items = [
+      ...resolved.school
+        .filter((x) => !x.isCancelled && x.subject.trim() !== '')
+        .map((x) => ({
+          s: x.startTime,
+          e: x.endTime,
+          t: `${periodLabel(x.period, lang)} · ${slotTitle(x.subject, x.status, lang)}`,
+          b: tr(lang, `학교 ${x.period}교시`, `School · P${x.period}`, `学校 第${x.period}节`),
+        })),
+      ...resolved.academy
+        .filter((x) => !x.isCancelled)
+        .map((x) => ({
+          s: x.startTime,
+          e: x.endTime,
+          t: slotTitle(x.subject, x.status, lang),
+          b: x.isAdded
+            ? tr(lang, '학원 보강/특강', 'Academy · Makeup', '补习班 补课/特讲')
+            : tr(lang, '학원', 'Academy', '补习班'),
+        })),
+    ].sort((a, b) => timeToMinutes(a.s) - timeToMinutes(b.s));
+    return { date, dateLabel: formatDateLabel(d, lang), items };
+  });
+
+  return {
+    v: 1,
+    lang,
+    labels: {
+      now: tr(lang, '지금', 'Now', '现在'),
+      next: tr(lang, '다음', 'Next', '下一节'),
+      tomorrow: tr(lang, '내일', 'Tomorrow', '明天'),
+      free: tr(lang, '지금은 빈 시간', 'Free time now', '现在是空闲时间'),
+      untilNextTpl: tr(lang, '다음 수업까지 {d}', 'Next class in {d}', '距下节课还有{d}'),
+      leftTpl: tr(lang, '{d} 남음', '{d} left', '剩余{d}'),
+      laterTpl: tr(lang, '{d} 후', 'in {d}', '{d}后'),
+      done: tr(lang, '오늘 일정 끝', 'All done for today', '今天的课程结束了'),
+      doneSub: tr(lang, '오늘도 수고했어요', 'Great job today', '今天辛苦了'),
+      none: tr(lang, '오늘은 수업이 없어요', 'No classes today', '今天没有课'),
+      noneSub: tr(lang, '편하게 쉬어요', 'Enjoy your day', '好好休息'),
+    },
+    dur: lang === 'zh' ? { h: '小时', m: '分', sep: '' } : lang === 'en' ? { h: 'h', m: 'm', sep: ' ' } : { h: '시간', m: '분', sep: ' ' },
+    days,
+  };
+}
+
 export function syncWidgetData(state: PlannerState): WidgetSyncPayload {
   const payload = buildWidgetSyncPayload(state, new Date());
   const jsonString = JSON.stringify(payload);
@@ -687,6 +771,8 @@ export function syncWidgetData(state: PlannerState): WidgetSyncPayload {
   } catch (e) {
     console.warn('AndroidWidgetBridge.updateWidget call skipped or failed:', e);
   }
+
+  pushNowWidget(JSON.stringify(buildNativeNowWidget(state)));
 
   return payload;
 }
