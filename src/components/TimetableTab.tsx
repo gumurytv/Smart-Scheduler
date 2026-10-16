@@ -2819,7 +2819,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       {/* SHEET 1: SCHOOL PERIOD EDIT */}
       {editingSchoolPeriod && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
           onClick={() => {
             handleSaveSchoolNote();
             closeEditSheet();
@@ -2932,7 +2932,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       {/* SHEET 2: ACADEMY EDIT */}
       {editingAcademyItem && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
           onClick={() => {
             handleSaveAcademyNote();
             closeEditSheet();
@@ -3093,7 +3093,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       {/* SHEET 3: ADD (academy makeup/special class OR schedule item) */}
       {isAddingAcademy && addTarget && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
           onClick={closeAddSheet}
         >
           <div

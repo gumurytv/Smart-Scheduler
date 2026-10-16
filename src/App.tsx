@@ -191,7 +191,7 @@ export default function App() {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-paper text-ink flex flex-col shadow-xl relative">
       {/* Sticky Top Header */}
-      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-30 bg-surface border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
         <div className="min-w-0 flex items-center gap-2">
           <h1 className="flex items-baseline gap-1.5 min-w-0">
             <span className="text-[20px] font-extrabold tracking-tight text-accent-700 shrink-0">
@@ -295,7 +295,7 @@ export default function App() {
       {/* Fixed Bottom 5-Tab Navigation Bar */}
       <nav
         aria-label={tr(lang, '메인 메뉴', 'Main Navigation', '主导航')}
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-surface/95 backdrop-blur-md border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-surface border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
       >
         {navTabs.map((tab) => {
           const IconComponent = tab.icon;
