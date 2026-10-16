@@ -1,6 +1,8 @@
 {
-  "name": "스마트 스쿨 & 아카데미 플래너",
-  "description": "학교·학원 시간표, 3대 라벨 일정표, 실질 출석률 및 보강 관리, 일일 메모장, AI 시간표 인식을 지원하는 오프라인 우선 학생 플래너",
+  "name": "틈틈 – 학교·학원 시간표 플래너",
+  "description": "틈틈 – 학교와 학원 시간표를 한곳에서. 빈 시간 찾기, 일정·D-Day, 출석과 보강 관리, 하루 한 장 메모까지 챙겨 주는 학생 플래너",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

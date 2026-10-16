@@ -180,13 +180,13 @@ export default function App() {
       {/* Sticky Top Header */}
       <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
         <div className="min-w-0 flex items-center gap-2">
-          <h1 className="text-base font-bold tracking-tight text-ink truncate">
-            {tr(
-              lang,
-              '스마트 스쿨 & 아카데미',
-              'Smart School & Academy',
-              '智能学校与补习班规划'
-            )}
+          <h1 className="flex items-baseline gap-1.5 min-w-0">
+            <span className="text-[20px] font-extrabold tracking-tight text-accent-700 shrink-0">
+              {tr(lang, '틈틈', 'TeumTeum', 'TeumTeum')}
+            </span>
+            <span className="text-[11px] font-semibold text-slate-600 truncate">
+              {tr(lang, '학교·학원 플래너', 'school & academy planner', '学校·补习班计划本')}
+            </span>
           </h1>
           {isOffline && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-100 text-accent-900 text-[10px] font-bold shrink-0">
