@@ -232,14 +232,14 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ id, open, onToggle, tone, i
   return (
     <section
       id={`settings-card-${id}`}
-      className={`bg-surface rounded-2xl shadow-xs overflow-hidden scroll-mt-4 transition-shadow ${open ? t.openRing : ''}`}
+      className={`bg-surface rounded-2xl shadow-xs overflow-hidden scroll-mt-4 ${open ? t.openRing : ''}`}
     >
       <button
         type="button"
         onClick={() => onToggle(id)}
         aria-expanded={open}
         aria-controls={`settings-panel-${id}`}
-        className="w-full px-3.5 py-3 flex items-center gap-3 text-left hover:bg-paper/40 transition-colors"
+        className="w-full px-3.5 py-3 flex items-center gap-3 text-left hover:bg-paper/40"
       >
         <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${t.icon}`}>
           <Icon strokeWidth={2.5} className="w-[18px] h-[18px]" />
@@ -250,7 +250,7 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ id, open, onToggle, tone, i
         </span>
         <ChevronDown
           strokeWidth={2.5}
-          className={`w-4 h-4 shrink-0 transition-transform duration-200 ${t.chevron} ${open ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 shrink-0 ${t.chevron} ${open ? 'rotate-180' : ''}`}
         />
       </button>
       {open && (

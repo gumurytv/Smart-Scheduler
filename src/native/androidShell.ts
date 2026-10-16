@@ -4,6 +4,12 @@ import { App } from '@capacitor/app';
 
 export const isNativeApp = Capacitor.isNativePlatform();
 
+// Mark the document so CSS can opt out of effects the Android WebView repaints badly
+// (see `.native-app` in index.css).
+if (isNativeApp && typeof document !== 'undefined') {
+  document.documentElement.classList.add('native-app');
+}
+
 // Every bottom sheet / popup in the app is a full-screen `fixed inset-0` backdrop that closes
 // when the backdrop itself is clicked (the sheet body stops propagation). Android's back
 // button should close the topmost one first, the same way tapping outside would.
@@ -34,6 +40,39 @@ export function registerBackButton(handlers: {
   });
   return () => {
     void listener.then((l) => l.remove());
+  };
+}
+
+/**
+ * Some Android WebViews keep stale tiles after the scroll area's content shrinks (e.g. every
+ * settings card collapsed), showing "ghost" copies of controls in the empty gaps. Whenever the
+ * content height changes, nudge the scroll layer so it is repainted in full. Returns a cleanup.
+ */
+export function keepRepainted(scroller: HTMLElement | null): () => void {
+  if (!isNativeApp || !scroller || typeof ResizeObserver === 'undefined') return () => {};
+  let frame = 0;
+  const repaint = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      scroller.style.opacity = '0.999';
+      frame = requestAnimationFrame(() => {
+        scroller.style.opacity = '';
+      });
+    });
+  };
+  const resizes = new ResizeObserver(repaint);
+  const observeChildren = () => {
+    resizes.disconnect();
+    Array.from(scroller.children).forEach((child) => resizes.observe(child));
+  };
+  observeChildren();
+  // Switching tabs replaces <main>'s child, so keep observing whatever is inside it.
+  const children = new MutationObserver(observeChildren);
+  children.observe(scroller, { childList: true });
+  return () => {
+    cancelAnimationFrame(frame);
+    resizes.disconnect();
+    children.disconnect();
   };
 }
 
