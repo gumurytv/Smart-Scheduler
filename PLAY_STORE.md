@@ -90,7 +90,7 @@ Play Console에 그대로 복사해서 쓰는 문구와 설문 답변입니다. 
 | 건강 앱 | 해당 기능 없음 |
 | 앱 카테고리 | 교육 (또는 생산성) |
 | 태그 | 학생, 시간표, 플래너, 일정 관리 중 선택 |
-| 연락처 | 개발자 이메일 (웹사이트는 선택: `https://gumurytv.github.io/Smart-Scheduler/`) |
+| 연락처 | 이메일 `dbo0ofly@gmail.com` (웹사이트는 선택: `https://gumurytv.github.io/Smart-Scheduler/`) |
 
 ### 데이터 보안 양식
 | 질문 | 답변 |
