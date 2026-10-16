@@ -1,150 +1,66 @@
 package com.gumurytv.teumteum.widget;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
 import android.view.View;
 import android.widget.RemoteViews;
-import com.gumurytv.teumteum.MainActivity;
 import com.gumurytv.teumteum.R;
-import java.util.Calendar;
-import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/**
- * 「지금」 home-screen widget: the class happening now (with time left) and the next one.
- *
- * The app sends the classes of the next 8 days (buildNativeNowWidget in src/utils/widgetSync.ts);
- * the widget picks current/next from the clock, so it stays right while the app is closed.
- * It redraws at the next class boundary (at most every 5 minutes) with a non-waking alarm.
- */
+/** 「지금」 widget: the class happening now (time left, progress) and the next one. */
 public class NowWidgetProvider extends AppWidgetProvider {
-
-    static final String PREFS = "teumteum_widgets";
-    static final String KEY_NOW = "now_json";
-    private static final String ACTION_REFRESH = "com.gumurytv.teumteum.widget.NOW_REFRESH";
-    private static final long MAX_REFRESH_MS = 5 * 60 * 1000L;
-
-    // ---- entry points ----
-
-    static void saveAndRefresh(Context context, String json) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_NOW, json).apply();
-        refreshAll(context);
-    }
-
-    static void refreshAll(Context context) {
-        AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        int[] ids = manager.getAppWidgetIds(new ComponentName(context, NowWidgetProvider.class));
-        if (ids.length == 0) {
-            cancelRefresh(context);
-            return;
-        }
-        Snapshot snapshot = Snapshot.compute(readPayload(context), Calendar.getInstance());
-        RemoteViews views = render(context, snapshot);
-        for (int id : ids) manager.updateAppWidget(id, views);
-        scheduleRefresh(context, snapshot.nextRefreshAt);
-    }
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] appWidgetIds) {
-        refreshAll(context);
-    }
-
-    @Override
-    public void onReceive(Context context, Intent intent) {
-        super.onReceive(context, intent);
-        String action = intent.getAction();
-        if (ACTION_REFRESH.equals(action)
-            || Intent.ACTION_TIME_CHANGED.equals(action)
-            || Intent.ACTION_TIMEZONE_CHANGED.equals(action)
-            || Intent.ACTION_DATE_CHANGED.equals(action)) {
-            refreshAll(context);
-        }
+        WidgetRefresher.refreshAll(context);
     }
 
     @Override
     public void onDisabled(Context context) {
-        cancelRefresh(context);
+        WidgetRefresher.refreshAll(context);
     }
 
-    // ---- rendering ----
-
-    private static RemoteViews render(Context context, Snapshot s) {
-        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_now);
-        v.setOnClickPendingIntent(R.id.widget_now_root, openAppIntent(context));
+    static RemoteViews render(Context context, WidgetKit k, Snapshot s) {
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.wd_now);
+        k.frame(context, v);
 
         if (s.empty) {
-            s.title = context.getString(R.string.widget_now_empty_title);
-            s.subtitle = context.getString(R.string.widget_now_empty_subtitle);
+            s.title = context.getString(R.string.widget_empty_title);
+            s.subtitle = context.getString(R.string.widget_empty_subtitle);
         }
-        v.setTextViewText(R.id.widget_now_label, "● " + s.nowLabel);
-        v.setTextViewText(R.id.widget_now_date, s.dateLabel);
-        v.setTextViewText(R.id.widget_now_title, s.title);
-        v.setTextViewText(R.id.widget_now_subtitle, s.subtitle);
-        v.setViewVisibility(R.id.widget_now_subtitle, s.subtitle.isEmpty() ? View.GONE : View.VISIBLE);
+        k.text(v, R.id.now_label, "● " + s.nowLabel, k.pick(WidgetKit.ACCENT_700, WidgetKit.ACCENT_400), 12);
+        k.text(v, R.id.now_date, s.dateLabel, k.sub(), 12);
+        v.setTextColor(R.id.now_clock, k.text());
+        k.size(v, R.id.now_clock, 15);
+        k.text(v, R.id.now_title, s.title, k.text(), 20);
+        k.text(v, R.id.now_subtitle, s.subtitle, k.sub(), 13);
+        v.setViewVisibility(R.id.now_subtitle, s.subtitle.isEmpty() ? View.GONE : View.VISIBLE);
 
+        int shown = k.dark ? R.id.now_progress_d : R.id.now_progress_l;
+        int hidden = k.dark ? R.id.now_progress_l : R.id.now_progress_d;
+        v.setViewVisibility(hidden, View.GONE);
         if (s.progress >= 0) {
-            v.setProgressBar(R.id.widget_now_progress, 100, s.progress, false);
-            v.setViewVisibility(R.id.widget_now_progress, View.VISIBLE);
+            v.setProgressBar(shown, 100, s.progress, false);
+            v.setViewVisibility(shown, View.VISIBLE);
         } else {
-            v.setViewVisibility(R.id.widget_now_progress, View.GONE);
+            v.setViewVisibility(shown, View.GONE);
         }
 
         if (s.nextTitle != null) {
-            v.setTextViewText(R.id.widget_now_next_label, s.nextLabel);
-            v.setTextViewText(R.id.widget_now_next_title, s.nextTitle);
-            v.setTextViewText(R.id.widget_now_next_time, s.nextTime);
-            v.setViewVisibility(R.id.widget_now_next_row, View.VISIBLE);
+            k.background(v, R.id.now_next_row, R.drawable.wd_panel_l, R.drawable.wd_panel_d);
+            k.text(v, R.id.now_next_label, s.nextLabel, k.pick(WidgetKit.SAGE_700, WidgetKit.SAGE_400), 12);
+            k.text(v, R.id.now_next_title, s.nextTitle, k.text(), 13);
+            k.text(v, R.id.now_next_time, s.nextTime, k.accentText(), 12);
+            v.setViewVisibility(R.id.now_next_row, View.VISIBLE);
         } else {
-            v.setViewVisibility(R.id.widget_now_next_row, View.GONE);
+            v.setViewVisibility(R.id.now_next_row, View.GONE);
         }
         return v;
     }
 
-    private static PendingIntent openAppIntent(Context context) {
-        Intent intent = new Intent(context, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        return PendingIntent.getActivity(
-            context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-    }
-
-    // ---- refresh scheduling ----
-
-    private static PendingIntent refreshIntent(Context context) {
-        Intent intent = new Intent(context, NowWidgetProvider.class).setAction(ACTION_REFRESH);
-        return PendingIntent.getBroadcast(
-            context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-    }
-
-    private static void scheduleRefresh(Context context, long at) {
-        AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (alarms == null) return;
-        // RTC (not _WAKEUP): never wakes the phone; a missed refresh runs when the screen turns on.
-        alarms.set(AlarmManager.RTC, at, refreshIntent(context));
-    }
-
-    private static void cancelRefresh(Context context) {
-        AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (alarms != null) alarms.cancel(refreshIntent(context));
-    }
-
-    private static JSONObject readPayload(Context context) {
-        String raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_NOW, null);
-        if (raw == null) return null;
-        try {
-            return new JSONObject(raw);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    // ---- what to show right now ----
-
+    /** What to show right now, worked out from the payload and the clock. */
     static final class Snapshot {
         boolean empty = false; // no usable data: render() shows the "open the app" message
         String nowLabel = "지금";
@@ -155,140 +71,82 @@ public class NowWidgetProvider extends AppWidgetProvider {
         String nextLabel = "";
         String nextTitle = null; // null hides the "next" row
         String nextTime = "";
-        long nextRefreshAt;
+        long nextBoundaryAt = Long.MAX_VALUE; // when the current class ends / the next one starts
 
-        static Snapshot compute(JSONObject data, Calendar now) {
+        static Snapshot compute(WidgetKit k) {
             Snapshot s = new Snapshot();
-            long nowMs = now.getTimeInMillis();
-            s.nextRefreshAt = Math.min(nowMs + MAX_REFRESH_MS, startOfNextDay(now));
-
-            JSONArray days = data == null ? null : data.optJSONArray("days");
-            int todayIndex = -1;
-            String today = String.format(
-                Locale.US, "%04d-%02d-%02d",
-                now.get(Calendar.YEAR), now.get(Calendar.MONTH) + 1, now.get(Calendar.DAY_OF_MONTH));
-            if (days != null) {
-                for (int i = 0; i < days.length(); i++) {
-                    JSONObject day = days.optJSONObject(i);
-                    if (day != null && today.equals(day.optString("date"))) {
-                        todayIndex = i;
-                        break;
-                    }
-                }
-            }
+            int todayIndex = k.todayIndex();
             if (todayIndex < 0) {
-                // No data yet, or older than the 8 days the app sent: ask to open the app once.
                 s.empty = true;
-                s.nextRefreshAt = startOfNextDay(now);
                 return s;
             }
-
-            JSONObject labels = data.optJSONObject("labels");
-            JSONObject dur = data.optJSONObject("dur");
-            s.nowLabel = label(labels, "now", "지금");
+            JSONArray days = k.array("days");
+            s.nowLabel = k.label("now", "지금");
+            s.nextLabel = k.label("next", "다음");
             JSONObject todayData = days.optJSONObject(todayIndex);
             s.dateLabel = todayData.optString("dateLabel", "");
-            JSONArray items = todayData.optJSONArray("items");
-            int nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
 
             JSONObject current = null;
             JSONObject next = null;
-            int count = items == null ? 0 : items.length();
-            for (int i = 0; i < count; i++) {
+            int classes = 0;
+            JSONArray items = todayData.optJSONArray("items");
+            for (int i = 0; items != null && i < items.length(); i++) {
                 JSONObject item = items.optJSONObject(i);
-                if (item == null) continue;
-                int start = minutes(item.optString("s"));
-                int end = minutes(item.optString("e"));
-                if (current == null && start <= nowMin && nowMin < end) current = item;
-                else if (next == null && start > nowMin) next = item;
+                if (!isClass(item)) continue;
+                classes++;
+                int start = WidgetKit.minutes(item.optString("s"));
+                int end = WidgetKit.minutes(item.optString("e"));
+                if (current == null && start <= k.nowMin && k.nowMin < end) current = item;
+                else if (next == null && start > k.nowMin) next = item;
             }
 
             if (current != null) {
-                int start = minutes(current.optString("s"));
-                int end = minutes(current.optString("e"));
+                int start = WidgetKit.minutes(current.optString("s"));
+                int end = WidgetKit.minutes(current.optString("e"));
                 s.title = current.optString("t");
                 s.subtitle = current.optString("b") + " · "
-                    + fill(label(labels, "leftTpl", "{d} 남음"), duration(end - nowMin, dur));
-                s.progress = Math.max(0, Math.min(100, (nowMin - start) * 100 / Math.max(1, end - start)));
-                s.nextRefreshAt = Math.min(s.nextRefreshAt, atMinute(now, end));
+                    + WidgetKit.fill(k.label("leftTpl", "{d} 남음"), "d", k.duration(end - k.nowMin));
+                s.progress = Math.max(0, Math.min(100, (k.nowMin - start) * 100 / Math.max(1, end - start)));
+                s.nextBoundaryAt = WidgetKit.atMinute(k.now, end);
             } else if (next != null) {
-                int start = minutes(next.optString("s"));
-                s.title = label(labels, "free", "지금은 빈 시간");
-                s.subtitle = fill(label(labels, "untilNextTpl", "다음 수업까지 {d}"), duration(start - nowMin, dur));
-            } else if (count > 0) {
-                s.title = label(labels, "done", "오늘 일정 끝");
-                s.subtitle = label(labels, "doneSub", "");
+                int start = WidgetKit.minutes(next.optString("s"));
+                s.title = k.label("free", "지금은 빈 시간");
+                s.subtitle = WidgetKit.fill(k.label("untilNextTpl", "다음 수업까지 {d}"), "d", k.duration(start - k.nowMin));
+            } else if (classes > 0) {
+                s.title = k.label("done", "오늘 일정 끝");
+                s.subtitle = k.label("doneSub", "");
             } else {
-                s.title = label(labels, "none", "오늘은 수업이 없어요");
-                s.subtitle = label(labels, "noneSub", "");
+                s.title = k.label("none", "오늘은 수업이 없어요");
+                s.subtitle = k.label("noneSub", "");
             }
 
-            s.nextLabel = label(labels, "next", "다음");
             if (next != null) {
-                int start = minutes(next.optString("s"));
+                int start = WidgetKit.minutes(next.optString("s"));
                 s.nextTitle = next.optString("t");
                 s.nextTime = next.optString("s") + " · "
-                    + fill(label(labels, "laterTpl", "{d} 후"), duration(start - nowMin, dur));
-                s.nextRefreshAt = Math.min(s.nextRefreshAt, atMinute(now, start));
+                    + WidgetKit.fill(k.label("laterTpl", "{d} 후"), "d", k.duration(start - k.nowMin));
+                s.nextBoundaryAt = Math.min(s.nextBoundaryAt, WidgetKit.atMinute(k.now, start));
             } else {
-                // Nothing left today: show the first class of the coming days.
+                // Nothing left today: the first class of the coming days.
                 for (int i = todayIndex + 1; i < days.length() && s.nextTitle == null; i++) {
                     JSONObject day = days.optJSONObject(i);
                     JSONArray dayItems = day == null ? null : day.optJSONArray("items");
-                    JSONObject first = dayItems == null ? null : dayItems.optJSONObject(0);
-                    if (first != null) {
+                    for (int j = 0; dayItems != null && j < dayItems.length(); j++) {
+                        JSONObject first = dayItems.optJSONObject(j);
+                        if (!isClass(first)) continue;
+                        String when = i == todayIndex + 1 ? k.label("tomorrow", "내일") : day.optString("dateLabel");
                         s.nextTitle = first.optString("t");
-                        String when = i == todayIndex + 1
-                            ? label(labels, "tomorrow", "내일")
-                            : day.optString("dateLabel");
                         s.nextTime = when + " " + first.optString("s");
+                        break;
                     }
                 }
             }
             return s;
         }
 
-        private static String label(JSONObject labels, String key, String fallback) {
-            return labels == null ? fallback : labels.optString(key, fallback);
-        }
-
-        private static String fill(String template, String value) {
-            return template.replace("{d}", value);
-        }
-
-        private static String duration(int minutes, JSONObject dur) {
-            String h = dur == null ? "시간" : dur.optString("h", "시간");
-            String m = dur == null ? "분" : dur.optString("m", "분");
-            String sep = dur == null ? " " : dur.optString("sep", " ");
-            int total = Math.max(0, minutes);
-            int hours = total / 60;
-            int mins = total % 60;
-            if (hours > 0 && mins > 0) return hours + h + sep + mins + m;
-            if (hours > 0) return hours + h;
-            return mins + m;
-        }
-
-        private static int minutes(String hhmm) {
-            try {
-                String[] parts = hhmm.split(":");
-                return Integer.parseInt(parts[0].trim()) * 60 + Integer.parseInt(parts[1].trim());
-            } catch (Exception e) {
-                return -1;
-            }
-        }
-
-        private static long atMinute(Calendar now, int minuteOfDay) {
-            Calendar c = (Calendar) now.clone();
-            c.set(Calendar.HOUR_OF_DAY, 0);
-            c.set(Calendar.MINUTE, 0);
-            c.set(Calendar.SECOND, 0);
-            c.set(Calendar.MILLISECOND, 0);
-            c.add(Calendar.MINUTE, minuteOfDay);
-            return c.getTimeInMillis();
-        }
-
-        private static long startOfNextDay(Calendar now) {
-            return atMinute(now, 24 * 60) + 1000L;
+        /** School/academy classes that take place (not events, not cancelled). */
+        private static boolean isClass(JSONObject item) {
+            return item != null && !"event".equals(item.optString("k")) && item.optInt("x", 0) != 1;
         }
     }
 }

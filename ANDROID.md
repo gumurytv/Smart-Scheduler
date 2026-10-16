@@ -67,11 +67,11 @@ npx @capacitor/assets generate --android --iconBackgroundColor '#b2622d' --splas
   - 빌드 전에 `.env`에 `VITE_API_BASE_URL=https://서버주소`를 넣습니다.
   - 서버 쪽에는 `AI_TIMETABLE_ENABLED=true`, `GEMINI_API_KEY`, `CORS_ALLOWED_ORIGINS=https://localhost`를 설정합니다.
   - 기본값은 꺼짐이라 1차 출시는 서버 없이 해도 됩니다.
-- **홈 화면 위젯:** 「지금」 위젯(지금 수업·남은 시간·다음 수업)을 지원해요.
-  - 앱이 바뀔 때마다 앞으로 8일치 수업을 위젯에 넘기고(`buildNativeNowWidget` → `src/native/nowWidget.ts` → `TeumWidgetPlugin`), 위젯은 시계를 보고 지금/다음을 스스로 계산해요. 그래서 앱을 닫아도 맞게 바뀌어요.
-  - 다음 수업 경계(최대 5분 간격)에 다시 그리며, 휴대폰을 깨우지 않는 알람을 써요.
-  - 코드: `android/app/src/main/java/.../widget/`, 레이아웃 `res/layout/widget_now.xml`, 정보 `res/xml/widget_now_info.xml`
-  - 나머지 4종(주간 학교·주간 학원·타임라인·월간 달력)은 아직 미리보기만 있어요.
+- **홈 화면 위젯 (5종):** 「지금」, 주간 학교 시간표, 주간 학원 시간표, 오늘 타임라인, 월간 캘린더.
+  - 앱이 바뀔 때마다 위젯 데이터 한 묶음을 넘겨요(`buildNativeWidgets` → `src/native/homeWidgets.ts` → `TeumWidgetPlugin`). 8일치 수업·일정, 이번 주·다음 주 시간표, 이번 달·다음 달 달력이 들어 있어요. 위젯은 시계를 보고 오늘·지금을 스스로 계산해서, 앱을 닫아도 맞게 바뀌어요.
+  - 설정 → 홈 화면 위젯에서 고른 **테마(밝게/어둡게)**와 **글자 크기(작게~아주 크게)**가 모든 위젯에 적용돼요.
+  - 「지금」·타임라인 위젯이 있으면 다음 수업 경계마다(최대 5분 간격), 없으면 자정에 다시 그려요. 휴대폰을 깨우지 않는 알람을 써요.
+  - 코드: `android/app/src/main/java/.../widget/` (`WidgetKit` 공통, `WidgetRefresher` 갱신, 위젯마다 `*WidgetProvider`), 레이아웃 `res/layout/wd_*.xml`, 위젯 정보 `res/xml/widget_*_info.xml`, 위젯 목록 미리보기 `res/drawable-nodpi/wd_preview_*.png`
 
 ## 7. Play Console 등록 체크리스트
 - [ ] 앱 만들기 (기본 언어: 한국어, 무료)

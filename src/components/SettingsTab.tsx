@@ -53,13 +53,14 @@ import {
   HOME_WIDGET_IDS,
   HomeWidgetId,
   WidgetConfig,
+  WidgetFontScale,
   UserProfile,
   TextScale,
   TEXT_SCALES,
 } from '../types';
-import { isAiTimetableEnabled, HOME_WIDGETS_AVAILABLE } from '../utils/featureFlags';
+import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { API_BASE_URL, isNativeApp } from '../native/androidShell';
-import { pinNowWidget } from '../native/nowWidget';
+import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
@@ -617,10 +618,44 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
-  const [widgetSyncToast, setWidgetSyncToast] = useState<string | null>(null);
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
-  // Result of "홈 화면에 추가" for the native 「지금」 widget
-  const [nowPinMessage, setNowPinMessage] = useState<string | null>(null);
+  // Native app: how many of each widget are on the home screen, and the last "홈 화면에 추가" result
+  const [placedWidgets, setPlacedWidgets] = useState<Partial<Record<HomeWidgetId, number>>>({});
+  const [pinMessage, setPinMessage] = useState<{ id: HomeWidgetId; text: string } | null>(null);
+  const refreshPlacedWidgets = () => {
+    void getPlacedHomeWidgets().then(setPlacedWidgets);
+  };
+  useEffect(() => {
+    if (!isNativeApp) return;
+    refreshPlacedWidgets();
+    // The launcher's "add widget" prompt pauses the app; recount when it comes back.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshPlacedWidgets();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+  const placedTotal = Object.values(placedWidgets).reduce((a, n) => a + (n ?? 0), 0);
+  const handlePinWidget = async (id: HomeWidgetId) => {
+    syncWidgetData(state);
+    const requested = await pinHomeWidget(id);
+    setPinMessage({
+      id,
+      text: requested
+        ? tr(
+            lang,
+            '홈 화면에 추가할지 묻는 창이 뜨면 「추가」를 눌러 주세요.',
+            'When your phone asks, tap "Add" to place the widget.',
+            '手机询问时，请点击「添加」。'
+          )
+        : tr(
+            lang,
+            `홈 화면 빈 곳을 길게 누른 뒤 「위젯」에서 「틈틈」을 찾아 「${HOME_WIDGET_META[id].name(lang)}」을 추가해 주세요.`,
+            `Long-press an empty spot on your home screen, open "Widgets", find "TeumTeum" and add "${HOME_WIDGET_META[id].name(lang)}".`,
+            `长按主屏幕空白处，打开「小组件」，找到「TeumTeum」并添加「${HOME_WIDGET_META[id].name(lang)}」。`
+          ),
+    });
+  };
 
   // 위젯 선택 시트: Esc로 닫기 + 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
@@ -643,6 +678,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   }, []);
   const widgetConfig = getWidgetConfig(state);
   const widgetTheme = widgetConfig.theme;
+  const widgetFontScale: WidgetFontScale = widgetConfig.fontScale ?? 'md';
   const widgetPreviewData = buildHomeWidgetsData(state, widgetNow);
   const updateWidgetConfig = (patch: Partial<WidgetConfig>) => {
     onUpdateState((prev) => {
@@ -653,12 +689,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         ...prev,
         widgetConfig: { ...next, enabled: HOME_WIDGET_IDS.filter((id) => enabledSet.has(id)) },
       };
-    });
-  };
-  const toggleWidget = (id: HomeWidgetId) => {
-    const isOn = widgetConfig.enabled.includes(id);
-    updateWidgetConfig({
-      enabled: isOn ? widgetConfig.enabled.filter((x) => x !== id) : [...widgetConfig.enabled, id],
     });
   };
 
@@ -3564,90 +3594,61 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           icon={Smartphone}
           title={tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
           summary={
-            !HOME_WIDGETS_AVAILABLE
-              ? isNativeApp
-                ? tr(
-                    lang,
-                    `「지금」 위젯 사용 가능 · ${HOME_WIDGET_IDS.length - 1}종 준비 중`,
-                    `"Now" widget ready · ${HOME_WIDGET_IDS.length - 1} coming soon`,
-                    `「现在」小组件可用 · ${HOME_WIDGET_IDS.length - 1} 种准备中`
-                  )
-                : tr(
-                    lang,
-                    `「지금」 위젯은 앱에서 사용 가능 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
-                    `"Now" widget in the Android app · ${HOME_WIDGET_IDS.length} previews`,
-                    `「现在」小组件可在安卓应用中使用 · ${HOME_WIDGET_IDS.length} 种预览`
-                  )
-              : widgetConfig.enabled.length > 0
+            !isNativeApp
               ? tr(
                   lang,
-                  `위젯 ${widgetConfig.enabled.length}개 추가됨 · 총 ${HOME_WIDGET_IDS.length}종`,
-                  `${widgetConfig.enabled.length} of ${HOME_WIDGET_IDS.length} widgets added`,
-                  `已添加 ${widgetConfig.enabled.length} 个 · 共 ${HOME_WIDGET_IDS.length} 种`
+                  `안드로이드 앱에서 사용 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
+                  `In the Android app · ${HOME_WIDGET_IDS.length} previews`,
+                  `安卓应用中可用 · ${HOME_WIDGET_IDS.length} 种预览`
+                )
+              : placedTotal > 0
+              ? tr(
+                  lang,
+                  `홈 화면에 ${placedTotal}개 · 총 ${HOME_WIDGET_IDS.length}종`,
+                  `${placedTotal} on home screen · ${HOME_WIDGET_IDS.length} kinds`,
+                  `主屏幕上 ${placedTotal} 个 · 共 ${HOME_WIDGET_IDS.length} 种`
                 )
               : tr(
                   lang,
-                  `추가된 위젯 없음 · 총 ${HOME_WIDGET_IDS.length}종`,
-                  `No widgets yet · ${HOME_WIDGET_IDS.length} available`,
-                  `尚未添加 · 共 ${HOME_WIDGET_IDS.length} 种`
+                  `위젯 ${HOME_WIDGET_IDS.length}종 · 홈 화면에 추가해 보세요`,
+                  `${HOME_WIDGET_IDS.length} widgets · add one to your home screen`,
+                  `${HOME_WIDGET_IDS.length} 种小组件 · 添加到主屏幕吧`
                 )
           }
         >
           <div className="p-4 space-y-3">
-        {!HOME_WIDGETS_AVAILABLE && (
-          <p className="rounded-2xl bg-other-100 text-other-800 px-3.5 py-3 text-[0.75rem] font-semibold leading-snug">
-            {isNativeApp
-              ? tr(
-                  lang,
-                  '「지금」 위젯을 홈 화면에 추가할 수 있어요. 나머지 위젯은 다음 업데이트에서 추가돼요.',
-                  'You can add the "Now" widget to your home screen. The other widgets are coming in a future update.',
-                  '「现在」小组件已可添加到主屏幕，其余小组件将在后续更新中推出。'
-                )
-              : tr(
-                  lang,
-                  '홈 화면 위젯은 안드로이드 앱에서 쓸 수 있어요. 지금은 「지금」 위젯을 지원하고, 나머지는 준비 중이에요.',
-                  'Home-screen widgets work in the Android app. The "Now" widget is available; the others are coming soon.',
-                  '主屏幕小组件需在安卓应用中使用。目前支持「现在」小组件，其余正在准备中。'
-                )}
-          </p>
-        )}
-        {HOME_WIDGETS_AVAILABLE && widgetConfig.enabled.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {widgetConfig.enabled.map((id) => (
-              <span
-                key={id}
-                className="inline-flex items-center gap-1 pl-3 pr-1 h-8 rounded-full bg-paper border border-divider text-xs font-semibold text-ink"
-              >
-                {HOME_WIDGET_META[id].name(lang)}
-                <button
-                  type="button"
-                  onClick={() => toggleWidget(id)}
-                  aria-label={tr(lang, `${HOME_WIDGET_META[id].name(lang)} 위젯 빼기`, `Remove ${HOME_WIDGET_META[id].name(lang)}`, `移除 ${HOME_WIDGET_META[id].name(lang)}`)}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+            <p className="rounded-2xl bg-other-100 text-other-800 px-3.5 py-3 text-[0.75rem] font-semibold leading-snug">
+              {isNativeApp
+                ? tr(
+                    lang,
+                    '원하는 위젯을 홈 화면에 추가하세요. 위젯 테마(밝게/어둡게)와 글자 크기도 여기서 바꿀 수 있어요.',
+                    'Add the widgets you like to your home screen. You can also change their theme and text size here.',
+                    '把喜欢的小组件添加到主屏幕。也可以在这里更改主题和字体大小。'
+                  )
+                : tr(
+                    lang,
+                    '홈 화면 위젯은 안드로이드 앱에서 쓸 수 있어요. 여기서는 모양을 미리 볼 수 있어요.',
+                    'Home-screen widgets work in the Android app. Here you can preview them.',
+                    '主屏幕小组件需在安卓应用中使用，这里可以先预览样式。'
+                  )}
+            </p>
 
-        <button
-          type="button"
-          onClick={() => setIsWidgetSheetOpen(true)}
-          className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
-        >
-          <Smartphone className="w-4 h-4" strokeWidth={2.75} />
-          {HOME_WIDGETS_AVAILABLE
-            ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
-            : isNativeApp
-              ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
-              : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
-        </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPinMessage(null);
+                refreshPlacedWidgets();
+                setIsWidgetSheetOpen(true);
+              }}
+              className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
+            >
+              <Smartphone className="w-4 h-4" strokeWidth={2.75} />
+              {isNativeApp
+                ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
+                : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
+            </button>
 
-            {HOME_WIDGETS_AVAILABLE && (
-              <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
-            )}
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
           </div>
         </SettingsCard>
 
@@ -3769,14 +3770,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </SettingsCard>
       </div>
 
-      {/* 위젯 선택 시트 (전체 화면) */}
+      {/* 위젯 시트: 테마·글자 크기 + 위젯별 미리보기와 "홈 화면에 추가" */}
       {isWidgetSheetOpen && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
           onClick={() => setIsWidgetSheetOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label={tr(lang, '홈 화면 위젯 고르기', 'Choose home screen widgets', '选择主屏幕小组件')}
+          aria-label={tr(lang, '홈 화면 위젯', 'Home screen widgets', '主屏幕小组件')}
         >
           <div
             className="w-full max-w-md max-h-[92vh] bg-paper rounded-t-[28px] shadow-2xl flex flex-col"
@@ -3787,21 +3788,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="text-[1rem] font-bold text-ink">
-                    {HOME_WIDGETS_AVAILABLE
-                      ? tr(lang, '홈 화면 위젯 고르기', 'Choose widgets', '选择小组件')
-                      : tr(lang, '홈 화면 위젯 미리보기', 'Widget preview', '小组件预览')}
+                    {tr(lang, '홈 화면 위젯', 'Home screen widgets', '主屏幕小组件')}
                   </h3>
                   <p className="text-[0.6875rem] text-slate-600">
-                    {!HOME_WIDGETS_AVAILABLE
-                      ? isNativeApp
-                        ? tr(lang, '「지금」 위젯을 추가할 수 있어요 · 나머지는 준비 중', 'Add the "Now" widget · others coming soon', '可添加「现在」小组件 · 其余准备中')
-                        : tr(lang, '곧 지원 예정이에요 · 모양을 미리 볼 수 있어요', 'Coming soon · preview how they look', '即将推出 · 可先预览样式')
-                      : tr(
-                      lang,
-                      `원하는 위젯의 "홈 화면에 추가"를 누르세요 · ${widgetConfig.enabled.length}개 추가됨`,
-                      `Tap "Add to Home" on the widgets you want · ${widgetConfig.enabled.length} added`,
-                      `点击想要的小组件的"添加到主屏幕" · 已添加 ${widgetConfig.enabled.length} 个`
-                    )}
+                    {isNativeApp
+                      ? tr(
+                          lang,
+                          '테마와 글자 크기는 모든 위젯에 함께 적용돼요',
+                          'Theme and text size apply to every widget',
+                          '主题和字体大小会应用到所有小组件'
+                        )
+                      : tr(lang, '안드로이드 앱에서 추가할 수 있어요', 'Add them in the Android app', '可在安卓应用中添加')}
                   </p>
                 </div>
                 <button
@@ -3813,171 +3810,122 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* 위젯 테마 */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
                 </span>
-              {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) — widgetConfig.theme */}
-              <div
-                className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
-                role="group"
-                aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
-              >
-                {(['light', 'dark'] as const).map((th) => (
-                  <button
-                    key={th}
-                    type="button"
-                    aria-pressed={widgetTheme === th}
-                    onClick={() => updateWidgetConfig({ theme: th })}
-                    className={`h-[30px] px-2.5 text-[0.6875rem] font-semibold flex items-center gap-1 transition-colors ${
-                      widgetTheme === th ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
-                    }`}
-                  >
-                    {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
-                    {th === 'light'
-                      ? tr(lang, '밝은 테마', 'Light', '浅色')
-                      : tr(lang, '어두운 테마', 'Dark', '深色')}
-                  </button>
-                ))}
+                <div
+                  className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+                  role="group"
+                  aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
+                >
+                  {(['light', 'dark'] as const).map((th) => (
+                    <button
+                      key={th}
+                      type="button"
+                      aria-pressed={widgetTheme === th}
+                      onClick={() => updateWidgetConfig({ theme: th })}
+                      className={`h-[30px] px-2.5 text-[0.6875rem] font-semibold flex items-center gap-1 transition-colors ${
+                        widgetTheme === th ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                      }`}
+                    >
+                      {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+                      {th === 'light' ? tr(lang, '밝은 테마', 'Light', '浅色') : tr(lang, '어두운 테마', 'Dark', '深色')}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* 위젯 글자 크기 */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
+                  {tr(lang, '위젯 글자 크기', 'Widget text size', '小组件字体大小')}
+                </span>
+                <div
+                  className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+                  role="radiogroup"
+                  aria-label={tr(lang, '위젯 글자 크기', 'Widget text size', '小组件字体大小')}
+                >
+                  {(
+                    [
+                      ['sm', tr(lang, '작게', 'S', '小')],
+                      ['md', tr(lang, '보통', 'M', '中')],
+                      ['lg', tr(lang, '크게', 'L', '大')],
+                      ['xl', tr(lang, '아주 크게', 'XL', '特大')],
+                    ] as Array<[WidgetFontScale, string]>
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={widgetFontScale === key}
+                      onClick={() => updateWidgetConfig({ fontScale: key })}
+                      className={`h-[30px] px-2.5 text-[0.6875rem] font-semibold whitespace-nowrap transition-colors ${
+                        widgetFontScale === key ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-              {/* 위젯 갤러리 */}
-              <div className="space-y-3">
-                {HOME_WIDGET_IDS.map((id) => {
-                  const meta = HOME_WIDGET_META[id];
-                  const isOn = HOME_WIDGETS_AVAILABLE && widgetConfig.enabled.includes(id);
-                  return (
-                    <div
-                      key={id}
-                      className={`rounded-2xl p-3 space-y-3 transition-colors ${
-                        isOn ? 'bg-paper ring-2 ring-accent' : 'bg-paper/60'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[0.8125rem] font-bold text-ink">{meta.name(lang)}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-mono text-slate-700">
-                              {meta.sizeLabel(lang)}
+              {HOME_WIDGET_IDS.map((id) => {
+                const meta = HOME_WIDGET_META[id];
+                const placed = placedWidgets[id] ?? 0;
+                return (
+                  <div key={id} className={`rounded-2xl p-3 space-y-3 bg-paper/60 ${placed > 0 ? 'ring-2 ring-sage-400' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[0.8125rem] font-bold text-ink">{meta.name(lang)}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-mono text-slate-700">
+                            {meta.sizeLabel(lang)}
+                          </span>
+                          {placed > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-bold inline-flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              {tr(lang, `홈 화면에 ${placed}개`, `${placed} on home`, `主屏幕 ${placed} 个`)}
                             </span>
-                            <span className="text-[0.6875rem] text-slate-600">
-                              {tr(lang, `${meta.source(lang)} 메뉴`, `from ${meta.source(lang)}`, `来自${meta.source(lang)}`)}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
+                          )}
                         </div>
-                        {!HOME_WIDGETS_AVAILABLE ? (
-                          id === 'now' && isNativeApp ? (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                syncWidgetData(state);
-                                const requested = await pinNowWidget();
-                                setNowPinMessage(
-                                  requested
-                                    ? tr(
-                                        lang,
-                                        '홈 화면에 추가할지 묻는 창이 뜨면 「추가」를 눌러 주세요.',
-                                        'When your phone asks, tap "Add" to place the widget.',
-                                        '手机询问时，请点击「添加」。'
-                                      )
-                                    : tr(
-                                        lang,
-                                        '홈 화면 빈 곳을 길게 누른 뒤 「위젯」에서 「틈틈 · 지금」을 찾아 추가해 주세요.',
-                                        'Long-press an empty spot on your home screen, open "Widgets" and add "TeumTeum · Now".',
-                                        '长按主屏幕空白处，打开「小组件」，找到「TeumTeum · 现在」并添加。'
-                                      )
-                                );
-                              }}
-                              className="h-8 px-3 rounded-full bg-accent-700 text-paper hover:bg-accent-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center gap-1 whitespace-nowrap"
-                            >
-                              <Plus className="w-3 h-3" />
-                              {tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
-                            </button>
-                          ) : (
-                            <span className="h-8 px-3 rounded-full bg-other-100 text-other-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center whitespace-nowrap">
-                              {id === 'now'
-                                ? tr(lang, '앱에서 가능', 'In the app', '应用内可用')
-                                : tr(lang, '준비 중', 'Coming soon', '准备中')}
-                            </span>
-                          )
-                        ) : (
+                        <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
+                      </div>
+                      {isNativeApp ? (
                         <button
                           type="button"
-                          aria-pressed={isOn}
-                          onClick={() => toggleWidget(id)}
-                          className={`h-8 px-3 rounded-full text-[0.6875rem] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
-                            isOn
-                              ? 'bg-sage-100 text-sage-800 hover:bg-sage-200'
-                              : 'bg-accent-700 text-paper hover:bg-accent-800'
-                          }`}
+                          onClick={() => void handlePinWidget(id)}
+                          className="h-8 px-3 rounded-full bg-accent-700 text-paper hover:bg-accent-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center gap-1 whitespace-nowrap"
                         >
-                          {isOn ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                          {isOn
-                            ? tr(lang, '추가됨', 'Added', '已添加')
-                            : tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
+                          <Plus className="w-3 h-3" />
+                          {tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
                         </button>
-                        )}
-                      </div>
-
-                      {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
-                      <div
-                        className={`p-3 rounded-2xl transition-colors ${
-                          widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'
-                        } ${isOn || !HOME_WIDGETS_AVAILABLE ? '' : 'opacity-80'}`}
-                      >
-                        <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
-                      </div>
-                      {id === 'now' && nowPinMessage && (
-                        <p aria-live="polite" className="rounded-xl bg-sage-100 text-sage-800 px-3 py-2 text-[0.75rem] font-semibold leading-snug">
-                          {nowPinMessage}
-                        </p>
+                      ) : (
+                        <span className="h-8 px-3 rounded-full bg-other-100 text-other-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center whitespace-nowrap">
+                          {tr(lang, '앱에서 가능', 'In the app', '应用内可用')}
+                        </span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
 
-              {HOME_WIDGETS_AVAILABLE && (
-              <p className="text-[0.6875rem] text-slate-600 leading-relaxed px-1">
-                {tr(
-                  lang,
-                  '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
-                  'In the Android/iOS app, the selected widgets appear as real home-screen widgets. The web app shows a preview and syncs the widget data.',
-                  '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
-                )}
-              </p>
-              )}
-
-              {HOME_WIDGETS_AVAILABLE && (
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-[0.6875rem] text-slate-600">
-                  {widgetSyncToast ||
-                    tr(
-                      lang,
-                      '시간표·일정·출석이 바뀌면 위젯 데이터도 자동으로 동기화돼요.',
-                      'Widget data syncs automatically whenever your plans change.',
-                      '课表、日程或考勤变化时，小组件数据会自动同步。'
+                    {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
+                    <div
+                      data-widget-preview={id}
+                      className={`p-3 rounded-2xl transition-colors ${widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'}`}
+                    >
+                      <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
+                    </div>
+                    {pinMessage?.id === id && (
+                      <p aria-live="polite" className="rounded-xl bg-sage-100 text-sage-800 px-3 py-2 text-[0.75rem] font-semibold leading-snug">
+                        {pinMessage.text}
+                      </p>
                     )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    syncWidgetData(state);
-                    setWidgetSyncToast(
-                      tr(lang, '✓ 방금 위젯 데이터가 동기화되었습니다.', '✓ Widget data synced just now.', '✓ 小组件数据刚刚已同步。')
-                    );
-                    setTimeout(() => setWidgetSyncToast(null), 2500);
-                  }}
-                  className="h-9 px-3 rounded-full border border-divider bg-transparent hover:bg-slate-100 text-ink text-xs font-semibold shrink-0 transition-colors"
-                >
-                  {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
-                </button>
-              </div>
-              )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="px-4 pt-3 pb-5 border-t border-divider shrink-0">
@@ -3986,14 +3934,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 onClick={() => setIsWidgetSheetOpen(false)}
                 className="w-full h-12 rounded-full bg-ink text-paper text-[0.875rem] font-bold hover:bg-slate-800"
               >
-                {!HOME_WIDGETS_AVAILABLE
-                  ? tr(lang, '닫기', 'Close', '关闭')
-                  : tr(
-                  lang,
-                  `완료 · ${widgetConfig.enabled.length}개 추가됨`,
-                  `Done · ${widgetConfig.enabled.length} added`,
-                  `完成 · 已添加 ${widgetConfig.enabled.length} 个`
-                )}
+                {tr(lang, '닫기', 'Close', '关闭')}
               </button>
             </div>
           </div>

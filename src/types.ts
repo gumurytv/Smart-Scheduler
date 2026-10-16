@@ -139,9 +139,14 @@ export type HomeWidgetId =
 
 export const HOME_WIDGET_IDS: HomeWidgetId[] = ['weeklySchool', 'weeklyAcademy', 'now', 'timeline', 'monthCalendar'];
 
+// Text size inside the home-screen widgets (Settings → 홈 화면 위젯)
+export type WidgetFontScale = 'sm' | 'md' | 'lg' | 'xl';
+export const WIDGET_FONT_SCALES: Record<WidgetFontScale, number> = { sm: 0.9, md: 1, lg: 1.15, xl: 1.3 };
+
 export interface WidgetConfig {
   enabled: HomeWidgetId[]; // widgets the user chose to add to the home screen (order = display order)
   theme: 'light' | 'dark';
+  fontScale?: WidgetFontScale;
 }
 
 export const DEFAULT_WIDGET_CONFIG: WidgetConfig = { enabled: ['now'], theme: 'light' };

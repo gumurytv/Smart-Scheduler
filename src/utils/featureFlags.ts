@@ -33,6 +33,3 @@ export function isAiTimetableEnabled(): boolean {
   }
 }
 
-// Home-screen widgets need native Android code (AppWidgetProvider) that is not built yet.
-// Until then Settings shows the widget gallery as a preview marked "곧 지원 예정" (coming soon).
-export const HOME_WIDGETS_AVAILABLE = false;

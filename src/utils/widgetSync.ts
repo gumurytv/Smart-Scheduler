@@ -10,6 +10,7 @@ import {
   ScheduleItem,
   SlotStatus,
   WidgetConfig,
+  WIDGET_FONT_SCALES,
 } from '../types';
 import { addDays, formatDateKey, getDayOfWeekKor, getMondayOfCurrentWeek } from '../data/initialData';
 import { resolveDailyTimetable, timeToMinutes } from './timetableHelpers';
@@ -22,7 +23,7 @@ import {
   formatDateLabel,
   formatYearMonthLabel,
 } from '../i18n/translations';
-import { pushNowWidget } from '../native/nowWidget';
+import { pushHomeWidgets } from '../native/homeWidgets';
 
 export const WIDGET_STORAGE_KEY = 'WIDGET_SYNC_DATA';
 
@@ -247,6 +248,7 @@ export function getWidgetConfig(state: PlannerState): WidgetConfig {
   return {
     enabled: HOME_WIDGET_IDS.filter((id) => enabledSet.has(id)),
     theme: cfg.theme === 'dark' ? 'dark' : 'light',
+    fontScale: cfg.fontScale && cfg.fontScale in WIDGET_FONT_SCALES ? cfg.fontScale : 'md',
   };
 }
 
@@ -672,76 +674,142 @@ export function buildWidgetSyncPayload(
   };
 }
 
-// ===================== Native 「지금」 widget =====================
+// ===================== Native home-screen widgets =====================
 
 /**
- * Payload for the Android 「지금」 widget. The widget runs while the app is closed, so instead
- * of a snapshot of "now" it gets the classes of the next 8 days and works out the current and
- * next class from the clock itself. Labels are pre-translated; `{d}` marks a duration.
+ * One payload for all Android widgets (android/.../widget/). The widgets keep running while
+ * the app is closed, so they get enough data to stay right on their own: 8 days of classes
+ * and events, this and next week's timetables, this and next month's calendar. "Today" and
+ * "now" are worked out on the phone from the clock. Labels are pre-translated; `{d}` marks
+ * a duration and `{n}` a count.
  */
-export interface NativeNowWidgetPayload {
-  v: 1;
+export interface NativeWidgetsPayload {
+  v: 2;
   lang: AppLanguage;
-  labels: Record<
-    | 'now'
-    | 'next'
-    | 'tomorrow'
-    | 'free'
-    | 'untilNextTpl'
-    | 'leftTpl'
-    | 'laterTpl'
-    | 'done'
-    | 'doneSub'
-    | 'none'
-    | 'noneSub',
-    string
-  >;
+  theme: WidgetConfig['theme'];
+  /** Text size multiplier (WIDGET_FONT_SCALES). */
+  font: number;
+  labels: Record<string, string>;
   dur: { h: string; m: string; sep: string };
+  /** k: school | academy | event; x: cancelled; st: status label; kl: kind label. */
   days: Array<{
     date: string;
     dateLabel: string;
-    /** Sorted by start. s/e = HH:MM, t = title, b = badge (e.g. 학교 3교시). */
-    items: Array<{ s: string; e: string; t: string; b: string }>;
+    freeTotal: string;
+    items: Array<{ s: string; e: string; t: string; b: string; k: 'school' | 'academy' | 'event'; kl: string; x?: 1; st?: string; added?: 1 }>;
+    free: Array<{ s: string; e: string; d: string }>;
   }>;
+  /** Monday-first; cells index 0 = period 1. st: 'absent' | 'selfStudy'. */
+  schoolWeeks: Array<{
+    title: string;
+    periods: number;
+    days: Array<{ date: string; dl: string; dn: number; cells: Array<{ t: string; x?: 1; st?: string } | null> }>;
+  }>;
+  academyWeeks: Array<{
+    title: string;
+    days: Array<{ date: string; dl: string; dn: number; items: Array<{ s: string; t: string; x?: 1; added?: 1; st?: string }> }>;
+  }>;
+  /** Sunday-first cells; c = [school, academy, other] event counts. */
+  months: Array<{ title: string; head: string[]; cells: Array<{ date: string; dn: number; in: boolean; c: [number, number, number] }> }>;
 }
 
-export function buildNativeNowWidget(state: PlannerState, now: Date = new Date()): NativeNowWidgetPayload {
+export function buildNativeWidgets(state: PlannerState, now: Date = new Date()): NativeWidgetsPayload {
   const lang: AppLanguage = state.language || 'ko';
+  const cfg = getWidgetConfig(state);
+
   const days = Array.from({ length: 8 }, (_, i) => {
     const d = addDays(now, i);
-    const date = formatDateKey(d);
-    const resolved = resolveDailyTimetable(date, state.masterTimetable, state.dailyOverrides);
-    const items = [
-      ...resolved.school
-        .filter((x) => !x.isCancelled && x.subject.trim() !== '')
-        .map((x) => ({
-          s: x.startTime,
-          e: x.endTime,
-          t: `${periodLabel(x.period, lang)} · ${slotTitle(x.subject, x.status, lang)}`,
-          b: tr(lang, `학교 ${x.period}교시`, `School · P${x.period}`, `学校 第${x.period}节`),
+    const tl = buildTimeline(state, d, lang);
+    return {
+      date: tl.date,
+      dateLabel: tl.dateLabel,
+      freeTotal: tl.totalFreeLabel,
+      items: tl.items.map((it) => ({
+        s: it.startTime,
+        e: it.endTime,
+        t: it.kind === 'school' ? `${it.kindLabel} · ${it.title}` : it.title,
+        b:
+          it.kind === 'school'
+            ? tr(lang, `학교 ${it.kindLabel}`, `School · ${it.kindLabel}`, `学校 ${it.kindLabel}`)
+            : it.kindLabel,
+        k: it.kind === 'schedule' ? ('event' as const) : it.kind,
+        kl: it.kindLabel,
+        ...(it.isCancelled ? { x: 1 as const } : {}),
+        ...(it.statusLabel && it.status !== 'cancelled' ? { st: it.statusLabel } : {}),
+        ...(it.isAdded ? { added: 1 as const } : {}),
+      })),
+      free: tl.freeSlots.map((f) => ({ s: f.startTime, e: f.endTime, d: f.durationLabel })),
+    };
+  });
+
+  const schoolWeeks = [now, addDays(now, 7)].map((d) => {
+    const w = buildWeeklySchool(state, d, lang);
+    return {
+      title: w.title,
+      periods: Math.min(w.periodCount, 8),
+      days: w.days.map((day) => ({
+        date: day.date,
+        dl: day.dayLabel,
+        dn: day.dayNum,
+        cells: day.periods.slice(0, 8).map((c) =>
+          c && c.subject.trim()
+            ? {
+                t: c.subjectLabel,
+                ...(c.isCancelled ? { x: 1 as const } : {}),
+                ...(c.status && c.status !== 'cancelled' ? { st: c.status } : {}),
+              }
+            : null
+        ),
+      })),
+    };
+  });
+
+  const academyWeeks = [now, addDays(now, 7)].map((d) => {
+    const w = buildWeeklyAcademy(state, d, lang);
+    return {
+      title: w.title,
+      days: w.days.map((day) => ({
+        date: day.date,
+        dl: day.dayLabel,
+        dn: day.dayNum,
+        items: day.items.map((it) => ({
+          s: it.startTime,
+          t: it.subjectLabel,
+          ...(it.isCancelled ? { x: 1 as const } : {}),
+          ...(it.isAdded ? { added: 1 as const } : {}),
+          ...(it.status && it.status !== 'cancelled' ? { st: it.status } : {}),
         })),
-      ...resolved.academy
-        .filter((x) => !x.isCancelled)
-        .map((x) => ({
-          s: x.startTime,
-          e: x.endTime,
-          t: slotTitle(x.subject, x.status, lang),
-          b: x.isAdded
-            ? tr(lang, '학원 보강/특강', 'Academy · Makeup', '补习班 补课/特讲')
-            : tr(lang, '학원', 'Academy', '补习班'),
-        })),
-    ].sort((a, b) => timeToMinutes(a.s) - timeToMinutes(b.s));
-    return { date, dateLabel: formatDateLabel(d, lang), items };
+      })),
+    };
+  });
+
+  const months = [now, new Date(now.getFullYear(), now.getMonth() + 1, 1)].map((d) => {
+    const m = buildMonthCalendar(state, d, lang);
+    return {
+      title: m.title,
+      head: m.weekHeader,
+      cells: m.cells.map((c) => ({
+        date: c.date,
+        dn: c.dayNum,
+        in: c.isCurrentMonth,
+        c: [c.counts.school ?? 0, c.counts.academy ?? 0, c.counts.other ?? 0] as [number, number, number],
+      })),
+    };
   });
 
   return {
-    v: 1,
+    v: 2,
     lang,
+    theme: cfg.theme,
+    font: WIDGET_FONT_SCALES[cfg.fontScale ?? 'md'],
     labels: {
       now: tr(lang, '지금', 'Now', '现在'),
       next: tr(lang, '다음', 'Next', '下一节'),
       tomorrow: tr(lang, '내일', 'Tomorrow', '明天'),
+      today: tr(lang, '오늘', 'Today', '今天'),
       free: tr(lang, '지금은 빈 시간', 'Free time now', '现在是空闲时间'),
+      freeShort: tr(lang, '빈 시간', 'Free', '空闲'),
+      freeTotalTpl: tr(lang, '빈 시간 {d}', 'Free {d}', '空闲 {d}'),
       untilNextTpl: tr(lang, '다음 수업까지 {d}', 'Next class in {d}', '距下节课还有{d}'),
       leftTpl: tr(lang, '{d} 남음', '{d} left', '剩余{d}'),
       laterTpl: tr(lang, '{d} 후', 'in {d}', '{d}后'),
@@ -749,9 +817,22 @@ export function buildNativeNowWidget(state: PlannerState, now: Date = new Date()
       doneSub: tr(lang, '오늘도 수고했어요', 'Great job today', '今天辛苦了'),
       none: tr(lang, '오늘은 수업이 없어요', 'No classes today', '今天没有课'),
       noneSub: tr(lang, '편하게 쉬어요', 'Enjoy your day', '好好休息'),
+      nothingToday: tr(lang, '오늘 일정이 없어요', 'Nothing today', '今天没有安排'),
+      cancelled: tr(lang, '휴강', 'Cancelled', '停课'),
+      makeupShort: tr(lang, '보강', 'M', '补'),
+      noneShort: tr(lang, '없음', 'None', '无'),
+      moreTpl: tr(lang, '외 {n}개', '+{n} more', '另有{n}项'),
+      monFri: tr(lang, '월~금', 'Mon–Fri', '周一至周五'),
+      monSun: tr(lang, '월~일', 'Mon–Sun', '周一至周日'),
+      school: tr(lang, '학교', 'School', '学校'),
+      academy: tr(lang, '학원', 'Academy', '补习班'),
+      other: tr(lang, '기타', 'Other', '其他'),
     },
     dur: lang === 'zh' ? { h: '小时', m: '分', sep: '' } : lang === 'en' ? { h: 'h', m: 'm', sep: ' ' } : { h: '시간', m: '분', sep: ' ' },
     days,
+    schoolWeeks,
+    academyWeeks,
+    months,
   };
 }
 
@@ -772,7 +853,7 @@ export function syncWidgetData(state: PlannerState): WidgetSyncPayload {
     console.warn('AndroidWidgetBridge.updateWidget call skipped or failed:', e);
   }
 
-  pushNowWidget(JSON.stringify(buildNativeNowWidget(state)));
+  pushHomeWidgets(JSON.stringify(buildNativeWidgets(state)));
 
   return payload;
 }
