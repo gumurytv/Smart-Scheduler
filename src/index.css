@@ -247,3 +247,12 @@
 .native-app *::after {
   transition: none !important;
 }
+
+/*
+ * The scroll area is an opaque composited layer of its own, so gaps between cards are
+ * repainted with the paper colour instead of keeping old pixels when content shrinks.
+ */
+.native-app main {
+  background-color: var(--color-paper);
+  transform: translateZ(0);
+}

@@ -44,6 +44,39 @@ export function registerBackButton(handlers: {
 }
 
 /**
+ * Some Android WebViews keep stale tiles after the scroll area's content shrinks (e.g. every
+ * settings card collapsed), showing "ghost" copies of controls in the empty gaps. Whenever the
+ * content height changes, nudge the scroll layer so it is repainted in full. Returns a cleanup.
+ */
+export function keepRepainted(scroller: HTMLElement | null): () => void {
+  if (!isNativeApp || !scroller || typeof ResizeObserver === 'undefined') return () => {};
+  let frame = 0;
+  const repaint = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      scroller.style.opacity = '0.999';
+      frame = requestAnimationFrame(() => {
+        scroller.style.opacity = '';
+      });
+    });
+  };
+  const resizes = new ResizeObserver(repaint);
+  const observeChildren = () => {
+    resizes.disconnect();
+    Array.from(scroller.children).forEach((child) => resizes.observe(child));
+  };
+  observeChildren();
+  // Switching tabs replaces <main>'s child, so keep observing whatever is inside it.
+  const children = new MutationObserver(observeChildren);
+  children.observe(scroller, { childList: true });
+  return () => {
+    cancelAnimationFrame(frame);
+    resizes.disconnect();
+    children.disconnect();
+  };
+}
+
+/**
  * Base URL for the app's own server API. In the browser the API is served from the same
  * origin, so this is ''. Inside the Android app the web files are bundled locally, so the
  * server must be addressed explicitly via VITE_API_BASE_URL (e.g. https://teumteum.example.com).

@@ -24,7 +24,7 @@ import { AttendanceTab } from './components/AttendanceTab';
 import { MemoTab } from './components/MemoTab';
 import { SettingsTab } from './components/SettingsTab';
 import { syncWidgetData } from './utils/widgetSync';
-import { registerBackButton } from './native/androidShell';
+import { registerBackButton, keepRepainted } from './native/androidShell';
 
 const STORAGE_KEY = 'smart_school_academy_planner_v1';
 
@@ -87,6 +87,7 @@ export default function App() {
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [activeTab]);
+  useEffect(() => keepRepainted(mainRef.current), []);
 
   // Android back button: close sheet → back to 시간표 → exit app (no-op in the browser)
   const activeTabRef = useRef(activeTab);
@@ -239,7 +240,7 @@ export default function App() {
       </header>
 
       {/* Main Scrollable Content Area (the only scroll container) */}
-      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3.5 pb-6">
+      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-paper p-3.5 pb-6">
         {activeTab === 'timetable' && (
           <TimetableTab
             language={lang}
