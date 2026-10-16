@@ -17,6 +17,24 @@ async function startServer() {
   // Allow large base64 images (up to 15MB)
   app.use(express.json({ limit: '15mb' }));
 
+  // The Android app (Capacitor) loads its web files from https://localhost, so calls to this
+  // server are cross-origin. Allow only the origins listed in CORS_ALLOWED_ORIGINS.
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.use('/api', (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+
   app.post('/api/parse-timetable', async (req, res) => {
     // Experimental feature: off unless the operator explicitly enables it, so a
     // public deployment cannot spend Gemini quota before the feature is released.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   CalendarClock,
   CalendarDays,
@@ -24,6 +24,7 @@ import { AttendanceTab } from './components/AttendanceTab';
 import { MemoTab } from './components/MemoTab';
 import { SettingsTab } from './components/SettingsTab';
 import { syncWidgetData } from './utils/widgetSync';
+import { registerBackButton } from './native/androidShell';
 
 const STORAGE_KEY = 'smart_school_academy_planner_v1';
 
@@ -80,6 +81,18 @@ export default function App() {
     }
     syncWidgetData(state);
   }, [state]);
+
+  // Android back button: close sheet → back to 시간표 → exit app (no-op in the browser)
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  useEffect(
+    () =>
+      registerBackButton({
+        isOnHomeTab: () => activeTabRef.current === 'timetable',
+        goHome: () => setActiveTab('timetable'),
+      }),
+    []
+  );
 
   // Listen to online/offline status
   useEffect(() => {
