@@ -82,6 +82,12 @@ export default function App() {
     syncWidgetData(state);
   }, [state]);
 
+  // The content area is the scroll container: start each tab at the top.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [activeTab]);
+
   // Android back button: close sheet → back to 시간표 → exit app (no-op in the browser)
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
@@ -189,9 +195,11 @@ export default function App() {
   ];
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-paper text-ink flex flex-col shadow-xl relative">
-      {/* Sticky Top Header */}
-      <header className="sticky top-0 z-30 bg-surface border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
+    <div className="max-w-md mx-auto h-screen h-[100dvh] overflow-hidden bg-paper text-ink flex flex-col shadow-xl relative">
+      {/* App shell: fixed-height column (header · scrolling content · tab bar). Only <main>
+          scrolls, so the page itself never does — the Android WebView repaints reliably this way. */}
+      {/* Top Header */}
+      <header className="flex-none z-30 bg-surface border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
         <div className="min-w-0 flex items-center gap-2">
           <h1 className="flex items-baseline gap-1.5 min-w-0">
             <span className="text-[20px] font-extrabold tracking-tight text-accent-700 shrink-0">
@@ -230,8 +238,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Scrollable Content Area (pb-24 as required) */}
-      <main className="flex-1 p-3.5 pb-24">
+      {/* Main Scrollable Content Area (the only scroll container) */}
+      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3.5 pb-6">
         {activeTab === 'timetable' && (
           <TimetableTab
             language={lang}
@@ -292,10 +300,10 @@ export default function App() {
         )}
       </main>
 
-      {/* Fixed Bottom 5-Tab Navigation Bar */}
+      {/* Bottom 5-Tab Navigation Bar (in flow, below the scroll area) */}
       <nav
         aria-label={tr(lang, '메인 메뉴', 'Main Navigation', '主导航')}
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-surface border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
+        className="flex-none w-full z-40 bg-surface border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
       >
         {navTabs.map((tab) => {
           const IconComponent = tab.icon;
