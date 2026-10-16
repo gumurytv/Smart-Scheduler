@@ -297,7 +297,7 @@ const StatusDonut: React.FC<{
       className="flex flex-col items-center gap-2.5 min-w-0 rounded-2xl bg-paper p-3"
       aria-label={ariaLabel}
     >
-      <figcaption className="self-start flex items-center gap-1.5 text-[12px] font-bold text-ink">
+      <figcaption className="self-start flex items-center gap-1.5 text-[0.75rem] font-bold text-ink">
         {icon}
         {title}
       </figcaption>
@@ -335,15 +335,15 @@ const StatusDonut: React.FC<{
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-[22px] leading-none font-mono tabular-nums text-ink">
+          <span className="text-[1.375rem] leading-none font-mono tabular-nums text-ink">
             {showRate ? `${Math.round(stats.rate)}%` : '–'}
           </span>
-          <span className="text-[11px] font-semibold text-slate-600 mt-1">
+          <span className="text-[0.6875rem] font-semibold text-slate-600 mt-1">
             {tr(lang, '실질 출석률', 'Real rate', '实际出勤率')}
           </span>
         </div>
       </div>
-      <ul className="w-full grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-700">
+      <ul className="w-full grid grid-cols-2 gap-x-2 gap-y-1 text-[0.6875rem] font-semibold text-slate-700">
         {STATUS_ORDER.map((st) => (
           <li key={st} className="flex items-center gap-1 whitespace-nowrap min-w-0">
             <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_META[st].barColor}`} />
@@ -389,7 +389,7 @@ const RateRing: React.FC<{ rate: number | null; label: string }> = ({ rate, labe
           ) : (
             <>
               <span className="text-[28px]">{Math.round(rate)}</span>
-              <span className="text-[15px]">%</span>
+              <span className="text-[0.9375rem]">%</span>
             </>
           )}
         </span>
@@ -906,7 +906,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             aria-checked={isSelected}
             title={statusLabel(st, lang)}
             onClick={() => onPick(st)}
-            className={`min-h-[50px] min-w-0 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px] font-bold transition-all active:scale-[0.97] ${
+            className={`min-h-[50px] min-w-0 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[0.75rem] font-bold transition-all active:scale-[0.97] ${
               isSelected ? `${meta.btnActive} shadow-xs` : 'text-slate-700 hover:bg-paper'
             }`}
           >
@@ -919,7 +919,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   );
 
   const reasonInputClass =
-    'w-full h-10 px-4 rounded-full border border-divider bg-surface text-[12px] text-ink placeholder:text-slate-500 focus:outline-none focus:border-accent';
+    'w-full h-10 px-4 rounded-full border border-divider bg-surface text-[0.75rem] text-ink placeholder:text-slate-500 focus:outline-none focus:border-accent';
 
   const clearButton = (onClear: () => void, label: string) => (
     <button
@@ -934,7 +934,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   );
 
   const unrecordedChip = (
-    <span className="px-2 py-0.5 rounded-full bg-surface text-[11px] font-semibold text-slate-600 whitespace-nowrap shrink-0">
+    <span className="px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-semibold text-slate-600 whitespace-nowrap shrink-0">
       {tr(lang, '미기록', 'Not set', '未登记')}
     </span>
   );
@@ -949,7 +949,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       >
         <ChevronLeft strokeWidth={2.75} className="w-3.5 h-3.5" />
       </button>
-      <span className="min-w-[84px] text-center text-[14px] font-mono tabular-nums text-ink whitespace-nowrap">
+      <span className="min-w-[84px] text-center text-[0.875rem] font-mono tabular-nums text-ink whitespace-nowrap">
         {monthLabel}
       </span>
       <button
@@ -966,7 +966,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   const legendChip = (st: AttendanceStatus, shape: 'dot' | 'bar' = 'dot') => (
     <span
       key={st}
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-paper text-[11px] font-semibold text-slate-700 whitespace-nowrap"
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-paper text-[0.6875rem] font-semibold text-slate-700 whitespace-nowrap"
     >
       <span
         className={`${shape === 'bar' ? 'w-3 h-1.5' : 'w-2 h-2'} rounded-full ${STATUS_META[st].barColor}`}
@@ -989,7 +989,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         {/* Title row */}
         <div className="flex items-center gap-1.5 min-w-0">
           <ClipboardCheck strokeWidth={2.75} className="w-4 h-4 text-accent-700 shrink-0" />
-          <h2 className="text-[13px] font-bold text-ink truncate">
+          <h2 className="text-[0.8125rem] font-bold text-ink truncate">
             {isSelectedToday
               ? tr(lang, '오늘 출석 체크', "Today's Attendance", '今日出勤登记')
               : tr(lang, '출석 체크', 'Attendance Check', '出勤登记')}
@@ -1003,8 +1003,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               {selectedDateObj.getDate()}
             </span>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[15px] font-bold text-ink truncate">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span className="text-[0.9375rem] font-bold text-ink truncate">
                   {tr(
                     lang,
                     `${selectedDateObj.getMonth() + 1}월`,
@@ -1013,12 +1013,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   )}
                 </span>
                 {isSelectedToday && (
-                  <span className="px-2 py-px rounded-full text-[11px] font-bold bg-accent-700 text-paper">
+                  <span className="px-2 py-px rounded-full text-[0.6875rem] font-bold bg-accent-700 text-paper whitespace-nowrap">
                     {tr(lang, '오늘', 'TODAY', '今天')}
                   </span>
                 )}
               </div>
-              <div className="text-[12px] font-semibold text-slate-600 truncate">
+              <div className="text-[0.75rem] font-semibold text-slate-600 truncate">
                 {(() => {
                   const w = FULL_WEEKDAYS[selectedDateObj.getDay()];
                   return `${tr(lang, w.ko, w.en, w.zh)} · ${selectedDateObj.getFullYear()}`;
@@ -1039,7 +1039,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               type="button"
               onClick={goToday}
               disabled={isSelectedToday}
-              className={`px-3 h-[34px] rounded-full text-[12px] font-bold whitespace-nowrap transition-colors ${
+              className={`px-3 h-[34px] rounded-full text-[0.75rem] font-bold whitespace-nowrap transition-colors ${
                 isSelectedToday
                   ? 'bg-paper/60 text-slate-500 cursor-default'
                   : 'bg-accent-700 text-paper hover:bg-accent-800'
@@ -1092,13 +1092,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 className={`flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-colors min-w-0 ${tone}`}
               >
                 <span
-                  className={`text-[11px] font-semibold leading-tight ${
+                  className={`text-[0.6875rem] font-semibold leading-tight ${
                     day.isSelected ? 'text-paper/90' : day.isToday ? 'text-accent-800' : 'text-slate-600'
                   }`}
                 >
                   {translateDay(KO_WEEKDAYS[day.date.getDay()], lang)}
                 </span>
-                <span className="font-mono text-[16px] leading-none tabular-nums">
+                <span className="font-mono text-[1rem] leading-none tabular-nums">
                   {day.date.getDate()}
                 </span>
                 <span className="h-1.5 flex items-center gap-[3px]" aria-hidden="true">
@@ -1117,7 +1117,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         {/* Day progress + quick action */}
         <div className="flex items-center gap-3 rounded-2xl bg-paper px-3.5 py-2.5">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
+            <div className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-slate-700">
               {dayAllDone && <CheckCircle2 strokeWidth={2.75} className="w-3.5 h-3.5 text-sage-700 shrink-0" />}
               <span className="truncate">{daySummary}</span>
             </div>
@@ -1141,7 +1141,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             <button
               type="button"
               onClick={handleMarkAllPresent}
-              className="h-9 px-3.5 rounded-full bg-sage-700 text-paper text-[12px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 hover:bg-sage-800 active:scale-95 transition-transform"
+              className="h-9 px-3.5 rounded-full bg-sage-700 text-paper text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 hover:bg-sage-800 active:scale-95 transition-transform"
               title={tr(
                 lang,
                 '아직 기록하지 않은 수업을 모두 출석으로',
@@ -1167,8 +1167,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 <GraduationCap strokeWidth={2.5} className="w-4 h-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-[14px] font-bold text-ink truncate">{schoolLabel}</div>
-                <div className="text-[11px] font-semibold text-slate-600 truncate">
+                <div className="text-[0.875rem] font-bold text-ink truncate">{schoolLabel}</div>
+                <div className="text-[0.6875rem] font-semibold text-slate-600 truncate">
                   {selectedDayResolved.schoolPeriodsCount > 0
                     ? tr(
                         lang,
@@ -1206,7 +1206,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
           {/* Academies */}
           {selectedDayResolved.academyList.length === 0 ? (
-            <div className="flex items-center gap-2.5 rounded-2xl border border-dashed border-divider px-3.5 py-3 text-[12px] text-slate-600">
+            <div className="flex items-center gap-2.5 rounded-2xl border border-dashed border-divider px-3.5 py-3 text-[0.75rem] text-slate-600">
               <Building2 strokeWidth={2.5} className="w-4 h-4 text-slate-500 shrink-0" />
               {tr(
                 lang,
@@ -1231,14 +1231,14 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[14px] font-bold text-ink truncate">{name}</span>
+                        <span className="text-[0.875rem] font-bold text-ink truncate">{name}</span>
                         {ac.isCancelledOnTimetable && (
-                          <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[11px] font-semibold whitespace-nowrap shrink-0">
+                          <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[0.6875rem] font-semibold whitespace-nowrap shrink-0">
                             {tr(lang, '시간표 휴강', 'Off on timetable', '课表停课')}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 min-w-0">
+                      <div className="flex items-center gap-1 text-[0.6875rem] font-semibold text-slate-600 min-w-0">
                         <Clock strokeWidth={2.5} className="w-3 h-3 shrink-0" />
                         <span className="font-mono tabular-nums truncate">{ac.timeLabel}</span>
                       </div>
@@ -1282,7 +1282,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                             makeupCompleted: !rec.needsMakeup ? Boolean(rec.makeupCompleted) : false,
                           })
                         }
-                        className={`h-8 px-3 rounded-full text-[12px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                        className={`h-8 px-3 rounded-full text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
                           rec.needsMakeup
                             ? 'bg-accent-700 text-paper hover:bg-accent-800'
                             : 'border border-divider text-slate-700 hover:bg-surface'
@@ -1300,7 +1300,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                               makeupCompleted: !rec.makeupCompleted,
                             })
                           }
-                          className={`h-8 px-3 rounded-full text-[12px] font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                          className={`h-8 px-3 rounded-full text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
                             rec.makeupCompleted
                               ? 'bg-sage-700 text-paper hover:bg-sage-800'
                               : 'border border-divider text-slate-700 hover:bg-surface'
@@ -1328,10 +1328,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             <PartyPopper strokeWidth={2.5} className="w-5 h-5" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-[13px] font-bold text-sage-900">
+            <h2 className="text-[0.8125rem] font-bold text-sage-900">
               {tr(lang, '밀린 보강이 없어요', 'No pending makeups', '没有待补的课')}
             </h2>
-            <p className="text-[12px] text-sage-800">
+            <p className="text-[0.75rem] text-sage-800">
               {tr(lang, '모든 보강을 마쳤어요. 멋져요!', 'All makeups are done. Nice!', '所有补课都已完成，真棒！')}
             </p>
           </div>
@@ -1341,10 +1341,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <AlertCircle strokeWidth={2.75} className="w-4 h-4 text-accent-700 shrink-0" />
-              <h2 className="text-[13px] font-bold text-ink truncate">
+              <h2 className="text-[0.8125rem] font-bold text-ink truncate">
                 {tr(lang, '미완료 보강', 'Pending makeups', '未完成补课')}
               </h2>
-              <span className="px-2 py-px rounded-full bg-accent-700 text-paper text-[11px] font-bold tabular-nums">
+              <span className="px-2 py-px rounded-full bg-accent-700 text-paper text-[0.6875rem] font-bold tabular-nums">
                 {tr(
                   lang,
                   `${monthlyStats.pendingMakeups.length}건`,
@@ -1353,7 +1353,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 )}
               </span>
             </div>
-            <span className="text-[11px] text-slate-600 text-right">
+            <span className="text-[0.6875rem] text-slate-600 text-right">
               {tr(lang, '보강하면 완료를 눌러요', 'Tap done after makeup', '补课后点击完成')}
             </span>
           </div>
@@ -1373,22 +1373,22 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   }}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <div className="text-[14px] font-bold text-ink truncate">
+                  <div className="text-[0.875rem] font-bold text-ink truncate">
                     {translateSubject(mk.academyName, lang)}
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface text-[11px] font-semibold text-slate-700 tabular-nums whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-semibold text-slate-700 tabular-nums whitespace-nowrap">
                       <Calendar strokeWidth={2.5} className="w-3 h-3" />
                       {mk.shortDateLabel}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${STATUS_META[mk.status].badgeClass}`}
+                      className={`px-2 py-0.5 rounded-full text-[0.6875rem] font-bold whitespace-nowrap ${STATUS_META[mk.status].badgeClass}`}
                     >
                       {statusShortLabel(mk.status, lang)}
                     </span>
                   </div>
                   {mk.reason && (
-                    <p className="mt-1 text-[12px] text-slate-600 truncate">
+                    <p className="mt-1 text-[0.75rem] text-slate-600 truncate">
                       {tr(lang, '사유: ', 'Reason: ', '原因：')}
                       {translateSampleText(mk.reason, lang)}
                     </p>
@@ -1401,7 +1401,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       makeupCompleted: true,
                     })
                   }
-                  className="h-10 px-3.5 rounded-full bg-sage-700 text-paper text-[12px] font-bold inline-flex items-center gap-1.5 hover:bg-sage-800 active:scale-95 transition-transform shrink-0 whitespace-nowrap"
+                  className="h-10 px-3.5 rounded-full bg-sage-700 text-paper text-[0.75rem] font-bold inline-flex items-center gap-1.5 hover:bg-sage-800 active:scale-95 transition-transform shrink-0 whitespace-nowrap"
                 >
                   <Check strokeWidth={3} className="w-4 h-4" />
                   {tr(lang, '보강 완료', 'Done', '补课完成')}
@@ -1416,13 +1416,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-[13px] font-bold text-ink flex items-center gap-1.5">
+            <h2 className="text-[0.8125rem] font-bold text-ink flex items-center gap-1.5">
               <BarChart3 strokeWidth={2.75} className="w-4 h-4 text-accent-700 shrink-0" />
               <span className="truncate">
                 {tr(lang, `${monthLabel} 출석 현황`, `${monthLabel} Attendance`, `${monthLabel} 出勤概况`)}
               </span>
             </h2>
-            <p className="text-[11px] text-slate-600 mt-0.5">
+            <p className="text-[0.6875rem] text-slate-600 mt-0.5">
               {tr(
                 lang,
                 '공식휴강은 출석률에서 제외 · 아래 달력과 같은 달',
@@ -1435,7 +1435,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             <button
               type="button"
               onClick={goToday}
-              className="px-3 h-8 rounded-full bg-accent-700 text-paper text-[12px] font-bold whitespace-nowrap shrink-0 hover:bg-accent-800"
+              className="px-3 h-8 rounded-full bg-accent-700 text-paper text-[0.75rem] font-bold whitespace-nowrap shrink-0 hover:bg-accent-800"
             >
               {tr(lang, '이번 달', 'This month', '本月')}
             </button>
@@ -1451,11 +1451,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             }`}
           />
           <div className="min-w-0">
-            <div className="text-[12px] font-bold text-slate-600">
+            <div className="text-[0.75rem] font-bold text-slate-600">
               {tr(lang, '실질 출석률 · 학교+학원', 'Real rate · school + academies', '实际出勤率 · 学校+补习班')}
             </div>
-            <div className="text-[17px] font-bold text-ink mt-0.5">{heroMessage}</div>
-            <div className="text-[11px] text-slate-600 mt-1 leading-snug">
+            <div className="text-[1.0625rem] font-bold text-ink mt-0.5">{heroMessage}</div>
+            <div className="text-[0.6875rem] text-slate-600 mt-1 leading-snug">
               {tr(
                 lang,
                 `출석·지각 ${combined.present + combined.late} / ${combinedEff}회`,
@@ -1480,10 +1480,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               <span className={`w-6 h-6 rounded-full flex items-center justify-center ${k.iconWrap}`} aria-hidden="true">
                 {k.icon}
               </span>
-              <div className={`text-[22px] leading-tight font-mono tabular-nums mt-1 ${k.valueColor}`}>
+              <div className={`text-[1.375rem] leading-tight font-mono tabular-nums mt-1 ${k.valueColor}`}>
                 {k.value}
               </div>
-              <div className="text-[11px] font-semibold text-slate-600 max-w-full truncate">{k.label}</div>
+              <div className="text-[0.6875rem] font-semibold text-slate-600 max-w-full truncate">{k.label}</div>
             </div>
           ))}
         </div>
@@ -1506,7 +1506,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
         {/* Weekly trend (column chart) */}
         <div className="rounded-2xl bg-paper p-3 space-y-2">
-          <h3 className="text-[12px] font-bold text-ink flex items-center gap-1.5">
+          <h3 className="text-[0.75rem] font-bold text-ink flex items-center gap-1.5">
             <TrendingUp strokeWidth={2.75} className="w-3.5 h-3.5 text-sage-700 shrink-0" />
             {tr(lang, '주차별 출석률', 'Weekly attendance rate', '每周出勤率')}
             <span className="font-semibold text-slate-600">
@@ -1533,7 +1533,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   }`}
                   style={{ bottom: `${(g / 100) * WEEK_PLOT_H}px` }}
                 >
-                  <span className="absolute -left-8 -top-[8px] w-6 text-right text-[11px] font-mono tabular-nums text-slate-500">
+                  <span className="absolute -left-8 -top-[8px] w-6 text-right text-[0.6875rem] font-mono tabular-nums text-slate-500">
                     {g}
                   </span>
                 </div>
@@ -1559,7 +1559,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       className="group flex flex-col items-center justify-end h-full flex-1 max-w-[48px] cursor-default"
                     >
                       <span
-                        className={`text-[11px] font-mono tabular-nums mb-0.5 ${
+                        className={`text-[0.6875rem] font-mono tabular-nums mb-0.5 ${
                           has ? 'text-ink' : 'text-slate-400'
                         }`}
                       >
@@ -1583,7 +1583,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 return (
                   <span
                     key={w.index}
-                    className={`flex-1 max-w-[48px] text-center text-[11px] whitespace-nowrap ${
+                    className={`flex-1 max-w-[48px] text-center text-[0.6875rem] whitespace-nowrap ${
                       isNowWeek ? 'font-bold text-sage-800' : 'text-slate-600'
                     }`}
                   >
@@ -1598,7 +1598,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         {/* Per-academy stacked bars */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 pt-1">
-            <h3 className="text-[12px] font-bold text-ink flex items-center gap-1.5 min-w-0">
+            <h3 className="text-[0.75rem] font-bold text-ink flex items-center gap-1.5 min-w-0">
               <Building2 strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-700 shrink-0" />
               <span className="truncate">
                 {tr(
@@ -1609,7 +1609,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 )}
               </span>
             </h3>
-            <span className="text-[11px] text-slate-600 shrink-0">
+            <span className="text-[0.6875rem] text-slate-600 shrink-0">
               {tr(lang, '눌러서 상세 보기', 'Tap for details', '点击查看详情')}
             </span>
           </div>
@@ -1621,7 +1621,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           )}
 
           {monthlyStats.perAcademyStats.length === 0 ? (
-            <div className="p-3 rounded-2xl bg-paper text-center text-[12px] text-slate-600">
+            <div className="p-3 rounded-2xl bg-paper text-center text-[0.75rem] text-slate-600">
               {tr(
                 lang,
                 '등록된 학원이 없습니다. [설정]에서 학원 후보군을 추가하세요.',
@@ -1662,14 +1662,14 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="w-2 h-2 rounded-full bg-accent shrink-0" aria-hidden="true" />
-                        <span className="text-[13px] font-bold text-ink truncate">{name}</span>
+                        <span className="text-[0.8125rem] font-bold text-ink truncate">{name}</span>
                         {pendingMakeupCount > 0 && (
-                          <span className="px-1.5 py-px rounded-full bg-accent-700 text-paper text-[11px] font-bold whitespace-nowrap shrink-0">
+                          <span className="px-1.5 py-px rounded-full bg-accent-700 text-paper text-[0.6875rem] font-bold whitespace-nowrap shrink-0">
                             {tr(lang, `보강 ${pendingMakeupCount}`, `Makeup ${pendingMakeupCount}`, `补课 ${pendingMakeupCount}`)}
                           </span>
                         )}
                         <span
-                          className={`ml-auto text-[16px] font-mono tabular-nums shrink-0 ${
+                          className={`ml-auto text-[1rem] font-mono tabular-nums shrink-0 ${
                             has ? 'text-ink' : 'text-slate-400'
                           }`}
                         >
@@ -1690,7 +1690,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                           />
                         ))}
                       </span>
-                      <span className="block text-[11px] text-slate-600 tabular-nums">
+                      <span className="block text-[0.6875rem] text-slate-600 tabular-nums">
                         {has || stats.cancelled > 0
                           ? STATUS_ORDER.filter((st) => stats[st] > 0)
                               .map((st) => `${statusShortLabel(st, lang)} ${stats[st]}`)
@@ -1709,12 +1709,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             <div className="mt-1 p-3.5 rounded-2xl bg-paper space-y-3 animate-in fade-in duration-150">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <span className="text-[14px] font-bold text-ink">
+                  <span className="text-[0.875rem] font-bold text-ink">
                     {translateSubject(activeAcademyDetailObj.academyName, lang)}{' '}
                     {tr(lang, '상세 출결 리포트', 'Attendance Report', '详细出勤报告')}
                   </span>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[12px] font-mono tabular-nums ${
+                    className={`px-2.5 py-0.5 rounded-full text-[0.75rem] font-mono tabular-nums ${
                       !hasEffective(activeAcademyDetailObj.stats)
                         ? 'bg-slate-200 text-slate-700'
                         : activeAcademyDetailObj.stats.rate < 75
@@ -1748,8 +1748,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   ] as Array<[AttendanceStatus, string, string]>
                 ).map(([st, label, color]) => (
                   <div key={st} className="p-2 rounded-xl bg-surface min-w-0">
-                    <div className="text-[11px] font-semibold text-slate-600 truncate">{label}</div>
-                    <div className={`text-[16px] font-mono tabular-nums mt-0.5 ${color}`}>
+                    <div className="text-[0.6875rem] font-semibold text-slate-600 truncate">{label}</div>
+                    <div className={`text-[1rem] font-mono tabular-nums mt-0.5 ${color}`}>
                       {countUnit(activeAcademyDetailObj.stats[st])}
                     </div>
                   </div>
@@ -1758,7 +1758,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
               {/* Late days */}
               <div className="space-y-1.5">
-                <span className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5">
+                <span className="text-[0.75rem] font-bold text-slate-700 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-accent-300" />
                   {tr(
                     lang,
@@ -1768,7 +1768,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   )}
                 </span>
                 {activeAcademyDetailObj.stats.lateDays.length === 0 ? (
-                  <div className="px-3 py-2 rounded-xl bg-surface text-[11px] text-slate-600">
+                  <div className="px-3 py-2 rounded-xl bg-surface text-[0.6875rem] text-slate-600">
                     {tr(lang, '이 달에 지각한 날이 없습니다.', 'No late records this month.', '本月没有迟到记录。')}
                   </div>
                 ) : (
@@ -1783,19 +1783,19 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <Calendar strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-700 shrink-0" />
-                            <span className="text-[12px] font-semibold text-ink tabular-nums">{item.shortDateLabel}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-accent-300 text-accent-900 text-[11px] font-bold">
+                            <span className="text-[0.75rem] font-semibold text-ink tabular-nums">{item.shortDateLabel}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-accent-300 text-accent-900 text-[0.6875rem] font-bold">
                               {statusShortLabel('late', lang)}
                             </span>
                           </div>
                           {item.record.reason && (
-                            <p className="text-[11px] text-slate-600 mt-0.5 truncate">
+                            <p className="text-[0.6875rem] text-slate-600 mt-0.5 truncate">
                               {tr(lang, '사유: ', 'Reason: ', '原因：')}
                               {translateSampleText(item.record.reason, lang)}
                             </p>
                           )}
                         </div>
-                        <span className="text-[11px] font-semibold text-accent-700 shrink-0">
+                        <span className="text-[0.6875rem] font-semibold text-accent-700 shrink-0">
                           {tr(lang, '날짜 이동 →', 'Jump →', '跳转 →')}
                         </span>
                       </button>
@@ -1806,7 +1806,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
               {/* Absent days */}
               <div className="space-y-1.5">
-                <span className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5">
+                <span className="text-[0.75rem] font-bold text-slate-700 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-accent-800" />
                   {tr(
                     lang,
@@ -1816,7 +1816,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   )}
                 </span>
                 {activeAcademyDetailObj.stats.absentDays.length === 0 ? (
-                  <div className="px-3 py-2 rounded-xl bg-surface text-[11px] text-slate-600">
+                  <div className="px-3 py-2 rounded-xl bg-surface text-[0.6875rem] text-slate-600">
                     {tr(lang, '이 달에 결석한 날이 없습니다.', 'No absent records this month.', '本月没有缺席记录。')}
                   </div>
                 ) : (
@@ -1833,13 +1833,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         >
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <Calendar strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-800 shrink-0" />
-                            <span className="text-[12px] font-semibold text-ink tabular-nums">{item.shortDateLabel}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-accent-800 text-paper text-[11px] font-bold">
+                            <span className="text-[0.75rem] font-semibold text-ink tabular-nums">{item.shortDateLabel}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-accent-800 text-paper text-[0.6875rem] font-bold">
                               {statusShortLabel('absent', lang)}
                             </span>
                             {item.record.needsMakeup && (
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                className={`px-2 py-0.5 rounded-full text-[0.6875rem] font-bold ${
                                   item.record.makeupCompleted
                                     ? 'bg-sage-200 text-sage-800'
                                     : 'bg-accent-100 text-accent-800'
@@ -1852,7 +1852,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                             )}
                           </div>
                           {item.record.reason && (
-                            <p className="text-[11px] text-slate-600 mt-0.5 truncate">
+                            <p className="text-[0.6875rem] text-slate-600 mt-0.5 truncate">
                               {tr(lang, '사유: ', 'Reason: ', '原因：')}
                               {translateSampleText(item.record.reason, lang)}
                             </p>
@@ -1867,7 +1867,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                                 makeupCompleted: true,
                               })
                             }
-                            className="h-8 px-3 rounded-full bg-sage-700 text-paper text-[11px] font-bold inline-flex items-center gap-1 hover:bg-sage-800 shrink-0 whitespace-nowrap"
+                            className="h-8 px-3 rounded-full bg-sage-700 text-paper text-[0.6875rem] font-bold inline-flex items-center gap-1 hover:bg-sage-800 shrink-0 whitespace-nowrap"
                           >
                             <Check strokeWidth={3} className="w-3.5 h-3.5" />
                             {tr(lang, '보강 완료', 'Done', '补课完成')}
@@ -1876,7 +1876,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                           <button
                             type="button"
                             onClick={() => selectDate(item.dateStr)}
-                            className="text-[11px] font-semibold text-accent-700 shrink-0"
+                            className="text-[0.6875rem] font-semibold text-accent-700 shrink-0"
                           >
                             {tr(lang, '날짜 이동 →', 'Jump →', '跳转 →')}
                           </button>
@@ -1894,7 +1894,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       {/* 4. MONTHLY CALENDAR FOR REVIEW (drives the charts above) */}
       <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-[13px] font-bold text-ink flex items-center gap-1.5 min-w-0">
+          <h2 className="text-[0.8125rem] font-bold text-ink flex items-center gap-1.5 min-w-0">
             <CalendarDays strokeWidth={2.75} className="w-4 h-4 text-accent-700 shrink-0" />
             <span className="truncate">{tr(lang, '출석 기록 달력', 'Attendance Calendar', '出勤记录日历')}</span>
           </h2>
@@ -1905,7 +1905,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           <div className="flex items-center gap-1.5 flex-wrap">
             {STATUS_ORDER.map((st) => legendChip(st))}
           </div>
-          <p className="text-[11px] text-slate-600 flex items-center gap-1.5 flex-wrap">
+          <p className="text-[0.6875rem] text-slate-600 flex items-center gap-1.5 flex-wrap">
             <span className="inline-flex items-center gap-1">
               <span className="w-3 h-1.5 rounded-full bg-slate-500" aria-hidden="true" />
               {tr(lang, '학교', 'School', '学校')}
@@ -1934,7 +1934,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
             {calendarWeekHeader.map((d, idx) => (
               <div
                 key={idx}
-                className={`py-1 text-[11px] font-bold ${
+                className={`py-1 text-[0.6875rem] font-bold ${
                   idx === 0 ? 'text-accent-700' : idx === 6 ? 'text-sage-700' : 'text-slate-600'
                 }`}
               >
@@ -1980,7 +1980,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       : 'text-ink opacity-40 hover:opacity-70'
                   }`}
                 >
-                  <span className="text-[13px] leading-none font-mono tabular-nums">{cell.dayNum}</span>
+                  <span className="text-[0.8125rem] leading-none font-mono tabular-nums">{cell.dayNum}</span>
                   <span
                     className={`w-full max-w-[32px] h-1.5 rounded-full ${
                       schoolMeta ? `${schoolMeta.barColor} ${markRing}` : 'bg-transparent'

@@ -153,8 +153,13 @@ export interface UserProfile {
   grade: string; // free text so any school system fits, e.g. '2학년 3반'
 }
 
+// 글자 크기 (Settings): percentage of the default text size, for easier reading.
+export type TextScale = 100 | 115 | 130 | 145;
+export const TEXT_SCALES: TextScale[] = [100, 115, 130, 145];
+
 export interface PlannerState {
   language?: AppLanguage;
+  textScale?: TextScale;
   subjectPool: SubjectPool;
   masterTimetable: MasterTimetable;
   dailyOverrides: DailyOverrides;
