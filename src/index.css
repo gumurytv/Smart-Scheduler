@@ -236,3 +236,14 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/*
+ * Android app (Capacitor WebView): CSS transitions running while content above them
+ * collapses or expands can leave stale painted tiles ("ghost" rows) in the WebView.
+ * The app shell marks <html class="native-app">; turn transitions off there.
+ */
+.native-app *,
+.native-app *::before,
+.native-app *::after {
+  transition: none !important;
+}

@@ -4,6 +4,12 @@ import { App } from '@capacitor/app';
 
 export const isNativeApp = Capacitor.isNativePlatform();
 
+// Mark the document so CSS can opt out of effects the Android WebView repaints badly
+// (see `.native-app` in index.css).
+if (isNativeApp && typeof document !== 'undefined') {
+  document.documentElement.classList.add('native-app');
+}
+
 // Every bottom sheet / popup in the app is a full-screen `fixed inset-0` backdrop that closes
 // when the backdrop itself is clicked (the sheet body stops propagation). Android's back
 // button should close the topmost one first, the same way tapping outside would.
