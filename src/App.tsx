@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   CalendarClock,
   CalendarDays,
@@ -15,6 +15,7 @@ import {
   MemoMap,
   AppLanguage,
   DEFAULT_SCHOOL_TIME_CONFIG,
+  TEXT_SCALES,
 } from './types';
 import { createInitialPlannerState } from './data/initialData';
 import { tr, formatDateLabel } from './i18n/translations';
@@ -82,6 +83,12 @@ export default function App() {
     syncWidgetData(state);
   }, [state]);
 
+  // 글자 크기: every text size is in rem, so scaling the root font size scales all text.
+  const textScale = TEXT_SCALES.includes(state.textScale ?? 100) ? state.textScale ?? 100 : 100;
+  useLayoutEffect(() => {
+    document.documentElement.style.fontSize = textScale === 100 ? '' : `${textScale}%`;
+  }, [textScale]);
+
   // The content area is the scroll container: start each tab at the top.
   const mainRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -148,6 +155,7 @@ export default function App() {
       language: prev.language || 'ko',
       schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
       profile: prev.profile,
+      textScale: prev.textScale,
     }));
   };
 
@@ -203,15 +211,15 @@ export default function App() {
       <header className="flex-none z-30 bg-surface border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
         <div className="min-w-0 flex items-center gap-2">
           <h1 className="flex items-baseline gap-1.5 min-w-0">
-            <span className="text-[20px] font-extrabold tracking-tight text-accent-700 shrink-0">
+            <span className="text-[1.25rem] font-extrabold tracking-tight text-accent-700 shrink-0">
               {tr(lang, '틈틈', 'TeumTeum', 'TeumTeum')}
             </span>
-            <span className="text-[11px] font-semibold text-slate-600 truncate">
+            <span className="text-[0.6875rem] font-semibold text-slate-600 truncate">
               {tr(lang, '학교·학원 플래너', 'school & academy planner', '学校·补习班计划本')}
             </span>
           </h1>
           {isOffline && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-100 text-accent-900 text-[10px] font-bold shrink-0">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-100 text-accent-900 text-[0.625rem] font-bold shrink-0">
               <WifiOff className="w-3 h-3" />{' '}
               {tr(lang, '오프라인 작동중', 'Offline Mode', '离线运行中')}
             </span>
@@ -223,7 +231,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab('attendance')}
-              className="h-7 px-2.5 rounded-full bg-accent-100 border border-accent-300 text-accent-900 text-[11px] font-bold tabular-nums hover:bg-accent-200 transition-colors"
+              className="h-7 px-2.5 rounded-full bg-accent-100 border border-accent-300 text-accent-900 text-[0.6875rem] font-bold tabular-nums hover:bg-accent-200 transition-colors"
             >
               {tr(
                 lang,
@@ -233,7 +241,7 @@ export default function App() {
               )}
             </button>
           )}
-          <span className="text-[13px] font-mono text-slate-500 tabular-nums">
+          <span className="text-[0.8125rem] font-mono text-slate-500 tabular-nums">
             {todayFormatted}
           </span>
         </div>
@@ -326,7 +334,7 @@ export default function App() {
                 }`}
               />
               <span
-                className={`text-[11px] mt-1 tracking-tight whitespace-nowrap ${
+                className={`text-[0.6875rem] mt-1 tracking-tight whitespace-nowrap ${
                   isActive ? 'font-bold text-accent-700' : 'font-medium text-slate-500'
                 }`}
               >

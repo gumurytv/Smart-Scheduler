@@ -165,9 +165,9 @@ const WidgetHeader: React.FC<{
   <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
     <div className="flex items-center gap-1.5 min-w-0">
       {icon}
-      <span className="text-[12px] font-bold truncate">{title}</span>
+      <span className="text-[0.75rem] font-bold truncate">{title}</span>
     </div>
-    {right && <span className={`text-[10px] font-mono tabular-nums shrink-0 ${p.sub}`}>{right}</span>}
+    {right && <span className={`text-[0.625rem] font-mono tabular-nums shrink-0 ${p.sub}`}>{right}</span>}
   </div>
 );
 
@@ -175,7 +175,7 @@ const StatusPill: React.FC<{ status?: SlotStatus; label?: string; dark?: boolean
   if (!status || status === 'cancelled' || !label) return null;
   return (
     <span
-      className={`px-1 rounded-full text-[8px] font-bold whitespace-nowrap ${
+      className={`px-1 rounded-full text-[0.5rem] font-bold whitespace-nowrap ${
         status === 'absent'
           ? 'bg-accent-800 text-paper'
           : dark
@@ -216,22 +216,22 @@ export const WeeklySchoolWidget: React.FC<{ data: WeeklySchoolWidgetData; theme:
         {data.days.map((d) => (
           <div
             key={d.date}
-            className={`rounded-md py-0.5 text-[10px] font-bold leading-tight ${d.isToday ? p.todayHead : ''}`}
+            className={`rounded-md py-0.5 text-[0.625rem] font-bold leading-tight ${d.isToday ? p.todayHead : ''}`}
           >
             {d.dayLabel}
-            <span className={`block font-mono text-[8px] font-normal ${d.isToday ? '' : p.sub}`}>{d.dayNum}</span>
+            <span className={`block font-mono text-[0.5rem] font-normal ${d.isToday ? '' : p.sub}`}>{d.dayNum}</span>
           </div>
         ))}
         {Array.from({ length: rows }, (_, i) => (
           <React.Fragment key={i}>
-            <div className={`flex items-center justify-center font-mono text-[9px] tabular-nums ${p.sub}`}>
+            <div className={`flex items-center justify-center font-mono text-[0.5625rem] tabular-nums ${p.sub}`}>
               {i + 1}
             </div>
             {data.days.map((d) => {
               const cell = d.periods[i];
               if (!cell || !cell.subject.trim()) {
                 return (
-                  <div key={d.date} className={`flex items-center justify-center text-[10px] ${p.muted}`}>
+                  <div key={d.date} className={`flex items-center justify-center text-[0.625rem] ${p.muted}`}>
                     -
                   </div>
                 );
@@ -252,7 +252,7 @@ export const WeeklySchoolWidget: React.FC<{ data: WeeklySchoolWidgetData; theme:
               return (
                 <div
                   key={d.date}
-                  className={`relative rounded-md flex items-center justify-center px-0.5 text-[10px] leading-none min-w-0 ${cls}`}
+                  className={`relative rounded-md flex items-center justify-center px-0.5 text-[0.625rem] leading-none min-w-0 ${cls}`}
                 >
                   <span className="truncate">{cell.subjectLabel}</span>
                   {(cell.note || cell.status === 'absent') && (
@@ -297,19 +297,19 @@ export const WeeklyAcademyWidget: React.FC<{ data: WeeklyAcademyWidgetData; them
               key={d.date}
               className={`flex-1 min-h-0 flex items-center gap-1.5 px-1 rounded-md ${d.isToday ? p.todayRow : ''}`}
             >
-              <div className="w-7 shrink-0 text-[10px] font-bold leading-none">
+              <div className="w-7 shrink-0 text-[0.625rem] font-bold leading-none">
                 <span className={d.isToday ? (theme === 'dark' ? 'text-accent-300' : 'text-accent-800') : ''}>
                   {d.dayLabel}
                 </span>
               </div>
               <div className="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
                 {d.items.length === 0 ? (
-                  <span className={`text-[9px] ${p.muted}`}>{tr(lang, '없음', 'None', '无')}</span>
+                  <span className={`text-[0.5625rem] ${p.muted}`}>{tr(lang, '없음', 'None', '无')}</span>
                 ) : (
                   d.items.slice(0, MAX_CHIPS).map((it) => (
                     <span
                       key={it.id}
-                      className={`min-w-0 px-1.5 py-[3px] rounded-full text-[9px] leading-none inline-flex items-center gap-1 ${
+                      className={`min-w-0 px-1.5 py-[3px] rounded-full text-[0.5625rem] leading-none inline-flex items-center gap-1 ${
                         it.isCancelled
                           ? `border border-dashed ${theme === 'dark' ? 'border-slate-600' : 'border-slate-400'} ${p.muted} line-through`
                           : it.status === 'selfStudy'
@@ -330,7 +330,7 @@ export const WeeklyAcademyWidget: React.FC<{ data: WeeklyAcademyWidgetData; them
                     </span>
                   ))
                 )}
-                {extra > 0 && <span className={`text-[9px] font-mono shrink-0 ${p.sub}`}>+{extra}</span>}
+                {extra > 0 && <span className={`text-[0.5625rem] font-mono shrink-0 ${p.sub}`}>+{extra}</span>}
               </div>
             </div>
           );
@@ -354,16 +354,16 @@ export const NowWidget: React.FC<{ data: NowWidgetData; theme: WidgetTheme; lang
     <WidgetFrame theme={theme} size="medium">
       <div className="flex items-start justify-between gap-2 shrink-0">
         <div>
-          <div className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${p.sub}`}>
+          <div className={`inline-flex items-center gap-1.5 text-[0.625rem] font-bold ${p.sub}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-accent-400 animate-pulse" />
             {tr(lang, '지금', 'Now', '现在')}
           </div>
           <div className="font-mono text-[30px] leading-none tabular-nums">{data.timeLabel}</div>
         </div>
         <div className="text-right">
-          <div className={`text-[10px] font-semibold ${p.sub}`}>{data.dateLabel}</div>
+          <div className={`text-[0.625rem] font-semibold ${p.sub}`}>{data.dateLabel}</div>
           {makeupCount > 0 && (
-            <span className="mt-1 inline-block px-1.5 py-0.5 rounded-full bg-accent-700 text-paper text-[9px] font-bold">
+            <span className="mt-1 inline-block px-1.5 py-0.5 rounded-full bg-accent-700 text-paper text-[0.5625rem] font-bold">
               {tr(lang, `보강 ${makeupCount}`, `Makeup ${makeupCount}`, `补课 ${makeupCount}`)}
             </span>
           )}
@@ -376,8 +376,8 @@ export const NowWidget: React.FC<{ data: NowWidgetData; theme: WidgetTheme; lang
             className={`rounded-2xl px-2.5 py-2 text-paper ${cur.kind === 'school' ? 'bg-sage-800' : 'bg-accent-800'}`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-bold truncate">{cur.title}</span>
-              <span className="shrink-0 font-mono text-[13px] tabular-nums">
+              <span className="text-[0.8125rem] font-bold truncate">{cur.title}</span>
+              <span className="shrink-0 font-mono text-[0.8125rem] tabular-nums">
                 {tr(lang, `${cur.remainingLabel} 남음`, `${cur.remainingLabel} left`, `剩余${cur.remainingLabel}`)}
               </span>
             </div>
@@ -390,7 +390,7 @@ export const NowWidget: React.FC<{ data: NowWidgetData; theme: WidgetTheme; lang
           </div>
         ) : (
           <div className={`rounded-2xl px-2.5 py-2 ${p.panel}`}>
-            <div className="text-[13px] font-bold">{tr(lang, '지금은 빈 시간', 'Free right now', '现在是空闲时间')}</div>
+            <div className="text-[0.8125rem] font-bold">{tr(lang, '지금은 빈 시간', 'Free right now', '现在是空闲时间')}</div>
           </div>
         )}
         <div className={`rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 ${p.panel}`}>
@@ -400,10 +400,10 @@ export const NowWidget: React.FC<{ data: NowWidgetData; theme: WidgetTheme; lang
                 <span
                   className={`w-1.5 h-1.5 rounded-full shrink-0 ${data.next.kind === 'school' ? 'bg-sage' : 'bg-accent'}`}
                 />
-                <span className={`text-[10px] font-bold shrink-0 ${p.sub}`}>{tr(lang, '다음', 'Next', '下一个')}</span>
-                <span className="text-[11px] font-bold truncate">{data.next.title}</span>
+                <span className={`text-[0.625rem] font-bold shrink-0 ${p.sub}`}>{tr(lang, '다음', 'Next', '下一个')}</span>
+                <span className="text-[0.6875rem] font-bold truncate">{data.next.title}</span>
               </div>
-              <span className="shrink-0 font-mono text-[11px] tabular-nums">
+              <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums">
                 {data.next.startTime}
                 <span className={`ml-1 ${theme === 'dark' ? 'text-accent-300' : 'text-accent-700'}`}>
                   {tr(lang, `${data.next.startsInLabel} 후`, `in ${data.next.startsInLabel}`, `${data.next.startsInLabel}后`)}
@@ -411,7 +411,7 @@ export const NowWidget: React.FC<{ data: NowWidgetData; theme: WidgetTheme; lang
               </span>
             </>
           ) : (
-            <span className={`text-[11px] font-semibold ${p.sub}`}>
+            <span className={`text-[0.6875rem] font-semibold ${p.sub}`}>
               {tr(lang, '오늘 남은 수업이 없어요', 'No more classes today', '今天没有剩余课程')}
             </span>
           )}
@@ -458,7 +458,7 @@ export const TimelineWidget: React.FC<{ data: TimelineWidgetData; theme: WidgetT
       />
       <div className="flex-1 min-h-0 flex flex-col gap-1 overflow-hidden">
         {visible.length === 0 && (
-          <div className={`text-[11px] text-center py-6 ${p.muted}`}>
+          <div className={`text-[0.6875rem] text-center py-6 ${p.muted}`}>
             {tr(lang, '오늘 일정이 없어요', 'Nothing today', '今天没有安排')}
           </div>
         )}
@@ -467,7 +467,7 @@ export const TimelineWidget: React.FC<{ data: TimelineWidgetData; theme: WidgetT
             return (
               <div
                 key={r.key}
-                className={`flex items-center gap-2 px-2 py-1 rounded-lg border border-dashed text-[10px] ${
+                className={`flex items-center gap-2 px-2 py-1 rounded-lg border border-dashed text-[0.625rem] ${
                   theme === 'dark' ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-600'
                 }`}
               >
@@ -491,16 +491,16 @@ export const TimelineWidget: React.FC<{ data: TimelineWidgetData; theme: WidgetT
               } ${it.phase === 'past' ? 'opacity-55' : ''}`}
             >
               <span className={`w-1 self-stretch rounded-full shrink-0 ${it.isCancelled ? 'bg-slate-400' : bar}`} />
-              <span className="font-mono text-[10px] tabular-nums w-[66px] shrink-0">
+              <span className="font-mono text-[0.625rem] tabular-nums w-[66px] shrink-0">
                 {it.kind === 'schedule' ? it.startTime : `${it.startTime}~${it.endTime}`}
               </span>
               <div className="min-w-0 flex-1 flex items-center gap-1">
-                <span className={`text-[9px] font-semibold shrink-0 ${p.sub}`}>{it.kindLabel}</span>
-                <span className={`text-[11px] font-bold truncate ${it.isCancelled ? 'line-through opacity-70' : ''}`}>
+                <span className={`text-[0.5625rem] font-semibold shrink-0 ${p.sub}`}>{it.kindLabel}</span>
+                <span className={`text-[0.6875rem] font-bold truncate ${it.isCancelled ? 'line-through opacity-70' : ''}`}>
                   {it.title}
                 </span>
                 {it.isCancelled && (
-                  <span className="px-1 rounded-full text-[8px] font-bold bg-slate-400 text-paper shrink-0">
+                  <span className="px-1 rounded-full text-[0.5rem] font-bold bg-slate-400 text-paper shrink-0">
                     {tr(lang, '휴강', 'Cancelled', '停课')}
                   </span>
                 )}
@@ -508,7 +508,7 @@ export const TimelineWidget: React.FC<{ data: TimelineWidgetData; theme: WidgetT
                 {it.note && <StickyNote className={`w-2.5 h-2.5 shrink-0 ${p.sub}`} />}
               </div>
               {isCurrent && (
-                <span className={`text-[9px] font-bold shrink-0 ${theme === 'dark' ? 'text-accent-300' : 'text-accent-700'}`}>
+                <span className={`text-[0.5625rem] font-bold shrink-0 ${theme === 'dark' ? 'text-accent-300' : 'text-accent-700'}`}>
                   {tr(lang, '지금', 'NOW', '现在')}
                 </span>
               )}
@@ -517,7 +517,7 @@ export const TimelineWidget: React.FC<{ data: TimelineWidgetData; theme: WidgetT
         })}
       </div>
       {hidden > 0 && (
-        <div className={`pt-1 text-[9px] text-right font-mono shrink-0 ${p.sub}`}>
+        <div className={`pt-1 text-[0.5625rem] text-right font-mono shrink-0 ${p.sub}`}>
           {tr(lang, `외 ${hidden}개`, `+${hidden} more`, `另有${hidden}项`)}
         </div>
       )}
@@ -566,7 +566,7 @@ export const MonthCalendarWidget: React.FC<{ data: MonthCalendarWidgetData; them
         {data.weekHeader.map((d, i) => (
           <div
             key={i}
-            className={`text-[9px] font-semibold pb-0.5 ${
+            className={`text-[0.5625rem] font-semibold pb-0.5 ${
               i === 0 ? 'text-accent-600' : i === 6 ? 'text-sage-600' : p.sub
             }`}
           >
@@ -588,7 +588,7 @@ export const MonthCalendarWidget: React.FC<{ data: MonthCalendarWidgetData; them
                 c.isToday ? 'bg-accent text-paper' : ''
               } ${!c.isCurrentMonth && !c.isToday ? p.muted : ''}`}
             >
-              <span className="font-mono text-[10px] leading-none tabular-nums">{c.dayNum}</span>
+              <span className="font-mono text-[0.625rem] leading-none tabular-nums">{c.dayNum}</span>
               <span className="flex items-center gap-[2px] h-1">
                 {cats.map((k) => (
                   <span
@@ -603,7 +603,7 @@ export const MonthCalendarWidget: React.FC<{ data: MonthCalendarWidgetData; them
           );
         })}
       </div>
-      <div className={`mt-1.5 pt-1.5 border-t text-[10px] flex items-center gap-1.5 min-w-0 shrink-0 ${p.divider}`}>
+      <div className={`mt-1.5 pt-1.5 border-t text-[0.625rem] flex items-center gap-1.5 min-w-0 shrink-0 ${p.divider}`}>
         <span className={`font-bold shrink-0 ${theme === 'dark' ? 'text-accent-300' : 'text-accent-700'}`}>
           {tr(lang, '오늘', 'Today', '今天')}
         </span>

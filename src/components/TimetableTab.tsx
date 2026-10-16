@@ -216,7 +216,7 @@ const StatusTag: React.FC<{ status?: SlotStatus; lang: AppLanguage; large?: bool
   if (!status || status === 'cancelled') return null;
   return (
     <span
-      className={`${large ? 'px-2 py-0.5 text-[13px] shrink-0' : 'px-1.5 py-px text-[11px] leading-tight shrink-0'} font-bold rounded-full whitespace-nowrap ${
+      className={`${large ? 'px-2 py-0.5 text-[0.8125rem] shrink-0' : 'px-1.5 py-px text-[0.6875rem] leading-tight shrink-0'} font-bold rounded-full whitespace-nowrap ${
         status === 'absent' ? 'bg-accent-800 text-paper' : 'bg-sage-200 text-sage-900'
       }`}
     >
@@ -267,7 +267,7 @@ function weekendTint(dayLabel: string): string {
 const DurationNum: React.FC<{ minutes: number; lang: AppLanguage; size?: string }> = ({
   minutes,
   lang,
-  size = 'text-[19px]',
+  size = 'text-[1.1875rem]',
 }) => {
   const total = Math.max(0, Math.round(minutes));
   const h = Math.floor(total / 60);
@@ -279,13 +279,13 @@ const DurationNum: React.FC<{ minutes: number; lang: AppLanguage; size?: string 
       {h > 0 && (
         <>
           <span className={`font-mono ${size} tabular-nums`}>{h}</span>
-          <span className="text-[11px] font-bold mr-1">{hu}</span>
+          <span className="text-[0.6875rem] font-bold mr-1">{hu}</span>
         </>
       )}
       {(m > 0 || h === 0) && (
         <>
           <span className={`font-mono ${size} tabular-nums`}>{m}</span>
-          <span className="text-[11px] font-bold">{mu}</span>
+          <span className="text-[0.6875rem] font-bold">{mu}</span>
         </>
       )}
     </span>
@@ -1124,10 +1124,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       <div className="space-y-3.5 p-3.5 rounded-2xl bg-surface">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] font-bold text-ink">
+            <span className="text-[0.8125rem] font-bold text-ink">
               {tr(lang, '오늘 이 수업은', 'This class today', '今天这节课')}
             </span>
-            <span className="text-[11px] font-semibold text-slate-600">
+            <span className="text-[0.6875rem] font-semibold text-slate-600">
               {tr(lang, '다시 누르면 해제', 'Tap again to clear', '再次点击取消')}
             </span>
           </div>
@@ -1147,7 +1147,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   type="button"
                   aria-pressed={active}
                   onClick={() => onToggle(opt)}
-                  className={`h-10 rounded-full text-[13px] font-bold border transition-all active:scale-95 inline-flex items-center justify-center gap-1.5 ${
+                  className={`h-10 rounded-full text-[0.8125rem] font-bold border transition-all active:scale-95 inline-flex items-center justify-center gap-1.5 ${
                     active ? activeCls : 'bg-paper text-ink border-divider hover:bg-slate-100'
                   }`}
                 >
@@ -1158,7 +1158,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             })}
           </div>
           {currentStatus === 'absent' && onUpdateAttendance && (
-            <p className="text-[11px] font-semibold text-accent-800">
+            <p className="text-[0.6875rem] font-semibold text-accent-800">
               {tr(
                 lang,
                 '출결 기록에도 결석으로 저장돼요.',
@@ -1169,7 +1169,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           )}
         </div>
         <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+          <label className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
             <StickyNote className="w-3.5 h-3.5 text-slate-600" />
             {tr(lang, '메모', 'Note', '备注')}
           </label>
@@ -1188,13 +1188,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 'e.g. Homework check, room change',
                 '例如：检查作业、换教室'
               )}
-              className="flex-1 min-w-0 h-10 px-4 rounded-full border border-divider bg-paper text-[13px] text-ink placeholder:text-slate-500 outline-none focus:border-accent"
+              className="flex-1 min-w-0 h-10 px-4 rounded-full border border-divider bg-paper text-[0.8125rem] text-ink placeholder:text-slate-500 outline-none focus:border-accent"
             />
             <button
               type="button"
               onClick={onSaveNote}
               disabled={!dirty}
-              className="h-10 px-4 rounded-full bg-accent-700 text-paper text-[13px] font-bold whitespace-nowrap hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-default"
+              className="h-10 px-4 rounded-full bg-accent-700 text-paper text-[0.8125rem] font-bold whitespace-nowrap hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-default"
             >
               {dirty ? tr(lang, '저장', 'Save', '保存') : tr(lang, '저장됨', 'Saved', '已保存')}
             </button>
@@ -1279,13 +1279,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         }`}
       >
         <span
-          className={`text-[11px] font-bold leading-none ${
+          className={`text-[0.6875rem] font-bold leading-none ${
             filled ? 'text-paper/90' : weekendTint(dayKor) || 'text-slate-600'
           }`}
         >
           {translateDay(dayKor, lang)}
         </span>
-        <span className={`font-mono leading-none tabular-nums ${size === 'md' ? 'text-[22px]' : 'text-[17px]'}`}>
+        <span className={`font-mono leading-none tabular-nums ${size === 'md' ? 'text-[1.375rem]' : 'text-[1.0625rem]'}`}>
           {d.getDate()}
         </span>
       </span>
@@ -1361,12 +1361,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       opts.isOverlapping && !opts.isCancelled ? 'ring-2 ring-accent-800 ring-offset-1 ring-offset-surface' : '';
 
     const liveChip = opts.isCurrent && (
-      <span className="px-1.5 py-px rounded-full bg-paper text-ink text-[11px] leading-tight font-bold whitespace-nowrap shrink-0">
+      <span className="px-1.5 py-px rounded-full bg-paper text-ink text-[0.6875rem] leading-tight font-bold whitespace-nowrap shrink-0">
         {tr(lang, '수업 중', 'LIVE', '上课中')}
       </span>
     );
     const cancelledChip = opts.isCancelled && (
-      <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[11px] leading-tight font-bold whitespace-nowrap shrink-0">
+      <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[0.6875rem] leading-tight font-bold whitespace-nowrap shrink-0">
         {statusLabel('cancelled', lang)}
       </span>
     );
@@ -1394,8 +1394,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         {compact ? (
           <span className="min-w-0 flex-1 flex items-center gap-1.5 px-2.5">
             {conflictIcon}
-            <span className={`min-w-0 truncate text-[14px] font-bold ${titleCls}`}>{opts.title}</span>
-            <span className={`font-mono text-[11px] tabular-nums whitespace-nowrap shrink-0 ${metaCls}`}>
+            <span className={`min-w-0 truncate text-[0.875rem] font-bold ${titleCls}`}>{opts.title}</span>
+            <span className={`font-mono text-[0.6875rem] tabular-nums whitespace-nowrap shrink-0 ${metaCls}`}>
               {opts.startTime}
             </span>
             <StatusTag status={opts.status} lang={lang} />
@@ -1403,7 +1403,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             {liveChip}
             <span className="flex-1" />
             {opts.totalCols === 1 && (
-              <span className={`px-1.5 py-px rounded-full text-[11px] leading-tight font-bold whitespace-nowrap shrink-0 ${badgeCls}`}>
+              <span className={`px-1.5 py-px rounded-full text-[0.6875rem] leading-tight font-bold whitespace-nowrap shrink-0 ${badgeCls}`}>
                 {opts.badge}
               </span>
             )}
@@ -1412,21 +1412,21 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           <span className="min-w-0 flex-1 flex flex-col gap-0.5 px-2.5 py-1.5">
             <span className="flex items-center gap-1.5 min-w-0">
               {conflictIcon}
-              <span className={`min-w-0 truncate text-[14px] leading-tight font-bold ${titleCls}`}>{opts.title}</span>
+              <span className={`min-w-0 truncate text-[0.875rem] leading-tight font-bold ${titleCls}`}>{opts.title}</span>
               <StatusTag status={opts.status} lang={lang} />
               {cancelledChip}
               {liveChip}
             </span>
             <span className="flex items-center gap-1.5 min-w-0">
-              <span className={`font-mono text-[11px] tabular-nums whitespace-nowrap ${metaCls}`}>
+              <span className={`font-mono text-[0.6875rem] tabular-nums whitespace-nowrap ${metaCls}`}>
                 {opts.startTime} – {opts.endTime}
               </span>
-              <span className={`px-1.5 py-px rounded-full text-[11px] leading-tight font-bold whitespace-nowrap shrink-0 ${badgeCls}`}>
+              <span className={`px-1.5 py-px rounded-full text-[0.6875rem] leading-tight font-bold whitespace-nowrap shrink-0 ${badgeCls}`}>
                 {opts.badge}
               </span>
               {opts.modifiedFrom && h >= 76 && opts.totalCols === 1 && (
                 <span
-                  className={`min-w-0 truncate text-[11px] font-semibold ${opts.isCurrent ? 'text-paper/90' : 'text-slate-700'}`}
+                  className={`min-w-0 truncate text-[0.6875rem] font-semibold ${opts.isCurrent ? 'text-paper/90' : 'text-slate-700'}`}
                 >
                   {tr(
                     lang,
@@ -1439,7 +1439,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             </span>
             {opts.note && h >= 64 && (
               <span
-                className={`flex items-center gap-1 min-w-0 text-[11px] font-medium ${
+                className={`flex items-center gap-1 min-w-0 text-[0.6875rem] font-medium ${
                   opts.isCurrent ? 'text-paper/90' : 'text-slate-700'
                 }`}
               >
@@ -1495,13 +1495,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       >
         <span className="w-12 shrink-0 flex flex-col justify-center">
           <span
-            className={`font-mono text-[16px] leading-none tabular-nums ${
+            className={`font-mono text-[1rem] leading-none tabular-nums ${
               opts.isCancelled ? 'text-slate-500' : 'text-ink'
             }`}
           >
             {opts.startTime}
           </span>
-          <span className="mt-1 font-mono text-[11px] leading-none tabular-nums text-slate-600">
+          <span className="mt-1 font-mono text-[0.6875rem] leading-none tabular-nums text-slate-600">
             {opts.endTime}
           </span>
         </span>
@@ -1512,7 +1512,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               <AlertTriangle className="w-3.5 h-3.5 text-accent-800 shrink-0" aria-label={overlapBadgeLabel} />
             )}
             <span
-              className={`min-w-0 truncate text-[14px] font-bold ${
+              className={`min-w-0 truncate text-[0.875rem] font-bold ${
                 opts.isCancelled ? 'line-through text-slate-500' : 'text-ink'
               }`}
             >
@@ -1521,7 +1521,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           </span>
           <span className="flex items-center gap-1 flex-wrap">
             <span
-              className={`px-1.5 py-px rounded-full text-[11px] leading-tight font-bold whitespace-nowrap ${
+              className={`px-1.5 py-px rounded-full text-[0.6875rem] leading-tight font-bold whitespace-nowrap ${
                 isSchool
                   ? 'bg-sage-200 text-sage-900'
                   : opts.isMakeup
@@ -1532,24 +1532,24 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               {opts.badge}
             </span>
             {opts.isCurrent && (
-              <span className="px-1.5 py-px rounded-full bg-ink text-paper text-[11px] leading-tight font-bold whitespace-nowrap">
+              <span className="px-1.5 py-px rounded-full bg-ink text-paper text-[0.6875rem] leading-tight font-bold whitespace-nowrap">
                 {tr(lang, '수업 중', 'LIVE', '上课中')}
               </span>
             )}
             <StatusTag status={opts.status} lang={lang} />
             {opts.isCancelled && (
-              <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[11px] leading-tight font-bold whitespace-nowrap">
+              <span className="px-1.5 py-px rounded-full bg-slate-200 text-slate-700 text-[0.6875rem] leading-tight font-bold whitespace-nowrap">
                 {statusLabel('cancelled', lang)}
               </span>
             )}
             {opts.modifiedFrom && (
-              <span className="text-[11px] font-semibold text-slate-600 truncate">
+              <span className="text-[0.6875rem] font-semibold text-slate-600 truncate">
                 {tr(lang, `기존 ${opts.modifiedFrom}`, `was ${opts.modifiedFrom}`, `原 ${opts.modifiedFrom}`)}
               </span>
             )}
           </span>
           {opts.note && (
-            <span className="flex items-center gap-1 min-w-0 text-[11px] font-medium text-slate-700">
+            <span className="flex items-center gap-1 min-w-0 text-[0.6875rem] font-medium text-slate-700">
               <StickyNote className="w-3 h-3 shrink-0" />
               <span className="truncate">{opts.note}</span>
             </span>
@@ -1579,18 +1579,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           const hasProfile = !!(name || school || grade);
           if (!hasProfile) {
             return (
-              <div className="flex items-center gap-3 pb-4 border-b border-paper/15">
+              <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-paper/15">
                 <span
                   aria-hidden="true"
                   className="w-11 h-11 rounded-full grid place-items-center shrink-0 border-2 border-dashed border-paper/45 text-paper/85"
                 >
                   <Plus className="w-5 h-5" strokeWidth={2.5} />
                 </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14px] font-bold text-paper leading-snug break-keep">
+                {/* With large text the button wraps under the message instead of squeezing it */}
+                <div className="flex-1 min-w-[100px]">
+                  <div className="text-[0.875rem] font-bold text-paper leading-snug break-keep">
                     {tr(lang, '나만의 플래너로 만들어 보세요', 'Make this planner your own', '打造专属于你的计划本')}
                   </div>
-                  <div className="text-[11px] font-medium text-paper/75 leading-snug break-keep">
+                  <div className="text-[0.6875rem] font-medium text-paper/75 leading-snug break-keep">
                     {tr(
                       lang,
                       '이름과 학교를 넣으면 여기에 표시돼요',
@@ -1603,7 +1604,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   <button
                     type="button"
                     onClick={onEditProfile}
-                    className="h-8 px-3 rounded-full bg-paper text-ink text-[11px] font-bold inline-flex items-center gap-1 shrink-0 hover:bg-paper/90 transition-colors"
+                    className="h-8 px-3 ml-auto rounded-full bg-paper text-ink text-[0.6875rem] font-bold inline-flex items-center gap-1 shrink-0 whitespace-nowrap hover:bg-paper/90 transition-colors"
                   >
                     <UserRound className="w-3.5 h-3.5" strokeWidth={2.5} />
                     {tr(lang, '이름·학교 입력', 'Add name & school', '填写姓名·学校')}
@@ -1628,31 +1629,31 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             <>
               <span
                 aria-hidden="true"
-                className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[18px] font-bold"
+                className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[1.125rem] font-bold"
               >
                 {initials || <UserRound className="w-5 h-5" strokeWidth={2.5} />}
               </span>
               <span className="flex-1 min-w-0">
-                <span className="block text-[12px] font-semibold text-paper/80 truncate">
+                <span className="block text-[0.75rem] font-semibold text-paper/80 truncate">
                   {name
                     ? tr(lang, `${greeting},`, `${greeting},`, `${greeting}，`)
                     : greeting}
                 </span>
                 {name && (
-                  <span className="block text-[20px] leading-tight font-bold text-paper truncate">
+                  <span className="block text-[1.25rem] leading-tight font-bold text-paper truncate">
                     {tr(lang, `${name} 님`, name, name)}
                   </span>
                 )}
                 {(school || grade) && (
                   <span className="mt-1.5 flex items-center gap-1.5 min-w-0">
                     {school && (
-                      <span className="inline-flex items-center gap-1 min-w-0 h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold">
+                      <span className="inline-flex items-center gap-1 min-w-0 h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[0.6875rem] font-bold">
                         <GraduationCap className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
                         <span className="truncate">{school}</span>
                       </span>
                     )}
                     {grade && (
-                      <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold whitespace-nowrap shrink-0 max-w-[45%]">
+                      <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[0.6875rem] font-bold whitespace-nowrap shrink-0 max-w-[45%]">
                         <span className="truncate">{grade}</span>
                       </span>
                     )}
@@ -1688,7 +1689,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         {/* Clock + date */}
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 text-[13px] font-bold text-paper/85 tracking-wide">
+            <div className="inline-flex items-center gap-2 text-[0.8125rem] font-bold text-paper/85 tracking-wide">
               <span className="relative inline-flex w-2.5 h-2.5" aria-hidden="true">
                 <span className="absolute inset-0 rounded-full bg-accent-400 opacity-75 animate-ping" />
                 <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-accent-400" />
@@ -1700,7 +1701,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               {minutesToTimeStr(nowMinutes)}
             </div>
           </div>
-          <div className="pb-1.5 text-[16px] font-bold text-paper/90 tabular-nums whitespace-nowrap">
+          <div className="pb-1.5 text-[1rem] font-bold text-paper/90 tabular-nums whitespace-nowrap">
             {formatDateLabel(todayStr, lang)}
           </div>
         </div>
@@ -1712,9 +1713,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               {tr(lang, '지금은 빈 시간', 'Free right now', '现在是空闲时间')}
             </div>
             {nowCard.next && (
-              <div className="mt-1.5 flex items-baseline gap-1.5 flex-wrap text-[15px] font-semibold text-paper/85">
+              <div className="mt-1.5 flex items-baseline gap-1.5 flex-wrap text-[0.9375rem] font-semibold text-paper/85">
                 <span>{tr(lang, '다음 수업까지', 'Next class in', '距离下节课')}</span>
-                <span className="font-mono text-[22px] leading-none tabular-nums text-accent-300">
+                <span className="font-mono text-[1.375rem] leading-none tabular-nums text-accent-300">
                   {formatDurationLocalized(nowCard.next.start - nowMinutes, lang)}
                 </span>
               </div>
@@ -1738,13 +1739,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[13px] font-bold whitespace-nowrap ${
+                      className={`px-2.5 py-0.5 rounded-full text-[0.8125rem] font-bold whitespace-nowrap ${
                         isSchool ? 'bg-sage-300 text-sage-900' : 'bg-accent-300 text-accent-900'
                       }`}
                     >
                       {entry.badge}
                     </span>
-                    <span className="text-[13px] font-semibold text-paper/85">
+                    <span className="text-[0.8125rem] font-semibold text-paper/85">
                       {tr(lang, '수업 중', 'In class', '上课中')}
                     </span>
                     <StatusTag status={entry.status} lang={lang} large />
@@ -1757,7 +1758,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       <div className="font-mono text-[28px] leading-none tabular-nums text-paper">
                         {formatDurationLocalized(entry.end - nowMinutes, lang)}
                       </div>
-                      <div className="text-[13px] font-semibold text-paper/85 mt-1">
+                      <div className="text-[0.8125rem] font-semibold text-paper/85 mt-1">
                         {tr(lang, '남음', 'left', '剩余')}
                       </div>
                     </div>
@@ -1775,7 +1776,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <div className="mt-1.5 flex items-center justify-between text-[13px] font-semibold text-paper/85 tabular-nums">
+                  <div className="mt-1.5 flex items-center justify-between text-[0.8125rem] font-semibold text-paper/85 tabular-nums">
                     <span className="font-mono">{entry.startTime}</span>
                     <span>
                       {tr(
@@ -1806,17 +1807,17 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   nowCard.next.kind === 'school' ? 'bg-sage-400' : 'bg-accent-400'
                 }`}
               />
-              <span className="text-[13px] font-bold text-paper/80 shrink-0">
+              <span className="text-[0.8125rem] font-bold text-paper/80 shrink-0">
                 {tr(lang, '다음', 'Next', '下一个')}
               </span>
-              <span className="text-[17px] font-bold text-paper truncate">{nowCard.next.title}</span>
+              <span className="text-[1.0625rem] font-bold text-paper truncate">{nowCard.next.title}</span>
               <StatusTag status={nowCard.next.status} lang={lang} large />
             </div>
             <div className="shrink-0 text-right whitespace-nowrap">
-              <div className="font-mono text-[18px] leading-none text-paper tabular-nums">
+              <div className="font-mono text-[1.125rem] leading-none text-paper tabular-nums">
                 {nowCard.next.startTime}
               </div>
-              <div className="mt-1 text-[13px] font-bold text-accent-300 tabular-nums">
+              <div className="mt-1 text-[0.8125rem] font-bold text-accent-300 tabular-nums">
                 {tr(
                   lang,
                   `${formatDurationLocalized(nowCard.next.start - nowMinutes, lang)} 후`,
@@ -1827,22 +1828,22 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             </div>
           </button>
         ) : (
-          <div className="px-4 py-3 rounded-[20px] bg-paper/10 text-[15px] font-semibold text-paper/85">
+          <div className="px-4 py-3 rounded-[20px] bg-paper/10 text-[0.9375rem] font-semibold text-paper/85">
             {tr(lang, '오늘 남은 수업이 없어요', 'No more classes today', '今天没有剩余课程')}
           </div>
         )}
 
         {/* Today's makeup / special classes: contrasting light panel inside the hero */}
         <div className="rounded-[24px] bg-paper text-ink p-4 space-y-2.5">
-          <div className="text-[16px] font-bold text-ink inline-flex items-center gap-2">
+          <div className="text-[1rem] font-bold text-ink inline-flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-accent" />
             {tr(lang, '오늘 보강/특강', "Today's makeup / special classes", '今日补课/特讲')}
-            <span className="min-w-[24px] h-6 px-1.5 rounded-full bg-accent-700 text-paper font-mono text-[13px] tabular-nums inline-flex items-center justify-center">
+            <span className="min-w-[24px] h-6 px-1.5 rounded-full bg-accent-700 text-paper font-mono text-[0.8125rem] tabular-nums inline-flex items-center justify-center">
               {nowCard.makeups.length + nowCard.makeupSchedules.length}
             </span>
           </div>
           {nowCard.makeups.length === 0 && nowCard.makeupSchedules.length === 0 ? (
-            <div className="px-3.5 py-3 rounded-2xl bg-surface text-[14px] font-semibold text-slate-700">
+            <div className="px-3.5 py-3 rounded-2xl bg-surface text-[0.875rem] font-semibold text-slate-700">
               {tr(lang, '오늘 예정된 보강/특강이 없어요', 'No makeup or special classes today', '今天没有补课/特讲')}
             </div>
           ) : (
@@ -1858,10 +1859,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       : 'bg-accent-700 text-paper shadow-xs hover:bg-accent-800'
                   }`}
                 >
-                  <span className="font-mono tabular-nums text-[16px] shrink-0">
+                  <span className="font-mono tabular-nums text-[1rem] shrink-0">
                     {m.startTime}~{m.endTime}
                   </span>
-                  <span className="text-[16px] font-bold truncate flex-1">{slotTitle(m.subject, m.status, lang)}</span>
+                  <span className="text-[1rem] font-bold truncate flex-1">{slotTitle(m.subject, m.status, lang)}</span>
                   <StatusTag status={m.status} lang={lang} large />
                 </button>
               ))}
@@ -1870,8 +1871,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   key={s.id}
                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-surface border border-accent-300 text-ink"
                 >
-                  {s.time && <span className="font-mono tabular-nums text-[16px] shrink-0">{s.time}</span>}
-                  <span className="text-[16px] font-bold truncate">{translateSampleText(s.title, lang)}</span>
+                  {s.time && <span className="font-mono tabular-nums text-[1rem] shrink-0">{s.time}</span>}
+                  <span className="text-[1rem] font-bold truncate">{translateSampleText(s.title, lang)}</span>
                 </div>
               ))}
             </div>
@@ -1879,7 +1880,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           <button
             type="button"
             onClick={() => openAddAcademyModal('18:00', '20:00')}
-            className="w-full h-12 rounded-full bg-accent-700 text-paper text-[15px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-800 shadow-xs"
+            className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.9375rem] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-800 shadow-xs"
           >
             <Plus className="w-4 h-4" strokeWidth={2.75} />
             {tr(lang, '당일 보강/특강 추가', 'Add makeup / special class', '添加当天补课/特讲')}
@@ -1908,7 +1909,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 role="tab"
                 aria-selected={active}
                 onClick={() => setViewMode(key)}
-                className={`h-9 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                className={`h-9 rounded-full text-[0.8125rem] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${
                   active ? 'bg-accent-700 text-paper shadow-xs' : 'text-slate-700 hover:text-ink'
                 }`}
               >
@@ -1926,15 +1927,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               {selectedDate.getDate()}
             </span>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[15px] font-bold text-ink truncate">{monthLabel(selectedDate, lang)}</span>
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span className="text-[0.9375rem] font-bold text-ink truncate">{monthLabel(selectedDate, lang)}</span>
                 {isSelectedToday && (
-                  <span className="px-2 py-px rounded-full text-[11px] font-bold bg-accent-700 text-paper">
+                  <span className="px-2 py-px rounded-full text-[0.6875rem] font-bold bg-accent-700 text-paper whitespace-nowrap">
                     {tr(lang, '오늘', 'TODAY', '今天')}
                   </span>
                 )}
               </div>
-              <div className="text-[12px] font-semibold text-slate-600 truncate tabular-nums">
+              <div className="text-[0.75rem] font-semibold text-slate-600 truncate tabular-nums">
                 {viewMode === 'daily'
                   ? (() => {
                       const w = FULL_WEEKDAYS[selectedDate.getDay()];
@@ -1962,7 +1963,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               type="button"
               onClick={handleGoToday}
               disabled={isSelectedToday}
-              className={`px-3 h-[34px] rounded-full text-[12px] font-bold whitespace-nowrap transition-colors ${
+              className={`px-3 h-[34px] rounded-full text-[0.75rem] font-bold whitespace-nowrap transition-colors ${
                 isSelectedToday
                   ? 'bg-paper/60 text-slate-500 cursor-default'
                   : 'bg-accent-700 text-paper hover:bg-accent-800'
@@ -2009,7 +2010,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 className={`flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-colors min-w-0 ${tone}`}
               >
                 <span
-                  className={`text-[11px] font-semibold leading-tight ${
+                  className={`text-[0.6875rem] font-semibold leading-tight ${
                     wd.isSelected
                       ? 'text-paper/90'
                       : wd.isToday
@@ -2019,7 +2020,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 >
                   {translateDay(wd.dayLabel, lang)}
                 </span>
-                <span className="font-mono text-[16px] leading-none tabular-nums">{wd.dayNumber}</span>
+                <span className="font-mono text-[1rem] leading-none tabular-nums">{wd.dayNumber}</span>
                 <span className="h-1.5 flex items-center gap-0.5" aria-hidden="true">
                   {mk.makeup && (
                     <span className={`w-1.5 h-1.5 rounded-full ${wd.isSelected ? 'bg-paper' : 'bg-accent'}`} />
@@ -2035,7 +2036,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             );
           })}
         </div>
-        <div className="flex items-center justify-center gap-3 text-[11px] font-semibold text-slate-600 flex-wrap">
+        <div className="flex items-center justify-center gap-3 text-[0.6875rem] font-semibold text-slate-600 flex-wrap">
           <span className="inline-flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-accent" />
             {tr(lang, '보강/특강', 'Makeup', '补课/特讲')}
@@ -2057,11 +2058,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           {/* Day summary: spectrum + stat tiles + conflicts */}
           <section className="bg-surface rounded-2xl p-4 shadow-xs space-y-3.5">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink min-w-0">
+              <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink min-w-0">
                 <Clock className="w-4 h-4 text-accent-700 shrink-0" strokeWidth={2.5} />
                 <span className="truncate">{tr(lang, '하루 한눈에', 'Day at a glance', '一天概览')}</span>
               </h2>
-              <span className="text-[11px] font-mono text-slate-600 tabular-nums whitespace-nowrap">
+              <span className="text-[0.6875rem] font-mono text-slate-600 tabular-nums whitespace-nowrap">
                 {startHourFormatted} – {endHourFormatted}
               </span>
             </div>
@@ -2107,7 +2108,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       style={{ left: `${pct}%` }}
                     >
                       <span className="w-px h-1 bg-slate-400" />
-                      <span className="font-mono text-[11px] leading-none text-slate-600 tabular-nums mt-0.5">{h}</span>
+                      <span className="font-mono text-[0.6875rem] leading-none text-slate-600 tabular-nums mt-0.5">{h}</span>
                     </span>
                   );
                 })}
@@ -2149,7 +2150,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${iconCls}`}>
                       <Icon className="w-3.5 h-3.5" strokeWidth={2.5} />
                     </span>
-                    <span className="text-[11px] font-bold text-slate-700 truncate">{label}</span>
+                    <span className="text-[0.6875rem] font-bold text-slate-700 truncate">{label}</span>
                   </div>
                   <div className={`mt-2 ${numCls}`}>
                     <DurationNum minutes={min} lang={lang} />
@@ -2161,7 +2162,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             {/* Conflict warning */}
             {timelineLayout.conflictZones.length > 0 && (
               <div className="rounded-xl bg-accent-800 text-paper p-3 space-y-2" role="alert">
-                <div className="flex items-center gap-2 text-[13px] font-bold">
+                <div className="flex items-center gap-2 text-[0.8125rem] font-bold">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>
                     {tr(
@@ -2176,7 +2177,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   {timelineLayout.conflictZones.map((cz) => (
                     <div
                       key={cz.id}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-paper/15 text-[12px] min-w-0"
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-paper/15 text-[0.75rem] min-w-0"
                     >
                       <span className="font-mono tabular-nums whitespace-nowrap shrink-0">
                         {cz.startTime}–{cz.endTime}
@@ -2210,7 +2211,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       role="tab"
                       aria-selected={active}
                       onClick={() => setDailySubMode(key)}
-                      className={`h-8 rounded-full text-[12px] font-bold inline-flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
+                      className={`h-8 rounded-full text-[0.75rem] font-bold inline-flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
                         active ? 'bg-ink text-paper' : 'text-slate-700 hover:text-ink'
                       }`}
                     >
@@ -2223,7 +2224,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               <button
                 type="button"
                 onClick={() => openAddAcademyModal('18:00', '20:00')}
-                className="h-10 px-3.5 rounded-full border border-divider bg-paper text-accent-800 text-[12px] font-bold inline-flex items-center gap-1 hover:bg-accent-100 whitespace-nowrap shrink-0"
+                className="h-10 px-3.5 rounded-full border border-divider bg-paper text-accent-800 text-[0.75rem] font-bold inline-flex items-center gap-1 hover:bg-accent-100 whitespace-nowrap shrink-0"
               >
                 <Plus className="w-4 h-4" strokeWidth={2.75} />
                 {tr(lang, '보강 추가', 'Makeup', '加补课')}
@@ -2235,11 +2236,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             /* VERTICAL TIMELINE VIEW */
             <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
               <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2 flex-wrap">
-                <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                   <CalendarRange className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
                   {tr(lang, '타임라인', 'Timeline', '时间轴')}
                 </h2>
-                <div className="flex items-center gap-2.5 text-[11px] font-semibold text-slate-700">
+                <div className="flex items-center gap-2.5 text-[0.6875rem] font-semibold text-slate-700">
                   <span className="inline-flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-sage-600" />
                     {tr(lang, '학교', 'School', '学校')}
@@ -2262,7 +2263,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                     {hoursArray.map((hour) => (
                       <span
                         key={hour}
-                        className="absolute right-2 -translate-y-1/2 font-mono text-[12px] leading-none text-slate-600 tabular-nums"
+                        className="absolute right-2 -translate-y-1/2 font-mono text-[0.75rem] leading-none text-slate-600 tabular-nums"
                         style={{ top: `${(hour - startHour) * HOUR_HEIGHT_PX}px` }}
                       >
                         {String(hour).padStart(2, '0')}
@@ -2302,7 +2303,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         style={{ top: `${cz.topPx}px`, height: `${cz.heightPx}px` }}
                         className="absolute left-0 right-0 z-20 pointer-events-none rounded-xl border-2 border-dashed border-accent-800 bg-accent-800/10 flex items-start justify-end"
                       >
-                        <span className="-mt-2.5 mr-2 px-2 py-px rounded-full bg-accent-800 text-paper text-[11px] font-bold shadow-xs inline-flex items-center gap-1 whitespace-nowrap">
+                        <span className="-mt-2.5 mr-2 px-2 py-px rounded-full bg-accent-800 text-paper text-[0.6875rem] font-bold shadow-xs inline-flex items-center gap-1 whitespace-nowrap">
                           <AlertTriangle className="w-3 h-3 shrink-0" />
                           <span className="font-mono tabular-nums">
                             {cz.startTime}–{cz.endTime}
@@ -2327,20 +2328,20 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         >
                           <span className="min-w-0 flex-1 flex flex-col">
                             <span className="flex items-center gap-1.5 min-w-0">
-                              <span className="font-mono text-[11px] text-slate-700 tabular-nums whitespace-nowrap">
+                              <span className="font-mono text-[0.6875rem] text-slate-700 tabular-nums whitespace-nowrap">
                                 {slot.startTime} – {slot.endTime}
                               </span>
-                              <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap">
+                              <span className="text-[0.6875rem] font-bold text-slate-600 whitespace-nowrap">
                                 · {formatDurationLocalized(slot.durationMin, lang)}
                               </span>
                             </span>
                             {roomy && (
-                              <span className="text-[11px] font-medium text-slate-600 truncate mt-0.5">
+                              <span className="text-[0.6875rem] font-medium text-slate-600 truncate mt-0.5">
                                 {slot.contextLabel}
                               </span>
                             )}
                           </span>
-                          <span className="shrink-0 inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full bg-paper border border-divider text-[11px] font-bold text-accent-800 group-hover:bg-accent-700 group-hover:text-paper group-hover:border-transparent transition-colors">
+                          <span className="shrink-0 inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full bg-paper border border-divider text-[0.6875rem] font-bold text-accent-800 group-hover:bg-accent-700 group-hover:text-paper group-hover:border-transparent transition-colors">
                             <Plus className="w-3 h-3" strokeWidth={3} />
                             {tr(lang, '추가', 'Add', '添加')}
                           </span>
@@ -2424,7 +2425,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         return (
                           <div
                             key={`sch-${sch.id}`}
-                            className={`absolute right-1.5 z-20 pointer-events-none max-w-[58%] -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border shadow-xs text-[11px] ${tone.pill}`}
+                            className={`absolute right-1.5 z-20 pointer-events-none max-w-[58%] -translate-y-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border shadow-xs text-[0.6875rem] ${tone.pill}`}
                             style={{ top: `${Math.max(10, topPx)}px` }}
                           >
                             <CalendarClock className="w-3 h-3 shrink-0" />
@@ -2443,7 +2444,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       aria-label={`${tr(lang, '지금', 'Now', '现在')} ${minutesToTimeStr(nowMinutes)}`}
                     >
                       <span className="w-11 shrink-0 flex justify-end pr-0.5">
-                        <span className="px-1.5 py-0.5 rounded-full bg-accent-700 text-paper font-mono text-[11px] leading-none tabular-nums shadow-xs">
+                        <span className="px-1.5 py-0.5 rounded-full bg-accent-700 text-paper font-mono text-[0.6875rem] leading-none tabular-nums shadow-xs">
                           {minutesToTimeStr(nowMinutes)}
                         </span>
                       </span>
@@ -2459,19 +2460,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             <div className="space-y-4">
               <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                     <GraduationCap className="w-4 h-4 text-sage-700" strokeWidth={2.5} />
                     {tr(lang, '학교', 'School', '学校')}
-                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-sage-700 text-paper font-mono text-[11px] tabular-nums inline-flex items-center justify-center">
+                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-sage-700 text-paper font-mono text-[0.6875rem] tabular-nums inline-flex items-center justify-center">
                       {dailyData.school.length}
                     </span>
                   </h2>
-                  <span className="text-[11px] font-semibold text-slate-600">
+                  <span className="text-[0.6875rem] font-semibold text-slate-600">
                     {tr(lang, '눌러서 이 날만 변경', 'Tap to edit this day', '点击修改当天')}
                   </span>
                 </div>
                 {dailyData.school.length === 0 ? (
-                  <p className="py-6 text-center text-[13px] font-medium text-slate-600 rounded-xl bg-paper">
+                  <p className="py-6 text-center text-[0.8125rem] font-medium text-slate-600 rounded-xl bg-paper">
                     {tr(
                       lang,
                       '등록된 정규 학교 수업이 없습니다.',
@@ -2512,24 +2513,24 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
               <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                     <Building2 className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
                     {tr(lang, '학원', 'Academy', '补习班')}
-                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-accent-700 text-paper font-mono text-[11px] tabular-nums inline-flex items-center justify-center">
+                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-accent-700 text-paper font-mono text-[0.6875rem] tabular-nums inline-flex items-center justify-center">
                       {dailyData.academy.length}
                     </span>
                   </h2>
                   <button
                     type="button"
                     onClick={() => openAddAcademyModal('18:00', '20:00')}
-                    className="inline-flex items-center gap-1 px-3 h-8 rounded-full bg-accent-700 text-paper text-[12px] font-bold hover:bg-accent-800 whitespace-nowrap"
+                    className="inline-flex items-center gap-1 px-3 h-8 rounded-full bg-accent-700 text-paper text-[0.75rem] font-bold hover:bg-accent-800 whitespace-nowrap"
                   >
                     <Plus className="w-3.5 h-3.5" strokeWidth={2.75} />
                     {tr(lang, '보강/특강', 'Makeup', '补课/特讲')}
                   </button>
                 </div>
                 {dailyData.academy.length === 0 ? (
-                  <p className="py-6 text-center text-[13px] font-medium text-slate-600 rounded-xl bg-paper">
+                  <p className="py-6 text-center text-[0.8125rem] font-medium text-slate-600 rounded-xl bg-paper">
                     {tr(
                       lang,
                       '이 날 예정된 학원 수업이 없습니다.',
@@ -2573,10 +2574,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
               {daySchedules.length > 0 && (
                 <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
-                  <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                     <CalendarClock className="w-4 h-4 text-other-700" strokeWidth={2.5} />
                     {tr(lang, '이날의 일정', 'Schedules on this day', '当天日程')}
-                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-other-700 text-paper font-mono text-[11px] tabular-nums inline-flex items-center justify-center">
+                    <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-other-700 text-paper font-mono text-[0.6875rem] tabular-nums inline-flex items-center justify-center">
                       {daySchedules.length}
                     </span>
                   </h2>
@@ -2585,26 +2586,26 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       const tone = SCHEDULE_CAT_TONE[sch.category] || SCHEDULE_CAT_TONE.other;
                       return (
                         <div key={sch.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-paper">
-                          <span className="w-12 shrink-0 font-mono text-[14px] leading-none text-ink tabular-nums">
+                          <span className="w-12 shrink-0 font-mono text-[0.875rem] leading-none text-ink tabular-nums">
                             {sch.time || (
-                              <span className="font-sans text-[11px] font-bold text-slate-600">
+                              <span className="font-sans text-[0.6875rem] font-bold text-slate-600">
                                 {tr(lang, '종일', 'All day', '全天')}
                               </span>
                             )}
                           </span>
                           <span className={`w-1 self-stretch rounded-full shrink-0 ${tone.dot}`} aria-hidden="true" />
                           <div className="min-w-0 flex-1">
-                            <div className="text-[14px] font-bold text-ink truncate">
+                            <div className="text-[0.875rem] font-bold text-ink truncate">
                               {translateSampleText(sch.title, lang)}
                             </div>
                             {sch.memo && (
-                              <div className="text-[11px] text-slate-600 truncate">
+                              <div className="text-[0.6875rem] text-slate-600 truncate">
                                 {translateSampleText(sch.memo, lang)}
                               </div>
                             )}
                           </div>
                           <span
-                            className={`px-2 py-px rounded-full border text-[11px] font-bold shrink-0 ${tone.pill}`}
+                            className={`px-2 py-px rounded-full border text-[0.6875rem] font-bold shrink-0 ${tone.pill}`}
                           >
                             {categoryLabel(sch.category, lang)}
                           </span>
@@ -2622,17 +2623,17 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         <div className="space-y-4">
           <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink min-w-0">
+              <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink min-w-0">
                 <GraduationCap className="w-4 h-4 text-sage-700 shrink-0" strokeWidth={2.5} />
                 <span className="truncate">{tr(lang, '학교 시간표 · 월~금', 'School · Mon–Fri', '学校课表 · 周一至周五')}</span>
               </h2>
-              <span className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">
+              <span className="text-[0.6875rem] font-semibold text-slate-600 whitespace-nowrap">
                 {tr(lang, '칸을 눌러 수정', 'Tap a cell to edit', '点击单元格修改')}
               </span>
             </div>
 
             {weeklyPeriods.length === 0 ? (
-              <p className="py-6 text-center text-[13px] font-medium text-slate-600 rounded-xl bg-paper">
+              <p className="py-6 text-center text-[0.8125rem] font-medium text-slate-600 rounded-xl bg-paper">
                 {tr(lang, '이번 주 학교 수업이 없어요.', 'No school classes this week.', '本周没有学校课程。')}
               </p>
             ) : (
@@ -2640,7 +2641,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 <table className="w-full text-center border-collapse table-fixed min-w-[320px]">
                   <thead>
                     <tr className="border-b border-divider">
-                      <th className="sticky left-0 z-10 bg-paper w-[54px] py-2 px-1 text-[11px] font-semibold text-slate-600 border-r border-divider">
+                      <th className="sticky left-0 z-10 bg-paper w-[54px] py-2 px-1 text-[0.6875rem] font-semibold text-slate-600 border-r border-divider">
                         {tr(lang, '교시', 'Per', '课时')}
                       </th>
                       {weeklyData.slice(0, 5).map((wd) => (
@@ -2660,10 +2661,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                 : 'text-ink hover:bg-surface'
                             }`}
                           >
-                            <span className={`text-[11px] font-bold ${wd.isToday ? 'text-paper/90' : 'text-slate-600'}`}>
+                            <span className={`text-[0.6875rem] font-bold ${wd.isToday ? 'text-paper/90' : 'text-slate-600'}`}>
                               {translateDay(wd.dayLabel, lang)}
                             </span>
-                            <span className="font-mono text-[14px] leading-none tabular-nums">{wd.dayNumber}</span>
+                            <span className="font-mono text-[0.875rem] leading-none tabular-nums">{wd.dayNumber}</span>
                           </button>
                         </th>
                       ))}
@@ -2674,8 +2675,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       <tr key={period} className="border-b border-divider last:border-b-0">
                         <td className="sticky left-0 z-10 bg-paper px-1 py-1 border-r border-divider">
                           <div className="flex flex-col items-center leading-tight">
-                            <span className="text-[11px] font-bold text-sage-800">{periodLabel(period, lang)}</span>
-                            <span className="font-mono text-[11px] text-slate-600 tabular-nums">{startTime}</span>
+                            <span className="text-[0.6875rem] font-bold text-sage-800">{periodLabel(period, lang)}</span>
+                            <span className="font-mono text-[0.6875rem] text-slate-600 tabular-nums">{startTime}</span>
                           </div>
                         </td>
                         {weeklyData.slice(0, 5).map((wd) => {
@@ -2683,7 +2684,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           if (!cell) {
                             return (
                               <td key={wd.dateStr} className={`p-0.5 ${wd.isToday ? 'bg-accent-100/60' : ''}`}>
-                                <span className="block py-2 text-[11px] text-slate-400">–</span>
+                                <span className="block py-2 text-[0.6875rem] text-slate-400">–</span>
                               </td>
                             );
                           }
@@ -2704,14 +2705,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                                 aria-label={`${formatDateLabel(wd.dateStr, lang)} ${periodLabel(period, lang)} ${translateSubject(cell.subject, lang)}`}
                                 className={`relative w-full min-h-[40px] px-0.5 py-1 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:brightness-95 active:scale-95 transition ${cellTone}`}
                               >
-                                <span className="w-full truncate text-[11px] font-bold leading-tight">
+                                <span className="w-full truncate text-[0.6875rem] font-bold leading-tight">
                                   {cell.status === 'selfStudy'
                                     ? tr(lang, '자습', 'Study', '自习')
                                     : translateSubject(cell.subject, lang)}
                                 </span>
                                 {(cell.status === 'absent' || cell.isCancelled) && (
                                   <span
-                                    className={`px-1 rounded-full text-[11px] leading-tight font-bold no-underline ${
+                                    className={`px-1 rounded-full text-[0.6875rem] leading-tight font-bold no-underline ${
                                       cell.isCancelled ? 'bg-slate-200 text-slate-700' : 'bg-accent-800 text-paper'
                                     }`}
                                   >
@@ -2736,7 +2737,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 </table>
               </div>
             )}
-            <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-600 flex-wrap">
+            <div className="flex items-center gap-3 text-[0.6875rem] font-semibold text-slate-600 flex-wrap">
               <span className="inline-flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
                 {tr(lang, '과목 변경', 'Changed', '已调课')}
@@ -2749,7 +2750,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           </section>
 
           <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
-            <h2 className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+            <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
               <Building2 className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
               {tr(lang, '학원 · 월~일', 'Academies · Mon–Sun', '补习班 · 周一至周日')}
             </h2>
@@ -2774,7 +2775,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   </button>
                   <div className="flex-1 min-w-0 flex flex-wrap gap-1.5">
                     {wd.resolved.academy.length === 0 ? (
-                      <span className="text-[12px] font-medium text-slate-500">
+                      <span className="text-[0.75rem] font-medium text-slate-500">
                         {tr(lang, '학원 없음', 'No academy', '无补习班')}
                       </span>
                     ) : (
@@ -2783,7 +2784,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           key={ac.id}
                           type="button"
                           onClick={() => openItemOnDate({ kind: 'academy', item: ac }, wd.dateObj)}
-                          className={`max-w-full px-2.5 py-1 rounded-full text-[12px] inline-flex items-center gap-1.5 active:scale-95 transition ${
+                          className={`max-w-full px-2.5 py-1 rounded-full text-[0.75rem] inline-flex items-center gap-1.5 active:scale-95 transition ${
                             ac.isCancelled
                               ? 'bg-paper border border-dashed border-slate-400 text-slate-600'
                               : ac.status === 'selfStudy'
@@ -2796,12 +2797,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           {ac.isOverlapping && !ac.isCancelled && (
                             <AlertTriangle className="w-3 h-3 shrink-0" aria-label={overlapBadgeLabel} />
                           )}
-                          <span className="font-mono text-[11px] tabular-nums shrink-0">{ac.startTime}</span>
+                          <span className="font-mono text-[0.6875rem] tabular-nums shrink-0">{ac.startTime}</span>
                           <span className={`font-bold truncate ${ac.isCancelled ? 'line-through' : ''}`}>
                             {ac.isCancelled ? translateSubject(ac.subject, lang) : slotTitle(ac.subject, ac.status, lang)}
                           </span>
                           {ac.isCancelled && (
-                            <span className="text-[11px] font-bold">{statusLabel('cancelled', lang)}</span>
+                            <span className="text-[0.6875rem] font-bold">{statusLabel('cancelled', lang)}</span>
                           )}
                           <StatusTag status={ac.status} lang={lang} />
                           {ac.note && <StickyNote className="w-3 h-3 shrink-0" />}
@@ -2837,14 +2838,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               <div className="flex items-center gap-3 min-w-0">
                 {renderDateBlock(editDateStr, 'sage')}
                 <div className="min-w-0">
-                  <h3 className="text-[16px] font-bold text-ink truncate">
+                  <h3 className="text-[1rem] font-bold text-ink truncate">
                     {translateSubject(editingSchoolPeriod.subject, lang)}
                   </h3>
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    <span className="px-2 py-px rounded-full bg-sage-200 text-sage-900 text-[11px] font-bold">
+                    <span className="px-2 py-px rounded-full bg-sage-200 text-sage-900 text-[0.6875rem] font-bold">
                       {periodLabel(editingSchoolPeriod.period, lang)}
                     </span>
-                    <span className="font-mono text-[12px] text-slate-700 tabular-nums">
+                    <span className="font-mono text-[0.75rem] text-slate-700 tabular-nums">
                       {editingSchoolPeriod.startTime} – {editingSchoolPeriod.endTime}
                     </span>
                   </div>
@@ -2862,7 +2863,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[12px] font-medium text-slate-600 -mt-1">
+            <p className="text-[0.75rem] font-medium text-slate-600 -mt-1">
               {formatDateLabel(editDateStr, lang)} ·{' '}
               {tr(
                 lang,
@@ -2881,11 +2882,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                   <GraduationCap className="w-4 h-4 text-sage-700" />
                   {tr(lang, '과목 바꾸기', 'Change subject', '更换科目')}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {tr(lang, '누르면 바로 적용', 'Applies instantly', '点击立即生效')}
                 </span>
               </div>
@@ -2899,7 +2900,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       type="button"
                       aria-pressed={isCurrent}
                       onClick={() => handleSelectSchoolSubject(subj)}
-                      className={`min-h-[44px] px-2 py-1.5 rounded-full text-[13px] font-semibold border transition-all flex flex-col items-center justify-center leading-tight ${
+                      className={`min-h-[44px] px-2 py-1.5 rounded-full text-[0.8125rem] font-semibold border transition-all flex flex-col items-center justify-center leading-tight ${
                         isCurrent
                           ? 'bg-sage-700 text-paper border-transparent'
                           : 'bg-surface text-ink border-transparent hover:bg-sage-100 active:scale-95'
@@ -2907,7 +2908,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                     >
                       <span className="truncate max-w-full">{translateSubject(subj, lang)}</span>
                       {isOriginal && (
-                        <span className={`text-[11px] font-medium ${isCurrent ? 'text-paper/85' : 'text-slate-600'}`}>
+                        <span className={`text-[0.6875rem] font-medium ${isCurrent ? 'text-paper/85' : 'text-slate-600'}`}>
                           {tr(lang, '기본', 'Default', '默认')}
                         </span>
                       )}
@@ -2920,7 +2921,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             <button
               type="button"
               onClick={handleRestoreSchoolPeriod}
-              className="w-full h-11 rounded-full border border-divider text-ink text-[13px] font-bold flex items-center justify-center gap-1.5 hover:bg-slate-100 transition-colors"
+              className="w-full h-11 rounded-full border border-divider text-ink text-[0.8125rem] font-bold flex items-center justify-center gap-1.5 hover:bg-slate-100 transition-colors"
             >
               <RotateCcw className="w-4 h-4 text-slate-600" />
               {tr(lang, '기본 시간표로 원상복구', 'Restore Default', '恢复默认课表')}
@@ -2950,12 +2951,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               <div className="flex items-center gap-3 min-w-0">
                 {renderDateBlock(editDateStr, 'accent')}
                 <div className="min-w-0">
-                  <h3 className="text-[16px] font-bold text-ink truncate">
+                  <h3 className="text-[1rem] font-bold text-ink truncate">
                     {translateSubject(editingAcademyItem.subject, lang)}
                   </h3>
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <span
-                      className={`px-2 py-px rounded-full text-[11px] font-bold ${
+                      className={`px-2 py-px rounded-full text-[0.6875rem] font-bold ${
                         editingAcademyItem.isAdded ? 'bg-accent-700 text-paper' : 'bg-accent-200 text-accent-900'
                       }`}
                     >
@@ -2963,7 +2964,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         ? tr(lang, '당일 보강', 'Makeup', '临时补课')
                         : tr(lang, '학원', 'Academy', '补习班')}
                     </span>
-                    <span className="font-mono text-[12px] text-slate-700 tabular-nums">
+                    <span className="font-mono text-[0.75rem] text-slate-700 tabular-nums">
                       {editingAcademyItem.startTime} – {editingAcademyItem.endTime}
                     </span>
                   </div>
@@ -2981,7 +2982,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[12px] font-medium text-slate-600 -mt-1">
+            <p className="text-[0.75rem] font-medium text-slate-600 -mt-1">
               {formatDateLabel(editDateStr, lang)} ·{' '}
               {tr(
                 lang,
@@ -2999,7 +3000,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             )}
 
             <div className="space-y-2">
-              <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+              <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                 <Clock className="w-4 h-4 text-accent-700" />
                 {tr(lang, '수업 시간', 'Class time', '上课时间')}
               </span>
@@ -3009,7 +3010,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   value={tempStartTime}
                   onChange={(e) => setTempStartTime(e.target.value)}
                   aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
-                  className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
+                  className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-accent"
                 />
                 <span className="text-sm font-bold text-slate-500">–</span>
                 <input
@@ -3017,7 +3018,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   value={tempEndTime}
                   onChange={(e) => setTempEndTime(e.target.value)}
                   aria-label={tr(lang, '종료 시간', 'End time', '结束时间')}
-                  className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
+                  className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-accent"
                 />
               </div>
               <button
@@ -3026,7 +3027,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 disabled={
                   tempStartTime === editingAcademyItem.startTime && tempEndTime === editingAcademyItem.endTime
                 }
-                className="w-full h-11 rounded-full bg-accent-700 text-paper text-[13px] font-bold hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-default inline-flex items-center justify-center gap-1.5"
+                className="w-full h-11 rounded-full bg-accent-700 text-paper text-[0.8125rem] font-bold hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-default inline-flex items-center justify-center gap-1.5"
               >
                 <Check className="w-4 h-4" strokeWidth={2.75} />
                 {tr(lang, '시간 저장', 'Save time', '保存时间')}
@@ -3035,11 +3036,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                   <Building2 className="w-4 h-4 text-accent-700" />
                   {tr(lang, '학원 바꾸기', 'Change academy', '更换补习班')}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {tr(lang, '누르면 바로 적용', 'Applies instantly', '点击立即生效')}
                 </span>
               </div>
@@ -3052,7 +3053,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       type="button"
                       aria-pressed={isCurrent}
                       onClick={() => handleSelectAcademySubject(acName)}
-                      className={`min-h-[42px] px-3 py-2 rounded-full text-[13px] font-semibold transition-all flex items-center justify-center ${
+                      className={`min-h-[42px] px-3 py-2 rounded-full text-[0.8125rem] font-semibold transition-all flex items-center justify-center ${
                         isCurrent
                           ? 'bg-accent-700 text-paper'
                           : 'bg-surface text-ink hover:bg-accent-100 active:scale-95'
@@ -3068,7 +3069,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             <button
               type="button"
               onClick={handleRestoreOrDeleteAcademyItem}
-              className={`w-full h-11 rounded-full border text-[13px] font-bold flex items-center justify-center gap-1.5 transition-colors ${
+              className={`w-full h-11 rounded-full border text-[0.8125rem] font-bold flex items-center justify-center gap-1.5 transition-colors ${
                 editingAcademyItem.isAdded
                   ? 'border-accent-300 text-accent-800 hover:bg-accent-100'
                   : 'border-divider text-ink hover:bg-slate-100'
@@ -3108,10 +3109,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               <div className="flex items-center gap-3 min-w-0">
                 {renderDateBlock(addTarget.date, 'accent')}
                 <div className="min-w-0">
-                  <h3 className="text-[16px] font-bold text-ink truncate">
+                  <h3 className="text-[1rem] font-bold text-ink truncate">
                     {tr(lang, '이 시간에 추가하기', 'Add at this time', '在此时间添加')}
                   </h3>
-                  <div className="text-[12px] font-semibold text-slate-600 truncate">
+                  <div className="text-[0.75rem] font-semibold text-slate-600 truncate">
                     {formatDateLabel(addTarget.date, lang)}
                   </div>
                 </div>
@@ -3142,7 +3143,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       role="tab"
                       aria-selected={active}
                       onClick={() => setAddKind(key)}
-                      className={`h-9 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors min-w-0 ${
+                      className={`h-9 rounded-full text-[0.8125rem] font-bold inline-flex items-center justify-center gap-1.5 transition-colors min-w-0 ${
                         active ? 'bg-accent-700 text-paper shadow-xs' : 'text-slate-700 hover:text-ink'
                       }`}
                     >
@@ -3157,7 +3158,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             {addKind === 'academy' || !onUpdateSchedules ? (
               <>
                 <div className="space-y-2">
-                  <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                  <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                     <Clock className="w-4 h-4 text-accent-700" />
                     {tr(lang, '수업 시간', 'Class time', '上课时间')}
                   </span>
@@ -3167,7 +3168,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       value={tempStartTime}
                       onChange={(e) => setTempStartTime(e.target.value)}
                       aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
-                      className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
+                      className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-accent"
                     />
                     <span className="text-sm font-bold text-slate-500">–</span>
                     <input
@@ -3175,23 +3176,23 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       value={tempEndTime}
                       onChange={(e) => setTempEndTime(e.target.value)}
                       aria-label={tr(lang, '종료 시간', 'End time', '结束时间')}
-                      className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
+                      className="flex-1 min-w-0 h-11 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-accent"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                    <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                       <Building2 className="w-4 h-4 text-accent-700" />
                       {tr(lang, '학원 선택', 'Pick an academy', '选择补习班')}
                     </span>
-                    <span className="text-[11px] font-semibold text-slate-600">
+                    <span className="text-[0.6875rem] font-semibold text-slate-600">
                       {tr(lang, '누르면 바로 추가', 'Adds instantly', '点击立即添加')}
                     </span>
                   </div>
                   {subjectPool.academy.length === 0 ? (
-                    <p className="px-4 py-3 rounded-2xl bg-surface text-[13px] text-slate-700">
+                    <p className="px-4 py-3 rounded-2xl bg-surface text-[0.8125rem] text-slate-700">
                       {tr(
                         lang,
                         '설정에서 학원 후보를 먼저 추가해 주세요.',
@@ -3206,7 +3207,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           key={acName}
                           type="button"
                           onClick={() => handleSelectAcademySubject(acName)}
-                          className="min-h-[44px] px-3 py-2 rounded-full text-[13px] font-semibold flex items-center justify-center gap-1 bg-surface text-ink hover:bg-accent-700 hover:text-paper active:scale-95 transition-all"
+                          className="min-h-[44px] px-3 py-2 rounded-full text-[0.8125rem] font-semibold flex items-center justify-center gap-1 bg-surface text-ink hover:bg-accent-700 hover:text-paper active:scale-95 transition-all"
                         >
                           <Plus className="w-3.5 h-3.5 shrink-0" strokeWidth={2.75} />
                           <span className="truncate">{translateSubject(acName, lang)}</span>
@@ -3224,7 +3225,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                     value={tempStartTime}
                     onChange={(e) => setTempStartTime(e.target.value)}
                     aria-label={tr(lang, '시작 시간', 'Start time', '开始时间')}
-                    className="w-[118px] h-11 px-3 rounded-full border border-divider bg-surface text-[14px] font-mono text-ink outline-none focus:border-accent"
+                    className="w-[118px] h-11 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-accent"
                   />
                   <input
                     type="text"
@@ -3232,11 +3233,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                     onChange={(e) => setNewScheduleTitle(e.target.value)}
                     aria-label={tr(lang, '제목', 'Title', '标题')}
                     placeholder={tr(lang, '제목 (예: 수행평가 준비)', 'Title (e.g. Prepare for quiz)', '标题（例如：准备测验）')}
-                    className="min-w-0 h-11 px-4 rounded-full border border-divider bg-surface text-[14px] text-ink placeholder:text-slate-500 outline-none focus:border-accent"
+                    className="min-w-0 h-11 px-4 rounded-full border border-divider bg-surface text-[0.875rem] text-ink placeholder:text-slate-500 outline-none focus:border-accent"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <span className="block text-[13px] font-bold text-ink">{tr(lang, '분류', 'Category', '分类')}</span>
+                  <span className="block text-[0.8125rem] font-bold text-ink">{tr(lang, '분류', 'Category', '分类')}</span>
                   <div className="grid grid-cols-3 gap-1.5">
                     {(['school', 'academy', 'other'] as ScheduleCategory[]).map((cat) => {
                       const active = newScheduleCategory === cat;
@@ -3247,7 +3248,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           type="button"
                           aria-pressed={active}
                           onClick={() => setNewScheduleCategory(cat)}
-                          className={`h-10 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                          className={`h-10 rounded-full text-[0.8125rem] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${
                             active
                               ? cat === 'school'
                                 ? 'bg-sage-700 text-paper'
@@ -3270,13 +3271,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   rows={2}
                   aria-label={tr(lang, '메모', 'Memo', '备注')}
                   placeholder={tr(lang, '메모 (선택)', 'Memo (optional)', '备注（可选）')}
-                  className="w-full px-4 py-2.5 rounded-2xl border border-divider bg-surface text-[14px] text-ink placeholder:text-slate-500 outline-none focus:border-accent resize-none"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-divider bg-surface text-[0.875rem] text-ink placeholder:text-slate-500 outline-none focus:border-accent resize-none"
                 />
                 <button
                   type="button"
                   onClick={handleAddScheduleItem}
                   disabled={!newScheduleTitle.trim()}
-                  className="w-full h-12 rounded-full bg-accent-700 text-paper text-[14px] font-bold hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-1.5"
+                  className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold hover:bg-accent-800 disabled:bg-slate-200 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-1.5"
                 >
                   <Plus className="w-4 h-4" strokeWidth={2.75} />
                   {tr(lang, '일정 추가', 'Add schedule', '添加日程')}

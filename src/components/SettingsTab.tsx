@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Clock,
   Globe,
+  Type,
   BookOpen,
   Sparkles,
   Check,
@@ -53,6 +54,8 @@ import {
   HomeWidgetId,
   WidgetConfig,
   UserProfile,
+  TextScale,
+  TEXT_SCALES,
 } from '../types';
 import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { API_BASE_URL } from '../native/androidShell';
@@ -171,9 +174,9 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
     >
       <Minus className="w-3.5 h-3.5" strokeWidth={2.75} />
     </button>
-    <span className="flex-1 min-w-0 text-center font-mono text-[13px] text-ink tabular-nums">
+    <span className="flex-1 min-w-0 text-center font-mono text-[0.8125rem] text-ink tabular-nums">
       {value}
-      {suffix && <span className="ml-0.5 font-sans text-[11px] font-semibold text-slate-600">{suffix}</span>}
+      {suffix && <span className="ml-0.5 font-sans text-[0.6875rem] font-semibold text-slate-600">{suffix}</span>}
     </span>
     <button
       type="button"
@@ -245,8 +248,8 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ id, open, onToggle, tone, i
           <Icon strokeWidth={2.5} className="w-[18px] h-[18px]" />
         </span>
         <span className="flex-1 min-w-0">
-          <span className="block text-[13px] font-bold text-ink truncate">{title}</span>
-          <span className="block text-[11px] text-slate-600 truncate">{summary}</span>
+          <span className="block text-[0.8125rem] font-bold text-ink truncate">{title}</span>
+          <span className="block text-[0.6875rem] text-slate-600 truncate">{summary}</span>
         </span>
         <ChevronDown
           strokeWidth={2.5}
@@ -279,14 +282,14 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[11px] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors"
+          className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors"
         >
           <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
           {label}
         </button>
       ) : (
         <div role="alertdialog" className="flex flex-wrap items-center gap-2">
-          <p className="flex-1 min-w-[180px] text-[11px] font-semibold text-accent-900 leading-snug">
+          <p className="flex-1 min-w-[180px] text-[0.6875rem] font-semibold text-accent-900 leading-snug">
             {confirmText ??
               tr(
                 lang,
@@ -299,7 +302,7 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="h-8 px-3 rounded-full border border-divider text-ink text-[11px] font-semibold hover:bg-slate-100"
+              className="h-8 px-3 rounded-full border border-divider text-ink text-[0.6875rem] font-semibold hover:bg-slate-100"
             >
               {tr(lang, '취소', 'Cancel', '取消')}
             </button>
@@ -309,7 +312,7 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
                 setConfirming(false);
                 onConfirm();
               }}
-              className="h-8 px-3 rounded-full bg-accent-800 text-paper text-[11px] font-bold inline-flex items-center gap-1 hover:bg-accent-900"
+              className="h-8 px-3 rounded-full bg-accent-800 text-paper text-[0.6875rem] font-bold inline-flex items-center gap-1 hover:bg-accent-900"
             >
               <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
               {confirmLabel ?? tr(lang, '되돌리기', 'Restore', '恢复')}
@@ -359,7 +362,7 @@ function profileInitials(name: string): string {
 }
 
 const GroupHeader: React.FC<{ label: string }> = ({ label }) => (
-  <h3 className="px-1.5 pt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600">{label}</h3>
+  <h3 className="px-1.5 pt-1 text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-slate-600">{label}</h3>
 );
 
 /** "2026-10-15 08:00" → "10/15 08:00" (falls back to the raw string). */
@@ -669,6 +672,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   const activeGuideTopic =
     USER_GUIDE_TOPICS.find((g) => g.id === selectedGuideId) || USER_GUIDE_TOPICS[0];
+
+  const textScale: TextScale = TEXT_SCALES.includes(state.textScale ?? 100) ? state.textScale ?? 100 : 100;
+  const handleSetTextScale = (next: TextScale) => {
+    onUpdateState((prev) => ({ ...prev, textScale: next }));
+  };
 
   const handleSetLanguage = (nextLang: AppLanguage) => {
     onUpdateState((prev) => ({
@@ -1513,8 +1521,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <Settings2 strokeWidth={2.5} className="w-6 h-6" />
             </span>
             <div className="min-w-0">
-              <h2 className="text-[20px] font-bold text-ink leading-tight">{tr(lang, '설정', 'Settings', '设置')}</h2>
-              <p className="text-[12px] text-slate-600 leading-snug">
+              <h2 className="text-[1.25rem] font-bold text-ink leading-tight">{tr(lang, '설정', 'Settings', '设置')}</h2>
+              <p className="text-[0.75rem] text-slate-600 leading-snug">
                 {tr(
                   lang,
                   '시간표 · 데이터 · 위젯을 한곳에서 관리해요',
@@ -1528,7 +1536,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <button
               type="button"
               onClick={collapseAllCards}
-              className="h-8 px-3 rounded-full border border-divider bg-paper text-[11px] font-semibold text-slate-700 inline-flex items-center gap-1 hover:bg-slate-100 shrink-0"
+              className="h-8 px-3 rounded-full border border-divider bg-paper text-[0.6875rem] font-semibold text-slate-700 inline-flex items-center gap-1 hover:bg-slate-100 shrink-0"
             >
               <ChevronsDownUp strokeWidth={2.5} className="w-3.5 h-3.5" />
               {tr(lang, '모두 접기', 'Collapse all', '全部收起')}
@@ -1568,8 +1576,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               onClick={() => openCardAndScroll(s.card)}
               className="rounded-xl bg-paper px-3 py-2.5 text-left hover:bg-slate-100 transition-colors min-w-0"
             >
-              <span className={`block font-mono text-[22px] leading-none tabular-nums ${s.tone}`}>{s.value}</span>
-              <span className="block mt-1 text-[11px] font-semibold text-slate-600 truncate">{s.label}</span>
+              <span className={`block font-mono text-[1.375rem] leading-none tabular-nums ${s.tone}`}>{s.value}</span>
+              <span className="block mt-1 text-[0.6875rem] font-semibold text-slate-600 truncate">{s.label}</span>
             </button>
           ))}
         </div>
@@ -1577,7 +1585,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
             <Globe strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-700" />
-            <span className="text-[12px] font-bold text-ink">{tr(lang, '언어', 'Language', '语言')}</span>
+            <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '언어', 'Language', '语言')}</span>
           </div>
           <div
             role="radiogroup"
@@ -1600,7 +1608,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   aria-checked={isSelected}
                   lang={item.htmlLang}
                   onClick={() => handleSetLanguage(item.code)}
-                  className={`h-9 rounded-full text-[13px] font-bold inline-flex items-center justify-center gap-1 transition-colors ${
+                  className={`h-9 rounded-full text-[0.8125rem] font-bold inline-flex items-center justify-center gap-1 transition-colors ${
                     isSelected ? 'bg-accent-700 text-paper shadow-xs' : 'text-ink hover:bg-slate-100'
                   }`}
                 >
@@ -1610,6 +1618,55 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* 글자 크기 — larger text for easier reading. Text is rem-based, so this scales it app-wide. */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Type strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-700" />
+            <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '글자 크기', 'Text size', '字体大小')}</span>
+          </div>
+          <div
+            role="radiogroup"
+            aria-label={tr(lang, '앱 글자 크기', 'App text size', '应用字体大小')}
+            className="grid grid-cols-4 gap-1 p-1 rounded-[20px] bg-paper border border-divider"
+          >
+            {TEXT_SCALES.map((scale, i) => {
+              const isSelected = textScale === scale;
+              const label = [
+                tr(lang, '기본', 'Default', '默认'),
+                tr(lang, '크게', 'Large', '大'),
+                tr(lang, '더 크게', 'Larger', '较大'),
+                tr(lang, '최대', 'Max', '最大'),
+              ][i];
+              return (
+                <button
+                  key={scale}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => handleSetTextScale(scale)}
+                  className={`min-h-[52px] py-1.5 px-1 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                    isSelected ? 'bg-accent-700 text-paper shadow-xs' : 'text-ink hover:bg-slate-100'
+                  }`}
+                >
+                  {/* Fixed px sample so each option shows its own size, whatever is selected */}
+                  <span aria-hidden="true" className="font-bold leading-none" style={{ fontSize: `${(16 * scale) / 100}px` }}>
+                    {tr(lang, '가', 'A', '字')}
+                  </span>
+                  <span className="text-[0.6875rem] font-semibold leading-tight text-center whitespace-nowrap">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[0.6875rem] text-slate-600 leading-snug">
+            {tr(
+              lang,
+              `지금 글자 크기 ${textScale}% · 앱 전체 글자가 함께 커져요.`,
+              `Text size ${textScale}% · applies to the whole app.`,
+              `当前字体 ${textScale}% · 整个应用的文字都会一起变大。`
+            )}
+          </p>
         </div>
       </section>
 
@@ -1630,12 +1687,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           {/* Live preview of the 지금 card identity row */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-slate-600">
+              <span className="text-[0.6875rem] font-bold text-slate-600">
                 {tr(lang, '시간표 「지금」 카드 미리보기', 'Preview on the timetable “Now” card', '课表「现在」卡片预览')}
               </span>
               <span
                 aria-live="polite"
-                className={`inline-flex items-center gap-1 text-[11px] font-bold text-sage-800 transition-opacity ${
+                className={`inline-flex items-center gap-1 text-[0.6875rem] font-bold text-sage-800 transition-opacity ${
                   profileSaved ? 'opacity-100' : 'opacity-0'
                 }`}
               >
@@ -1650,11 +1707,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               const initials = profileInitials(name);
               return (
                 <div className="bg-ink text-paper rounded-[24px] p-4 flex items-center gap-3" aria-hidden="true">
-                  <span className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[18px] font-bold">
+                  <span className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[1.125rem] font-bold">
                     {initials || <UserRound className="w-5 h-5" strokeWidth={2.5} />}
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[12px] font-semibold text-paper/80 truncate">
+                    <span className="block text-[0.75rem] font-semibold text-paper/80 truncate">
                       {(() => {
                         const hour = new Date().getHours();
                         return hour < 12
@@ -1664,17 +1721,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           : tr(lang, '좋은 저녁이에요,', 'Good evening,', '晚上好，');
                       })()}
                     </span>
-                    <span className="block text-[20px] leading-tight font-bold text-paper truncate">
+                    <span className="block text-[1.25rem] leading-tight font-bold text-paper truncate">
                       {name
                         ? tr(lang, `${name} 님`, name, name)
                         : tr(lang, '이름', 'Your name', '姓名')}
                     </span>
                     <span className="mt-1.5 flex items-center gap-1.5 min-w-0">
-                      <span className="inline-flex items-center gap-1 min-w-0 h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold">
+                      <span className="inline-flex items-center gap-1 min-w-0 h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[0.6875rem] font-bold">
                         <GraduationCap className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
                         <span className="truncate">{school || tr(lang, '학교', 'School', '学校')}</span>
                       </span>
-                      <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[11px] font-bold whitespace-nowrap shrink-0 max-w-[45%]">
+                      <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-paper/15 text-paper text-[0.6875rem] font-bold whitespace-nowrap shrink-0 max-w-[45%]">
                         <span className="truncate">{grade || tr(lang, '학년', 'Grade', '年级')}</span>
                       </span>
                     </span>
@@ -1688,7 +1745,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           {/* Fields */}
           <div className="space-y-2.5">
             <label className="block space-y-1">
-              <span className="text-[12px] font-bold text-ink">{tr(lang, '이름', 'Name', '姓名')}</span>
+              <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '이름', 'Name', '姓名')}</span>
               <input
                 ref={profileNameRef}
                 type="text"
@@ -1697,11 +1754,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 autoComplete="name"
                 onChange={(e) => updateProfile({ name: e.target.value })}
                 placeholder={tr(lang, '예: 김민준', 'e.g. Minjun Kim', '例如：金敏俊')}
-                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[0.875rem] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </label>
             <label className="block space-y-1">
-              <span className="text-[12px] font-bold text-ink">{tr(lang, '학교', 'School', '学校')}</span>
+              <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '학교', 'School', '学校')}</span>
               <input
                 type="text"
                 value={profile.school}
@@ -1709,11 +1766,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 autoComplete="organization"
                 onChange={(e) => updateProfile({ school: e.target.value })}
                 placeholder={tr(lang, '예: 한빛중학교', 'e.g. Hanbit Middle School', '例如：韩光中学')}
-                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[0.875rem] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
             </label>
             <div className="space-y-1">
-              <label htmlFor="settings-profile-grade" className="block text-[12px] font-bold text-ink">
+              <label htmlFor="settings-profile-grade" className="block text-[0.75rem] font-bold text-ink">
                 {tr(lang, '학년·반', 'Grade & class', '年级·班级')}
               </label>
               <input
@@ -1727,7 +1784,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   updateProfile({ grade: e.target.value });
                 }}
                 placeholder={tr(lang, '예: 2학년 3반', 'e.g. Grade 8, Class 3', '例如：初二 3班')}
-                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[14px] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
+                className="w-full h-10 px-4 rounded-full bg-paper border border-divider text-[0.875rem] text-ink placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sage-400"
               />
               <div
                 role="group"
@@ -1742,7 +1799,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       type="button"
                       aria-pressed={active}
                       onClick={() => applyGradeChip(chip)}
-                      className={`h-7 min-w-[40px] px-2.5 rounded-full text-[11px] font-bold transition-colors ${
+                      className={`h-7 min-w-[40px] px-2.5 rounded-full text-[0.6875rem] font-bold transition-colors ${
                         active
                           ? 'bg-sage-700 text-paper'
                           : chip.level === 'e'
@@ -1757,7 +1814,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-600 leading-snug">
+              <p className="text-[0.6875rem] text-slate-600 leading-snug">
                 {tr(
                   lang,
                   '학년을 고른 뒤 반을 이어서 입력할 수 있어요. 정보는 이 기기에만 저장돼요.',
@@ -1812,7 +1869,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           }
         >
           <div className="p-4 space-y-3">
-            <p className="text-[11px] text-slate-600">
+            <p className="text-[0.6875rem] text-slate-600">
               {tr(
                 lang,
                 '[시간표 > 일별 상세 보기]의 타임라인 표와 빈 시간 계산에 적용할 하루의 시작 시각과 종료 시각을 선택하세요.',
@@ -1823,7 +1880,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
             <div className="grid grid-cols-2 gap-2.5">
               <label className="space-y-1">
-                <span className="block text-[11px] font-medium text-slate-600">
+                <span className="block text-[0.6875rem] font-medium text-slate-600">
                   {tr(lang, '하루 시작 시간', 'Start Hour', '开始时间')}
                 </span>
                 <select
@@ -1834,7 +1891,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       timelineEndHour <= nextStart + 1 ? Math.min(24, nextStart + 2) : timelineEndHour;
                     handleUpdateTimelineRange(nextStart, adjustedEnd);
                   }}
-                  className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
+                  className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[0.8125rem] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
                 >
                   {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
                     <option key={h} value={h}>
@@ -1844,13 +1901,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </select>
               </label>
               <label className="space-y-1">
-                <span className="block text-[11px] font-medium text-slate-600">
+                <span className="block text-[0.6875rem] font-medium text-slate-600">
                   {tr(lang, '하루 종료 시간', 'End Hour', '结束时间')}
                 </span>
                 <select
                   value={timelineEndHour}
                   onChange={(e) => handleUpdateTimelineRange(timelineStartHour, Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
+                  className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[0.8125rem] font-mono text-ink tabular-nums focus:outline-none focus:border-accent"
                 >
                   {[16, 17, 18, 19, 20, 21, 22, 23, 24]
                     .filter((h) => h >= timelineStartHour + 2)
@@ -1875,7 +1932,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   key={`${p.s}-${p.e}`}
                   type="button"
                   onClick={() => handleUpdateTimelineRange(p.s, p.e)}
-                  className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
+                  className={`h-[30px] px-3 rounded-full text-[0.6875rem] font-semibold border transition-colors ${
                     timelineStartHour === p.s && timelineEndHour === p.e
                       ? 'bg-ink text-paper border-transparent'
                       : 'bg-transparent text-ink border-divider hover:bg-slate-100'
@@ -1903,7 +1960,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             {/* STEP A: class times */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-sage-700 text-paper font-mono text-[11px] grid place-items-center shrink-0">
+                <span className="w-5 h-5 rounded-full bg-sage-700 text-paper font-mono text-[0.6875rem] grid place-items-center shrink-0">
                   1
                 </span>
                 <span className="text-xs font-bold text-ink">
@@ -1930,7 +1987,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       role="radio"
                       aria-checked={active}
                       onClick={() => updateSchoolTimeConfig({ mode: opt.mode })}
-                      className={`h-8 rounded-full text-[11px] font-bold transition-colors ${
+                      className={`h-8 rounded-full text-[0.6875rem] font-bold transition-colors ${
                         active ? 'bg-sage-700 text-paper' : 'text-ink hover:bg-sage-100'
                       }`}
                     >
@@ -1954,7 +2011,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                         key={q.min}
                         type="button"
                         onClick={() => updateSchoolTimeConfig({ classMinutes: q.min })}
-                        className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
+                        className={`h-[30px] px-3 rounded-full text-[0.6875rem] font-semibold border transition-colors ${
                           schoolTimeConfig.classMinutes === q.min
                             ? 'bg-sage-700 text-paper border-transparent'
                             : 'border-divider text-ink hover:bg-sage-100 hover:border-sage-300'
@@ -1967,18 +2024,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
                   <div className="grid grid-cols-2 gap-x-2.5 gap-y-2">
                     <label className="space-y-1">
-                      <span className="block text-[11px] font-medium text-slate-600">
+                      <span className="block text-[0.6875rem] font-medium text-slate-600">
                         {tr(lang, '첫 수업 시작', 'First Class Starts', '第一节开始')}
                       </span>
                       <input
                         type="time"
                         value={schoolTimeConfig.firstStart}
                         onChange={(e) => e.target.value && updateSchoolTimeConfig({ firstStart: e.target.value })}
-                        className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:border-sage"
+                        className="w-full h-9 px-3 rounded-full border border-divider bg-paper text-[0.8125rem] font-mono text-ink tabular-nums focus:outline-none focus:border-sage"
                       />
                     </label>
                     <div className="space-y-1">
-                      <span className="block text-[11px] font-medium text-slate-600">
+                      <span className="block text-[0.6875rem] font-medium text-slate-600">
                         {tr(lang, '교시 수', 'Periods', '节数')}
                       </span>
                       <Stepper
@@ -1992,7 +2049,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       />
                     </div>
                     <div className="space-y-1">
-                      <span className="block text-[11px] font-medium text-slate-600">
+                      <span className="block text-[0.6875rem] font-medium text-slate-600">
                         {tr(lang, '수업 시간', 'Class Length', '每节时长')}
                       </span>
                       <Stepper
@@ -2007,7 +2064,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       />
                     </div>
                     <div className="space-y-1">
-                      <span className="block text-[11px] font-medium text-slate-600">
+                      <span className="block text-[0.6875rem] font-medium text-slate-600">
                         {tr(lang, '쉬는 시간', 'Break', '课间休息')}
                       </span>
                       <Stepper
@@ -2022,7 +2079,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       />
                     </div>
                     <div className="space-y-1 col-span-2">
-                      <span className="block text-[11px] font-medium text-slate-600">
+                      <span className="block text-[0.6875rem] font-medium text-slate-600">
                         {tr(lang, '점심시간', 'Lunch Length', '午休时长')}
                       </span>
                       <Stepper
@@ -2039,7 +2096,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    <span className="block text-[11px] font-medium text-slate-600">
+                    <span className="block text-[0.6875rem] font-medium text-slate-600">
                       {tr(lang, '점심은 언제?', 'Lunch comes after', '午休位置')}
                     </span>
                     <div className="flex flex-wrap gap-1.5">
@@ -2055,7 +2112,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                               key={n}
                               type="button"
                               onClick={() => updateSchoolTimeConfig({ lunchAfterPeriod: n })}
-                              className={`h-[30px] px-3 rounded-full text-[11px] font-semibold border transition-colors ${
+                              className={`h-[30px] px-3 rounded-full text-[0.6875rem] font-semibold border transition-colors ${
                                 active
                                   ? n === 0
                                     ? 'bg-ink text-paper border-transparent'
@@ -2076,10 +2133,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {/* Live visual preview: vertical time ruler */}
                   <div className="rounded-xl bg-paper p-3 space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold text-slate-600">
+                      <span className="text-[0.6875rem] font-bold text-slate-600">
                         {tr(lang, '미리보기', 'Preview', '预览')}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-sage-100 text-sage-900 text-[11px] font-bold">
+                      <span className="px-2 py-0.5 rounded-full bg-sage-100 text-sage-900 text-[0.6875rem] font-bold">
                         {tr(
                           lang,
                           `${schoolTimeConfig.periodCount}교시 · ${schoolTimeConfig.firstStart} 시작 · ${presetEndTime} 종료`,
@@ -2097,7 +2154,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                         return (
                           <React.Fragment key={row.period}>
                             <div className="flex gap-2">
-                              <div className="w-10 shrink-0 text-right text-[11px] font-mono text-slate-600 tabular-nums leading-none pt-1">
+                              <div className="w-10 shrink-0 text-right text-[0.6875rem] font-mono text-slate-600 tabular-nums leading-none pt-1">
                                 {row.startTime}
                               </div>
                               <div className="flex-1 min-w-0 border-l-2 border-sage-300 pl-2">
@@ -2105,8 +2162,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                   style={{ height: Math.max(30, schoolTimeConfig.classMinutes * PREVIEW_PX_PER_MIN) }}
                                   className="rounded-xl bg-sage-200 text-sage-900 px-2.5 flex items-center justify-between gap-2"
                                 >
-                                  <span className="text-[11px] font-bold">{periodLabel(row.period)}</span>
-                                  <span className="text-[11px] font-mono tabular-nums">
+                                  <span className="text-[0.6875rem] font-bold">{periodLabel(row.period)}</span>
+                                  <span className="text-[0.6875rem] font-mono tabular-nums">
                                     {row.startTime}–{row.endTime}
                                   </span>
                                 </div>
@@ -2115,7 +2172,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             {!isLast &&
                               (lunchHere ? (
                                 <div className="flex gap-2">
-                                  <div className="w-10 shrink-0 text-right text-[11px] font-mono text-accent-700 tabular-nums leading-none pt-1.5">
+                                  <div className="w-10 shrink-0 text-right text-[0.6875rem] font-mono text-accent-700 tabular-nums leading-none pt-1.5">
                                     {row.endTime}
                                   </div>
                                   <div className="flex-1 min-w-0 border-l-2 border-accent-300 pl-2 py-1">
@@ -2123,10 +2180,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                       style={{ height: Math.max(28, gapMin * PREVIEW_PX_PER_MIN) }}
                                       className="rounded-xl bg-accent-100 border border-dashed border-accent-300 text-accent-800 px-2.5 flex items-center justify-between gap-2"
                                     >
-                                      <span className="text-[11px] font-bold">
+                                      <span className="text-[0.6875rem] font-bold">
                                         {tr(lang, `점심 ${gapMin}분`, `Lunch ${gapMin} min`, `午休 ${gapMin} 分钟`)}
                                       </span>
-                                      <span className="text-[11px] font-mono tabular-nums">
+                                      <span className="text-[0.6875rem] font-mono tabular-nums">
                                         {row.endTime}–{gapEnd}
                                       </span>
                                     </div>
@@ -2140,7 +2197,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                     style={{ height: gapMin > 0 ? Math.max(18, gapMin * PREVIEW_PX_PER_MIN) : 6 }}
                                   >
                                     {gapMin > 0 && (
-                                      <span className="text-[11px] text-slate-600">
+                                      <span className="text-[0.6875rem] text-slate-600">
                                         {tr(lang, `쉬는 시간 ${gapMin}분`, `Break ${gapMin} min`, `课间 ${gapMin} 分钟`)}
                                       </span>
                                     )}
@@ -2151,10 +2208,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                         );
                       })}
                       <div className="flex gap-2 pt-1">
-                        <div className="w-10 shrink-0 text-right text-[11px] font-mono font-bold text-ink tabular-nums">
+                        <div className="w-10 shrink-0 text-right text-[0.6875rem] font-mono font-bold text-ink tabular-nums">
                           {presetEndTime}
                         </div>
-                        <span className="text-[11px] font-semibold text-slate-600">
+                        <span className="text-[0.6875rem] font-semibold text-slate-600">
                           {tr(lang, '하교', 'School ends', '放学')}
                         </span>
                       </div>
@@ -2169,7 +2226,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <Check className="w-4 h-4" />
                     {tr(lang, '모든 요일에 적용', 'Apply to All Days', '应用到所有星期')}
                   </button>
-                  <p className="text-[11px] text-slate-600 text-center">
+                  <p className="text-[0.6875rem] text-slate-600 text-center">
                     {tr(
                       lang,
                       '기존 과목은 교시 순서대로 유지되며, 학교 수업이 없는 요일(예: 토·일)은 건너뜁니다.',
@@ -2179,7 +2236,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </p>
                 </div>
               ) : (
-                <p className="text-[11px] text-slate-600 px-3 py-2 rounded-xl bg-paper">
+                <p className="text-[0.6875rem] text-slate-600 px-3 py-2 rounded-xl bg-paper">
                   {tr(
                     lang,
                     '아래 표에서 왼쪽 교시 칸을 누르면 그 교시의 시작·종료 시간을 바꿀 수 있어요. 요일마다 다르게 정할 수도 있습니다.',
@@ -2194,7 +2251,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <div className="space-y-2.5 pt-4 border-t border-divider">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-sage-700 text-paper font-mono text-[11px] grid place-items-center shrink-0">
+                  <span className="w-5 h-5 rounded-full bg-sage-700 text-paper font-mono text-[0.6875rem] grid place-items-center shrink-0">
                     2
                   </span>
                   <span className="text-xs font-bold text-ink">
@@ -2205,7 +2262,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   type="button"
                   onClick={() => setShowWeekendPref(!showWeekend)}
                   aria-pressed={showWeekend}
-                  className={`h-7 px-2.5 rounded-full text-[11px] font-semibold border transition-colors ${
+                  className={`h-7 px-2.5 rounded-full text-[0.6875rem] font-semibold border transition-colors ${
                     showWeekend
                       ? 'bg-sage-100 text-sage-900 border-transparent'
                       : 'border-divider text-ink hover:bg-slate-100'
@@ -2216,7 +2273,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     : tr(lang, '+ 토·일 보기', '+ Sat/Sun', '+ 显示周六日')}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-600">
+              <p className="text-[0.6875rem] text-slate-600">
                 {tr(
                   lang,
                   '칸을 눌러 과목을 고르세요. 빈 칸(+)을 누르면 그 요일에 해당 교시가 생깁니다.',
@@ -2227,7 +2284,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
               {schoolRows.length === 0 ? (
                 <div className="rounded-xl bg-paper px-3 py-5 text-center space-y-2">
-                  <p className="text-[11px] text-slate-600">
+                  <p className="text-[0.6875rem] text-slate-600">
                     {tr(
                       lang,
                       '아직 등록된 교시가 없습니다. 첫 교시를 추가해 보세요.',
@@ -2238,7 +2295,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <button
                     type="button"
                     onClick={handleAddSchoolRow}
-                    className="h-8 px-3 rounded-full bg-sage-700 text-paper text-[11px] font-bold inline-flex items-center gap-1 hover:bg-sage-800"
+                    className="h-8 px-3 rounded-full bg-sage-700 text-paper text-[0.6875rem] font-bold inline-flex items-center gap-1 hover:bg-sage-800"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     {tr(lang, '교시 추가', 'Add Period', '添加节次')}
@@ -2249,7 +2306,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <table className="w-full text-center border-collapse table-fixed min-w-[300px]">
                     <thead>
                       <tr className="border-b border-divider">
-                        <th className="w-[62px] py-2 px-1 text-[11px] font-semibold text-slate-600 border-r border-divider">
+                        <th className="w-[62px] py-2 px-1 text-[0.6875rem] font-semibold text-slate-600 border-r border-divider">
                           {tr(lang, '교시', 'Per', '课时')}
                         </th>
                         {gridDays.map((d) => (
@@ -2276,7 +2333,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                   `编辑第${periodNum}节时间`
                                 )}
                               >
-                                <span className="text-[11px] font-bold text-sage-800 inline-flex items-center gap-0.5">
+                                <span className="text-[0.6875rem] font-bold text-sage-800 inline-flex items-center gap-0.5">
                                   {periodLabel(periodNum)}
                                   {info.mismatch && (
                                     <span
@@ -2285,10 +2342,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                     />
                                   )}
                                 </span>
-                                <span className="text-[11px] font-mono text-slate-600 tabular-nums">
+                                <span className="text-[0.6875rem] font-mono text-slate-600 tabular-nums">
                                   {info.times.startTime}
                                 </span>
-                                <span className="text-[11px] font-mono text-slate-600 tabular-nums">
+                                <span className="text-[0.6875rem] font-mono text-slate-600 tabular-nums">
                                   {info.times.endTime}
                                 </span>
                               </button>
@@ -2318,7 +2375,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                     )}
                                   >
                                     {cell ? (
-                                      <span className="block truncate text-[11px]">
+                                      <span className="block truncate text-[0.6875rem]">
                                         {cell.subject
                                           ? translateSubject(cell.subject, lang)
                                           : tr(lang, '(없음)', '(none)', '（无）')}
@@ -2343,7 +2400,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <button
                     type="button"
                     onClick={handleAddSchoolRow}
-                    className="flex-1 h-8 rounded-full bg-sage-100 text-sage-900 text-[11px] font-bold inline-flex items-center justify-center gap-1 hover:bg-sage-200"
+                    className="flex-1 h-8 rounded-full bg-sage-100 text-sage-900 text-[0.6875rem] font-bold inline-flex items-center justify-center gap-1 hover:bg-sage-200"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     {tr(lang, `${maxSchoolPeriod + 1}교시 추가`, `Add P${maxSchoolPeriod + 1}`, `添加第${maxSchoolPeriod + 1}节`)}
@@ -2352,7 +2409,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     type="button"
                     onClick={() => setRemovePeriodConfirm(true)}
                     aria-expanded={removePeriodConfirm}
-                    className="flex-1 h-8 rounded-full border border-divider text-ink text-[11px] font-semibold inline-flex items-center justify-center gap-1 hover:bg-slate-100"
+                    className="flex-1 h-8 rounded-full border border-divider text-ink text-[0.6875rem] font-semibold inline-flex items-center justify-center gap-1 hover:bg-slate-100"
                   >
                     <Minus className="w-3.5 h-3.5" />
                     {tr(lang, `${maxSchoolPeriod}교시 삭제`, `Remove P${maxSchoolPeriod}`, `删除第${maxSchoolPeriod}节`)}
@@ -2362,7 +2419,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
               {removePeriodConfirm && schoolRows.length > 0 && (
                 <div role="alert" className="rounded-xl bg-accent-100 px-3 py-2.5 space-y-2">
-                  <p className="text-[12px] font-semibold text-accent-900">
+                  <p className="text-[0.75rem] font-semibold text-accent-900">
                     {tr(
                       lang,
                       `모든 요일에서 ${maxSchoolPeriod}교시를 삭제할까요?`,
@@ -2374,14 +2431,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <button
                       type="button"
                       onClick={() => setRemovePeriodConfirm(false)}
-                      className="flex-1 h-8 rounded-full border border-divider bg-paper text-ink text-[11px] font-semibold hover:bg-slate-100"
+                      className="flex-1 h-8 rounded-full border border-divider bg-paper text-ink text-[0.6875rem] font-semibold hover:bg-slate-100"
                     >
                       {tr(lang, '취소', 'Cancel', '取消')}
                     </button>
                     <button
                       type="button"
                       onClick={handleRemoveLastSchoolRow}
-                      className="flex-1 h-8 rounded-full bg-accent-800 text-paper text-[11px] font-bold hover:bg-accent-900"
+                      className="flex-1 h-8 rounded-full bg-accent-800 text-paper text-[0.6875rem] font-bold hover:bg-accent-900"
                     >
                       {tr(lang, '삭제', 'Remove', '删除')}
                     </button>
@@ -2398,7 +2455,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {tr(lang, '요일 통째로 복사', 'Copy a Whole Day', '整天复制')}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-600">
+              <p className="text-[0.6875rem] text-slate-600">
                 {tr(
                   lang,
                   '원본 요일의 학교 과목과 학원 일정을 모두 대상 요일에 덮어씁니다.',
@@ -2469,7 +2526,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   >
                     <span className="text-xs font-bold leading-none">{translateDay(d, lang)}</span>
                     <span
-                      className={`text-[11px] font-mono leading-none tabular-nums ${
+                      className={`text-[0.6875rem] font-mono leading-none tabular-nums ${
                         active ? 'text-accent-100' : count > 0 ? 'text-accent-700' : 'text-slate-400'
                       }`}
                     >
@@ -2492,7 +2549,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             {academyDayData.academy.length === 0 ? (
-              <p className="text-[11px] text-slate-600 py-3 text-center rounded-xl bg-paper">
+              <p className="text-[0.6875rem] text-slate-600 py-3 text-center rounded-xl bg-paper">
                 {tr(
                   lang,
                   '이 요일에 등록된 기본 학원 일정이 없습니다.',
@@ -2559,7 +2616,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <button
               type="button"
               onClick={handleAddMasterAcademyItem}
-              className="w-full h-9 rounded-full border border-dashed border-accent-300 text-accent-800 text-[11px] font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-100"
+              className="w-full h-9 rounded-full border border-dashed border-accent-300 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-100"
             >
               <Plus className="w-3.5 h-3.5" />
               {tr(
@@ -2589,7 +2646,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           )}
         >
           <div className="p-4 space-y-4">
-            <p className="text-[11px] text-slate-600 leading-relaxed">
+            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
               {tr(
                 lang,
                 '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요.',
@@ -2613,7 +2670,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.school.map((subj) => (
                   <span
                     key={subj}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[11px] font-semibold"
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-semibold"
                   >
                     {translateSubject(subj, lang)}
                     <button
@@ -2670,7 +2727,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.academy.map((acName) => (
                   <span
                     key={acName}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[11px] font-semibold"
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-semibold"
                   >
                     {translateSubject(acName, lang)}
                     <button
@@ -2746,7 +2803,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h3 className="text-[13px] font-bold text-ink">
+                        <h3 className="text-[0.8125rem] font-bold text-ink">
                           {tr(
                             lang,
                             `${day}요일 ${period}교시`,
@@ -2754,7 +2811,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             `${translateDay(day, lang)} 第${period}节`
                           )}
                         </h3>
-                        <p className="text-[11px] font-mono text-slate-600 tabular-nums">
+                        <p className="text-[0.6875rem] font-mono text-slate-600 tabular-nums">
                           {rowTimes.startTime}–{rowTimes.endTime}
                           {!sheetCell && (
                             <span className="ml-1.5 font-sans text-sage-700">
@@ -2774,7 +2831,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     </div>
 
                     <div className="space-y-1.5">
-                      <span className="block text-[11px] font-medium text-slate-600">
+                      <span className="block text-[0.6875rem] font-medium text-slate-600">
                         {tr(lang, '과목 선택', 'Pick a subject', '选择科目')}
                       </span>
                       <div className="flex flex-wrap gap-1.5">
@@ -2846,7 +2903,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
                     {sheetCell && !isPresetMode && (
                       <div className="space-y-1.5 pt-3 border-t border-divider">
-                        <span className="block text-[11px] font-medium text-slate-600">
+                        <span className="block text-[0.6875rem] font-medium text-slate-600">
                           {tr(
                             lang,
                             `${day}요일만 시간 바꾸기`,
@@ -2862,7 +2919,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             onChange={(e) =>
                               e.target.value && handleUpdateDayPeriodTime(day, period, { startTime: e.target.value })
                             }
-                            className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                            className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[0.8125rem] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
                           />
                           <span className="text-xs text-slate-400">~</span>
                           <input
@@ -2872,7 +2929,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             onChange={(e) =>
                               e.target.value && handleUpdateDayPeriodTime(day, period, { endTime: e.target.value })
                             }
-                            className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                            className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[0.8125rem] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
                           />
                         </div>
                       </div>
@@ -2888,10 +2945,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h3 className="text-[13px] font-bold text-ink">
+                        <h3 className="text-[0.8125rem] font-bold text-ink">
                           {tr(lang, `${period}교시 시간`, `Period ${period} Time`, `第${period}节时间`)}
                         </h3>
-                        <p className="text-[11px] text-slate-600">
+                        <p className="text-[0.6875rem] text-slate-600">
                           {tr(
                             lang,
                             `${info.entries.length}개 요일에 있는 교시`,
@@ -2914,11 +2971,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       <div className="space-y-2.5">
                         <div className="rounded-xl bg-sage-100 px-3 py-2.5 flex items-center justify-between">
                           <span className="text-xs font-bold text-sage-900">{periodLabel(period)}</span>
-                          <span className="text-[13px] font-mono text-sage-900 tabular-nums">
+                          <span className="text-[0.8125rem] font-mono text-sage-900 tabular-nums">
                             {info.times.startTime}–{info.times.endTime}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-600">
+                        <p className="text-[0.6875rem] text-slate-600">
                           {tr(
                             lang,
                             '프리셋 모드에서는 시간이 자동 계산됩니다. 교시마다 직접 바꾸려면 직접 입력 모드로 전환하세요.',
@@ -2937,7 +2994,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     ) : (
                       <div className="space-y-3">
                         <div className="space-y-1.5">
-                          <span className="block text-[11px] font-medium text-slate-600">
+                          <span className="block text-[0.6875rem] font-medium text-slate-600">
                             {tr(lang, '모든 요일 한 번에', 'All days at once', '所有星期统一')}
                           </span>
                           <div className="flex items-center gap-1.5">
@@ -2948,7 +3005,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                               onChange={(e) =>
                                 e.target.value && handleUpdateRowTimeAllDays(period, { startTime: e.target.value })
                               }
-                              className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                              className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[0.8125rem] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
                             />
                             <span className="text-xs text-slate-400">~</span>
                             <input
@@ -2958,11 +3015,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                               onChange={(e) =>
                                 e.target.value && handleUpdateRowTimeAllDays(period, { endTime: e.target.value })
                               }
-                              className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[13px] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
+                              className="flex-1 min-w-0 h-9 px-3 rounded-full bg-surface text-[0.8125rem] font-mono text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-sage"
                             />
                           </div>
                           {info.mismatch && (
-                            <p className="text-[11px] text-accent-800">
+                            <p className="text-[0.6875rem] text-accent-800">
                               {tr(
                                 lang,
                                 '요일마다 시간이 달라요. 여기서 바꾸면 모든 요일이 같은 시간으로 맞춰집니다.',
@@ -2975,7 +3032,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
                         {info.entries.length > 0 && (
                           <details className="rounded-xl bg-surface px-3 py-2" open={info.mismatch}>
-                            <summary className="text-[11px] font-bold text-ink cursor-pointer">
+                            <summary className="text-[0.6875rem] font-bold text-ink cursor-pointer">
                               {tr(lang, '요일별 시간', 'Per-day times', '按星期设置时间')}
                             </summary>
                             <div className="space-y-1.5 pt-2">
@@ -3045,11 +3102,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="rounded-xl bg-other-100 border border-other-300 p-3.5 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-other-800">
                   <FlaskConical className="w-4 h-4" strokeWidth={2.75} />
-                  <span className="text-[13px] font-bold">
+                  <span className="text-[0.8125rem] font-bold">
                     {tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · Coming soon', '实验功能 · 即将推出')}
                   </span>
                 </div>
-                <p className="text-[12px] text-other-800 leading-relaxed">
+                <p className="text-[0.75rem] text-other-800 leading-relaxed">
                   {tr(
                     lang,
                     '시간표 사진 한 장으로 요일·교시·과목과 학원 일정을 자동으로 채워 주는 기능이에요. 지금은 비공개 테스트 중이라 정식 출시 후에 쓸 수 있어요.',
@@ -3082,11 +3139,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       <step.icon className="w-4 h-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[13px] font-bold text-ink">
+                      <span className="block text-[0.8125rem] font-bold text-ink">
                         <span className="font-mono text-slate-500 mr-1">{i + 1}</span>
                         {step.title}
                       </span>
-                      <span className="block text-[12px] text-slate-600 leading-relaxed">{step.body}</span>
+                      <span className="block text-[0.75rem] text-slate-600 leading-relaxed">{step.body}</span>
                     </span>
                   </li>
                 ))}
@@ -3102,7 +3159,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {tr(lang, '사진으로 시간표 인식 · 준비 중', 'Recognize from photo · In preparation', '照片识别课表 · 准备中')}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-600 text-center">
+              <p className="text-[0.6875rem] text-slate-600 text-center">
                 {tr(
                   lang,
                   '지금은 [학교 시간표] 표에서 칸을 눌러 직접 입력할 수 있어요.',
@@ -3115,7 +3172,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <>
               <div className="mx-4 mt-4 rounded-xl bg-other-100 border border-other-300 px-3 py-2 flex items-center gap-1.5 text-other-800">
                 <FlaskConical className="w-3.5 h-3.5 shrink-0" strokeWidth={2.75} />
-                <span className="text-[11px] font-semibold">
+                <span className="text-[0.6875rem] font-semibold">
                   {tr(
                     lang,
                     '실험 기능 · 테스트 모드로 켜져 있어요. 결과를 꼭 확인한 뒤 합쳐 주세요.',
@@ -3125,7 +3182,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </span>
               </div>
           <div className="p-4 space-y-4">
-            <p className="text-[11px] text-slate-600 leading-relaxed">
+            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
               {tr(
                 lang,
                 '가정통신문·칠판·손글씨 시간표 사진을 AI가 분석해요. 결과를 표에서 확인·수정한 뒤 기본 시간표에 합칠 수 있어요.',
@@ -3225,7 +3282,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       )}
                     </h3>
                     {aiSummary && (
-                      <p className="text-[11px] text-slate-600 mt-0.5">{aiSummary}</p>
+                      <p className="text-[0.6875rem] text-slate-600 mt-0.5">{aiSummary}</p>
                     )}
                   </div>
                 </div>
@@ -3362,7 +3419,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           summary={backupSummary}
         >
           <div className="p-4 space-y-4">
-            <p className="text-[11px] text-slate-600 leading-relaxed">
+            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
               {tr(
                 lang,
                 '휴대폰 교체나 브라우저 초기화에 대비해 플래너 전체를 JSON 파일로 보관하고 언제든 복원하세요.',
@@ -3371,10 +3428,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               )}
             </p>
             <div className="px-3.5 py-2.5 rounded-xl bg-paper flex items-center justify-between gap-2">
-              <span className="text-[12px] font-semibold text-slate-600">
+              <span className="text-[0.75rem] font-semibold text-slate-600">
                 {tr(lang, '마지막 백업 일시', 'Last Backup Date', '上次备份时间')}
               </span>
-              <span className="text-[13px] font-mono text-ink tabular-nums">
+              <span className="text-[0.8125rem] font-mono text-ink tabular-nums">
                 {state.backupMeta.lastBackupDate ||
                   tr(lang, '백업 기록 없음', 'Never backed up', '暂无备份记录')}
               </span>
@@ -3428,7 +3485,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <div className="pt-4 border-t border-divider space-y-2">
               <div className="flex items-center gap-1.5">
                 <ShieldAlert strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-800" />
-                <span className="text-[12px] font-bold text-accent-800">
+                <span className="text-[0.75rem] font-bold text-accent-800">
                   {tr(lang, '초기화', 'Danger zone', '重置')}
                 </span>
               </div>
@@ -3448,7 +3505,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </button>
               ) : (
                 <div role="alert" className="rounded-xl bg-accent-100 border border-accent-300 p-3 space-y-2.5">
-                  <p className="text-[12px] font-semibold text-accent-900 leading-snug">
+                  <p className="text-[0.75rem] font-semibold text-accent-900 leading-snug">
                     {tr(
                       lang,
                       '모든 시간표·일정·출석·메모가 샘플 데이터로 바뀌어요. 되돌릴 수 없으니 먼저 백업을 권장합니다.',
@@ -3544,7 +3601,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <button
           type="button"
           onClick={() => setIsWidgetSheetOpen(true)}
-          className="w-full h-12 rounded-full bg-accent-700 text-paper text-[14px] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
+          className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
         >
           <Smartphone className="w-4 h-4" strokeWidth={2.75} />
           {tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')}
@@ -3586,7 +3643,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   >
                     <div className="min-w-0 flex items-baseline gap-1">
                       <div
-                        className={`hidden sm:block text-[11px] font-mono ${
+                        className={`hidden sm:block text-[0.6875rem] font-mono ${
                           isSelected ? 'text-accent-100' : 'text-accent-700'
                         }`}
                       >
@@ -3609,7 +3666,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             {/* Selected Feature Step-by-Step Walkthrough Card */}
             <div className="p-3 rounded-xl bg-paper space-y-2.5">
               <div className="space-y-1 border-b border-divider pb-2.5">
-                <span className="inline-block px-2 py-0.5 rounded-full bg-accent-100 text-accent-800 text-[11px] font-bold">
+                <span className="inline-block px-2 py-0.5 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-bold">
                   {tr(
                     lang,
                     activeGuideTopic.badge.ko,
@@ -3639,7 +3696,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="space-y-1.5">
                 {activeGuideTopic.steps.map((st, sIdx) => (
                   <div key={sIdx} className="flex items-start gap-2">
-                    <span className="flex-none w-[18px] h-[18px] mt-px rounded-full bg-accent-700 text-paper font-mono text-[11px] grid place-items-center">
+                    <span className="flex-none w-[18px] h-[18px] mt-px rounded-full bg-accent-700 text-paper font-mono text-[0.6875rem] grid place-items-center">
                       {sIdx + 1}
                     </span>
                     <div className="flex-1 min-w-0 space-y-0.5">
@@ -3657,7 +3714,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               {/* Pro Tip Box */}
               <div className="px-2.5 py-2 rounded bg-sage-100 flex items-start gap-2">
                 <Sparkles className="w-3.5 h-3.5 text-sage-700 shrink-0 mt-0.5" />
-                <p className="text-[11px] font-medium text-sage-900 leading-relaxed">
+                <p className="text-[0.6875rem] font-medium text-sage-900 leading-relaxed">
                   <strong className="font-bold mr-1">{tr(lang, '팁:', 'TIP:', '提示：')}</strong>
                   {tr(
                     lang,
@@ -3689,10 +3746,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <h3 className="text-[16px] font-bold text-ink">
+                  <h3 className="text-[1rem] font-bold text-ink">
                     {tr(lang, '홈 화면 위젯 고르기', 'Choose widgets', '选择小组件')}
                   </h3>
-                  <p className="text-[11px] text-slate-600">
+                  <p className="text-[0.6875rem] text-slate-600">
                     {tr(
                       lang,
                       `원하는 위젯의 "홈 화면에 추가"를 누르세요 · ${widgetConfig.enabled.length}개 추가됨`,
@@ -3711,7 +3768,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </button>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
                 </span>
               {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) — widgetConfig.theme */}
@@ -3726,7 +3783,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     type="button"
                     aria-pressed={widgetTheme === th}
                     onClick={() => updateWidgetConfig({ theme: th })}
-                    className={`h-[30px] px-2.5 text-[11px] font-semibold flex items-center gap-1 transition-colors ${
+                    className={`h-[30px] px-2.5 text-[0.6875rem] font-semibold flex items-center gap-1 transition-colors ${
                       widgetTheme === th ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
                     }`}
                   >
@@ -3756,21 +3813,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[13px] font-bold text-ink">{meta.name(lang)}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-surface text-[11px] font-mono text-slate-700">
+                            <span className="text-[0.8125rem] font-bold text-ink">{meta.name(lang)}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-mono text-slate-700">
                               {meta.sizeLabel(lang)}
                             </span>
-                            <span className="text-[11px] text-slate-600">
+                            <span className="text-[0.6875rem] text-slate-600">
                               {tr(lang, `${meta.source(lang)} 메뉴`, `from ${meta.source(lang)}`, `来自${meta.source(lang)}`)}
                             </span>
                           </div>
-                          <p className="mt-0.5 text-[11px] text-slate-600">{meta.description(lang)}</p>
+                          <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
                         </div>
                         <button
                           type="button"
                           aria-pressed={isOn}
                           onClick={() => toggleWidget(id)}
-                          className={`h-8 px-3 rounded-full text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
+                          className={`h-8 px-3 rounded-full text-[0.6875rem] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
                             isOn
                               ? 'bg-sage-100 text-sage-800 hover:bg-sage-200'
                               : 'bg-accent-700 text-paper hover:bg-accent-800'
@@ -3796,7 +3853,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 })}
               </div>
 
-              <p className="text-[11px] text-slate-600 leading-relaxed px-1">
+              <p className="text-[0.6875rem] text-slate-600 leading-relaxed px-1">
                 {tr(
                   lang,
                   '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
@@ -3806,7 +3863,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </p>
 
               <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-[11px] text-slate-600">
+                <span className="text-[0.6875rem] text-slate-600">
                   {widgetSyncToast ||
                     tr(
                       lang,
@@ -3835,7 +3892,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <button
                 type="button"
                 onClick={() => setIsWidgetSheetOpen(false)}
-                className="w-full h-12 rounded-full bg-ink text-paper text-[14px] font-bold hover:bg-slate-800"
+                className="w-full h-12 rounded-full bg-ink text-paper text-[0.875rem] font-bold hover:bg-slate-800"
               >
                 {tr(
                   lang,

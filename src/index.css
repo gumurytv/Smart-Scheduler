@@ -254,5 +254,13 @@
  */
 .native-app main {
   background-color: var(--color-paper);
-  transform: translateZ(0);
+}
+
+/*
+ * 글자 크기 (Settings): the app sets <html> font-size to 100–145%. Text sizes are in rem so
+ * they follow it; spacing and the shell width stay in px so the layout itself doesn't grow.
+ */
+@theme {
+  --spacing: 4px;
+  --container-md: 448px;
 }
