@@ -57,7 +57,7 @@ import {
   TextScale,
   TEXT_SCALES,
 } from '../types';
-import { isAiTimetableEnabled } from '../utils/featureFlags';
+import { isAiTimetableEnabled, HOME_WIDGETS_AVAILABLE } from '../utils/featureFlags';
 import { API_BASE_URL } from '../native/androidShell';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
@@ -3561,7 +3561,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           icon={Smartphone}
           title={tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
           summary={
-            widgetConfig.enabled.length > 0
+            !HOME_WIDGETS_AVAILABLE
+              ? tr(
+                  lang,
+                  `곧 지원 예정 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
+                  `Coming soon · ${HOME_WIDGET_IDS.length} previews`,
+                  `即将推出 · ${HOME_WIDGET_IDS.length} 种预览`
+                )
+              : widgetConfig.enabled.length > 0
               ? tr(
                   lang,
                   `위젯 ${widgetConfig.enabled.length}개 추가됨 · 총 ${HOME_WIDGET_IDS.length}종`,
@@ -3577,7 +3584,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           }
         >
           <div className="p-4 space-y-3">
-        {widgetConfig.enabled.length > 0 && (
+        {!HOME_WIDGETS_AVAILABLE && (
+          <p className="rounded-2xl bg-other-100 text-other-800 px-3.5 py-3 text-[0.75rem] font-semibold leading-snug">
+            {tr(
+              lang,
+              '홈 화면 위젯은 준비 중이에요. 다음 업데이트에서 휴대폰 홈 화면에 추가할 수 있어요. 지금은 어떤 모양인지 미리 볼 수 있어요.',
+              'Home-screen widgets are coming soon. You will be able to add them in a future update — for now you can preview them.',
+              '主屏幕小组件正在准备中，将在后续更新中支持添加。现在可以先预览样式。'
+            )}
+          </p>
+        )}
+        {HOME_WIDGETS_AVAILABLE && widgetConfig.enabled.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {widgetConfig.enabled.map((id) => (
               <span
@@ -3604,10 +3621,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
         >
           <Smartphone className="w-4 h-4" strokeWidth={2.75} />
-          {tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')}
+          {HOME_WIDGETS_AVAILABLE
+            ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
+            : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
         </button>
 
-            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
+            {HOME_WIDGETS_AVAILABLE && (
+              <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
+            )}
           </div>
         </SettingsCard>
 
@@ -3747,10 +3768,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="text-[1rem] font-bold text-ink">
-                    {tr(lang, '홈 화면 위젯 고르기', 'Choose widgets', '选择小组件')}
+                    {HOME_WIDGETS_AVAILABLE
+                      ? tr(lang, '홈 화면 위젯 고르기', 'Choose widgets', '选择小组件')
+                      : tr(lang, '홈 화면 위젯 미리보기', 'Widget preview', '小组件预览')}
                   </h3>
                   <p className="text-[0.6875rem] text-slate-600">
-                    {tr(
+                    {!HOME_WIDGETS_AVAILABLE
+                      ? tr(lang, '곧 지원 예정이에요 · 모양을 미리 볼 수 있어요', 'Coming soon · preview how they look', '即将推出 · 可先预览样式')
+                      : tr(
                       lang,
                       `원하는 위젯의 "홈 화면에 추가"를 누르세요 · ${widgetConfig.enabled.length}개 추가됨`,
                       `Tap "Add to Home" on the widgets you want · ${widgetConfig.enabled.length} added`,
@@ -3802,7 +3827,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="space-y-3">
                 {HOME_WIDGET_IDS.map((id) => {
                   const meta = HOME_WIDGET_META[id];
-                  const isOn = widgetConfig.enabled.includes(id);
+                  const isOn = HOME_WIDGETS_AVAILABLE && widgetConfig.enabled.includes(id);
                   return (
                     <div
                       key={id}
@@ -3823,6 +3848,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           </div>
                           <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
                         </div>
+                        {!HOME_WIDGETS_AVAILABLE ? (
+                          <span className="h-8 px-3 rounded-full bg-other-100 text-other-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center whitespace-nowrap">
+                            {tr(lang, '준비 중', 'Coming soon', '准备中')}
+                          </span>
+                        ) : (
                         <button
                           type="button"
                           aria-pressed={isOn}
@@ -3838,13 +3868,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             ? tr(lang, '추가됨', 'Added', '已添加')
                             : tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
                         </button>
+                        )}
                       </div>
 
                       {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
                       <div
                         className={`p-3 rounded-2xl transition-colors ${
                           widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'
-                        } ${isOn ? '' : 'opacity-80'}`}
+                        } ${isOn || !HOME_WIDGETS_AVAILABLE ? '' : 'opacity-80'}`}
                       >
                         <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
                       </div>
@@ -3853,6 +3884,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 })}
               </div>
 
+              {HOME_WIDGETS_AVAILABLE && (
               <p className="text-[0.6875rem] text-slate-600 leading-relaxed px-1">
                 {tr(
                   lang,
@@ -3861,7 +3893,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
                 )}
               </p>
+              )}
 
+              {HOME_WIDGETS_AVAILABLE && (
               <div className="flex items-center justify-between gap-2 pt-1">
                 <span className="text-[0.6875rem] text-slate-600">
                   {widgetSyncToast ||
@@ -3886,6 +3920,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
                 </button>
               </div>
+              )}
             </div>
 
             <div className="px-4 pt-3 pb-5 border-t border-divider shrink-0">
@@ -3894,7 +3929,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 onClick={() => setIsWidgetSheetOpen(false)}
                 className="w-full h-12 rounded-full bg-ink text-paper text-[0.875rem] font-bold hover:bg-slate-800"
               >
-                {tr(
+                {!HOME_WIDGETS_AVAILABLE
+                  ? tr(lang, '닫기', 'Close', '关闭')
+                  : tr(
                   lang,
                   `완료 · ${widgetConfig.enabled.length}개 추가됨`,
                   `Done · ${widgetConfig.enabled.length} added`,
