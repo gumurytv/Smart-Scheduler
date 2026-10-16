@@ -1393,7 +1393,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       {/* DATE POPUP: day's events (edit/delete) + shared add/edit form */}
       {isSheetOpen && sheetDateStr && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
           onClick={closeSheet}
         >
           <div
