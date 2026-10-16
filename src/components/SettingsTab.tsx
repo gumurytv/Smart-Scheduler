@@ -55,6 +55,7 @@ import {
   UserProfile,
 } from '../types';
 import { isAiTimetableEnabled } from '../utils/featureFlags';
+import { API_BASE_URL } from '../native/androidShell';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
@@ -1117,7 +1118,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           ? state.masterTimetable['월'].school
           : generatePeriodSchedule(45, []);
 
-      const response = await fetch('/api/parse-timetable', {
+      const response = await fetch(`${API_BASE_URL}/api/parse-timetable`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
