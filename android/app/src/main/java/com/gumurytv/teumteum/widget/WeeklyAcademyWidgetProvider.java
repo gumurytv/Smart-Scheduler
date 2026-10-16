@@ -36,8 +36,7 @@ public class WeeklyAcademyWidgetProvider extends AppWidgetProvider {
             return v;
         }
 
-        k.text(v, R.id.wd_title, week.optString("title"), k.text(), 13);
-        k.text(v, R.id.wd_right, k.label("monSun", "월~일"), k.sub(), 11);
+        k.header(v, R.drawable.ic_wd_academy, R.drawable.wd_icon_bg_accent, week.optString("title"), k.label("monSun", "월~일"));
         v.removeAllViews(R.id.wd_body);
         JSONArray days = week.optJSONArray("days");
         int[] chipIds = {R.id.ac_chip1, R.id.ac_chip2};

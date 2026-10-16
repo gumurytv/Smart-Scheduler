@@ -2,6 +2,7 @@
 <!-- Fixed-width first column (period numbers / weekday names). -->
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/wd_cell"
+        android:fontFamily="@font/caprasimo"
     android:layout_width="24dp"
     android:layout_height="match_parent"
     android:gravity="center"

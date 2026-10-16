@@ -53,9 +53,9 @@ public class TimelineWidgetProvider extends AppWidgetProvider {
             return v;
         }
         JSONObject day = k.array("days").optJSONObject(todayIndex);
-        k.text(v, R.id.wd_title, k.label("today", "오늘") + " · " + day.optString("dateLabel"), k.text(), 13);
-        k.text(v, R.id.wd_right,
-            WidgetKit.fill(k.label("freeTotalTpl", "빈 시간 {d}"), "d", day.optString("freeTotal")), k.sub(), 11);
+        k.header(v, R.drawable.ic_wd_clock, R.drawable.wd_icon_bg_accent,
+            k.label("today", "오늘") + " · " + day.optString("dateLabel"),
+            WidgetKit.fill(k.label("freeTotalTpl", "빈 시간 {d}"), "d", day.optString("freeTotal")));
         v.removeAllViews(R.id.wd_body);
 
         List<Row> rows = new ArrayList<>();

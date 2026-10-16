@@ -143,18 +143,28 @@ const SIZE_CLASS: Record<WidgetSize, string> = {
   largeTall: 'h-[340px]',
 };
 
+/** Background opacity of the widget frame (Settings → 배경 투명도), 0–1. */
+const WidgetBgOpacity = React.createContext(1);
+const FRAME_RGB: Record<WidgetTheme, string> = { light: '245, 234, 216', dark: '32, 30, 29' };
+
 const WidgetFrame: React.FC<{
   theme: WidgetTheme;
   size: WidgetSize;
   children: React.ReactNode;
   className?: string;
-}> = ({ theme, size, children, className = '' }) => (
-  <div
-    className={`w-full max-w-[360px] mx-auto rounded-[26px] p-3 shadow-md overflow-hidden flex flex-col ${SIZE_CLASS[size]} ${PALETTES[theme].frame} ${className}`}
-  >
-    {children}
-  </div>
-);
+}> = ({ theme, size, children, className = '' }) => {
+  const opacity = React.useContext(WidgetBgOpacity);
+  return (
+    <div
+      className={`w-full max-w-[360px] mx-auto rounded-[26px] p-3 overflow-hidden flex flex-col ${
+        opacity < 1 ? '' : 'shadow-md'
+      } ${SIZE_CLASS[size]} ${PALETTES[theme].frame} ${className}`}
+      style={opacity < 1 ? { backgroundColor: `rgba(${FRAME_RGB[theme]}, ${opacity})` } : undefined}
+    >
+      {children}
+    </div>
+  );
+};
 
 const WidgetHeader: React.FC<{
   icon: React.ReactNode;
@@ -620,6 +630,19 @@ export const MonthCalendarWidget: React.FC<{ data: MonthCalendarWidgetData; them
 // ===================== Dispatcher =====================
 
 export const HomeWidgetPreview: React.FC<{
+  id: HomeWidgetId;
+  data: HomeWidgetsData;
+  theme: WidgetTheme;
+  lang: AppLanguage;
+  /** Background opacity 0–1 (default opaque). */
+  bgOpacity?: number;
+}> = ({ id, data, theme, lang, bgOpacity = 1 }) => (
+  <WidgetBgOpacity.Provider value={bgOpacity}>
+    <WidgetPreviewBody id={id} data={data} theme={theme} lang={lang} />
+  </WidgetBgOpacity.Provider>
+);
+
+const WidgetPreviewBody: React.FC<{
   id: HomeWidgetId;
   data: HomeWidgetsData;
   theme: WidgetTheme;

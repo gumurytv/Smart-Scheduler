@@ -10,6 +10,7 @@
 
     <TextView
         android:id="@+id/mc_day"
+        android:fontFamily="@font/caprasimo"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1" />

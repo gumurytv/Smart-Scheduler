@@ -51,6 +51,8 @@ final class WidgetKit {
     final JSONObject data; // null when the app hasn't sent anything yet
     final boolean dark;
     final float font;
+    /** Background opacity 0–255 (Settings → 배경 투명도). */
+    final int bgAlpha;
     final Calendar now;
     final int nowMin;
     final String today;
@@ -66,6 +68,8 @@ final class WidgetKit {
         this.dark = data != null && "dark".equals(data.optString("theme"));
         float f = data == null ? 1f : (float) data.optDouble("font", 1.0);
         this.font = (f < 0.7f || f > 2.0f) ? 1f : f;
+        double bg = data == null ? 1.0 : data.optDouble("bg", 1.0);
+        this.bgAlpha = (int) Math.round(255 * Math.max(0.0, Math.min(1.0, bg)));
         this.labels = data == null ? null : data.optJSONObject("labels");
         this.dur = data == null ? null : data.optJSONObject("dur");
     }
@@ -132,10 +136,25 @@ final class WidgetKit {
         size(v, viewId, sp);
     }
 
-    /** The themed frame with the click-to-open handler. */
+    /** Themed background (with the chosen transparency) and the click-to-open handler. */
     void frame(Context context, RemoteViews v) {
-        background(v, R.id.wd_root, R.drawable.wd_frame_l, R.drawable.wd_frame_d);
+        v.setImageViewResource(R.id.wd_bg, res(R.drawable.wd_frame_l, R.drawable.wd_frame_d));
+        v.setInt(R.id.wd_bg, "setImageAlpha", bgAlpha);
         v.setOnClickPendingIntent(R.id.wd_root, openApp(context));
+    }
+
+    /** Header of the list/grid widgets: icon badge, title and the small pill on the right. */
+    void header(RemoteViews v, int iconRes, int iconBgRes, CharSequence title, CharSequence right) {
+        v.setImageViewResource(R.id.wd_icon, iconRes);
+        v.setInt(R.id.wd_icon, "setBackgroundResource", iconBgRes);
+        text(v, R.id.wd_title, title, text(), 14);
+        if (right == null || right.length() == 0) {
+            v.setViewVisibility(R.id.wd_right, android.view.View.GONE);
+        } else {
+            text(v, R.id.wd_right, right, sub(), 10);
+            background(v, R.id.wd_right, R.drawable.wd_pill_l, R.drawable.wd_pill_d);
+            v.setViewVisibility(R.id.wd_right, android.view.View.VISIBLE);
+        }
     }
 
     // ---- data ----
@@ -237,8 +256,8 @@ final class WidgetKit {
     /** Frame body that asks to open the app once (no data, or the data is too old). */
     static void showOpenAppMessage(Context context, WidgetKit k, RemoteViews v) {
         v.removeAllViews(R.id.wd_body);
-        k.text(v, R.id.wd_title, context.getString(R.string.widget_empty_title), k.text(), 13);
-        k.text(v, R.id.wd_right, "", k.sub(), 11);
+        k.text(v, R.id.wd_title, context.getString(R.string.widget_empty_title), k.text(), 14);
+        v.setViewVisibility(R.id.wd_right, android.view.View.GONE);
         RemoteViews msg = new RemoteViews(context.getPackageName(), R.layout.wd_row);
         RemoteViews cell = new RemoteViews(context.getPackageName(), R.layout.wd_cell);
         k.text(cell, R.id.wd_cell, context.getString(R.string.widget_empty_subtitle), k.sub(), 12);

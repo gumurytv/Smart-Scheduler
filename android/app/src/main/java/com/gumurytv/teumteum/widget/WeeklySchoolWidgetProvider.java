@@ -33,8 +33,7 @@ public class WeeklySchoolWidgetProvider extends AppWidgetProvider {
             return v;
         }
 
-        k.text(v, R.id.wd_title, week.optString("title"), k.text(), 13);
-        k.text(v, R.id.wd_right, k.label("monFri", "월~금"), k.sub(), 11);
+        k.header(v, R.drawable.ic_wd_school, R.drawable.wd_icon_bg_sage, week.optString("title"), k.label("monFri", "월~금"));
         v.removeAllViews(R.id.wd_body);
         JSONArray days = week.optJSONArray("days");
         int dayCount = days == null ? 0 : Math.min(5, days.length());
@@ -48,9 +47,8 @@ public class WeeklySchoolWidgetProvider extends AppWidgetProvider {
             boolean isToday = k.today.equals(day.optString("date"));
             RemoteViews cell = new RemoteViews(pkg, R.layout.wd_cell);
             String label = day.optString("dl") + "\n" + day.optInt("dn");
-            k.text(cell, R.id.wd_cell, WidgetKit.styled(label, true, false),
-                isToday ? k.pick(WidgetKit.ACCENT_800, WidgetKit.ACCENT_300) : k.text(), 11);
-            if (isToday) k.background(cell, R.id.wd_cell, R.drawable.wd_head_today_l, R.drawable.wd_head_today_d);
+            k.text(cell, R.id.wd_cell, WidgetKit.styled(label, true, false), isToday ? WidgetKit.PAPER : k.text(), 11);
+            if (isToday) cell.setInt(R.id.wd_cell, "setBackgroundResource", R.drawable.wd_today_pill);
             head.addView(R.id.wd_row, cell);
         }
         v.addView(R.id.wd_body, head);

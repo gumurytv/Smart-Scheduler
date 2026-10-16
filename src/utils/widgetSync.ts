@@ -249,6 +249,7 @@ export function getWidgetConfig(state: PlannerState): WidgetConfig {
     enabled: HOME_WIDGET_IDS.filter((id) => enabledSet.has(id)),
     theme: cfg.theme === 'dark' ? 'dark' : 'light',
     fontScale: cfg.fontScale && cfg.fontScale in WIDGET_FONT_SCALES ? cfg.fontScale : 'md',
+    bgOpacity: typeof cfg.bgOpacity === 'number' ? Math.max(0, Math.min(100, cfg.bgOpacity)) : 100,
   };
 }
 
@@ -689,6 +690,8 @@ export interface NativeWidgetsPayload {
   theme: WidgetConfig['theme'];
   /** Text size multiplier (WIDGET_FONT_SCALES). */
   font: number;
+  /** Background opacity 0–1. */
+  bg: number;
   labels: Record<string, string>;
   dur: { h: string; m: string; sep: string };
   /** k: school | academy | event; x: cancelled; st: status label; kl: kind label. */
@@ -802,6 +805,7 @@ export function buildNativeWidgets(state: PlannerState, now: Date = new Date()):
     lang,
     theme: cfg.theme,
     font: WIDGET_FONT_SCALES[cfg.fontScale ?? 'md'],
+    bg: (cfg.bgOpacity ?? 100) / 100,
     labels: {
       now: tr(lang, '지금', 'Now', '现在'),
       next: tr(lang, '다음', 'Next', '下一节'),

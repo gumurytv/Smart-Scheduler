@@ -33,26 +33,42 @@ public class NowWidgetProvider extends AppWidgetProvider {
         k.text(v, R.id.now_label, "● " + s.nowLabel, k.pick(WidgetKit.ACCENT_700, WidgetKit.ACCENT_400), 12);
         k.text(v, R.id.now_date, s.dateLabel, k.sub(), 12);
         v.setTextColor(R.id.now_clock, k.text());
-        k.size(v, R.id.now_clock, 15);
-        k.text(v, R.id.now_title, s.title, k.text(), 18);
-        k.text(v, R.id.now_subtitle, s.subtitle, k.sub(), 13);
+        k.size(v, R.id.now_clock, 20);
+
+        // Class card: school = sage, academy = terracotta; free time / done = plain panel.
+        boolean inClass = s.currentKind != null;
+        boolean school = "school".equals(s.currentKind);
+        if (inClass) {
+            v.setInt(R.id.now_card, "setBackgroundResource", school ? R.drawable.wd_card_school : R.drawable.wd_card_academy);
+        } else {
+            k.background(v, R.id.now_card, R.drawable.wd_card_free_l, R.drawable.wd_card_free_d);
+        }
+        int titleColor = inClass ? WidgetKit.PAPER : k.text();
+        int subColor = inClass ? 0xCCF5EAD8 : k.sub();
+        k.text(v, R.id.now_title, s.title, titleColor, 17);
+        if (s.left.isEmpty()) {
+            v.setViewVisibility(R.id.now_left, View.GONE);
+        } else {
+            k.text(v, R.id.now_left, s.left, school ? WidgetKit.SAGE_200 : WidgetKit.ACCENT_300, 12);
+            v.setViewVisibility(R.id.now_left, View.VISIBLE);
+        }
+        k.text(v, R.id.now_subtitle, s.subtitle, subColor, 12);
         v.setViewVisibility(R.id.now_subtitle, s.subtitle.isEmpty() ? View.GONE : View.VISIBLE);
 
-        int shown = k.dark ? R.id.now_progress_d : R.id.now_progress_l;
-        int hidden = k.dark ? R.id.now_progress_l : R.id.now_progress_d;
-        v.setViewVisibility(hidden, View.GONE);
-        if (s.progress >= 0) {
-            v.setProgressBar(shown, 100, s.progress, false);
-            v.setViewVisibility(shown, View.VISIBLE);
-        } else {
-            v.setViewVisibility(shown, View.GONE);
+        int bar = school ? R.id.now_progress_school : R.id.now_progress_academy;
+        v.setViewVisibility(R.id.now_progress_school, View.GONE);
+        v.setViewVisibility(R.id.now_progress_academy, View.GONE);
+        if (inClass && s.progress >= 0) {
+            v.setProgressBar(bar, 100, s.progress, false);
+            v.setViewVisibility(bar, View.VISIBLE);
         }
 
         if (s.nextTitle != null) {
-            k.background(v, R.id.now_next_row, R.drawable.wd_panel_l, R.drawable.wd_panel_d);
-            k.text(v, R.id.now_next_label, s.nextLabel, k.pick(WidgetKit.SAGE_700, WidgetKit.SAGE_400), 12);
+            k.background(v, R.id.now_next_row, R.drawable.wd_pill_l, R.drawable.wd_pill_d);
+            k.text(v, R.id.now_next_dot, "●", "school".equals(s.nextKind) ? WidgetKit.SAGE : WidgetKit.ACCENT, 9);
+            k.text(v, R.id.now_next_label, s.nextLabel, k.sub(), 11);
             k.text(v, R.id.now_next_title, s.nextTitle, k.text(), 13);
-            k.text(v, R.id.now_next_time, s.nextTime, k.accentText(), 12);
+            k.text(v, R.id.now_next_time, s.nextTime, k.accentText(), 11);
             v.setViewVisibility(R.id.now_next_row, View.VISIBLE);
         } else {
             v.setViewVisibility(R.id.now_next_row, View.GONE);
@@ -68,6 +84,9 @@ public class NowWidgetProvider extends AppWidgetProvider {
         String title = "";
         String subtitle = "";
         int progress = -1; // -1 hides the bar
+        String left = ""; // "30분 남음" on the class card
+        String currentKind = null; // school | academy while a class is on
+        String nextKind = null;
         String nextLabel = "";
         String nextTitle = null; // null hides the "next" row
         String nextTime = "";
@@ -104,8 +123,9 @@ public class NowWidgetProvider extends AppWidgetProvider {
                 int start = WidgetKit.minutes(current.optString("s"));
                 int end = WidgetKit.minutes(current.optString("e"));
                 s.title = current.optString("t");
-                s.subtitle = current.optString("b") + " · "
-                    + WidgetKit.fill(k.label("leftTpl", "{d} 남음"), "d", k.duration(end - k.nowMin));
+                s.currentKind = current.optString("k");
+                s.left = WidgetKit.fill(k.label("leftTpl", "{d} 남음"), "d", k.duration(end - k.nowMin));
+                s.subtitle = current.optString("b") + " · " + current.optString("s") + "~" + current.optString("e");
                 s.progress = Math.max(0, Math.min(100, (k.nowMin - start) * 100 / Math.max(1, end - start)));
                 s.nextBoundaryAt = WidgetKit.atMinute(k.now, end);
             } else if (next != null) {
@@ -123,6 +143,7 @@ public class NowWidgetProvider extends AppWidgetProvider {
             if (next != null) {
                 int start = WidgetKit.minutes(next.optString("s"));
                 s.nextTitle = next.optString("t");
+                s.nextKind = next.optString("k");
                 s.nextTime = next.optString("s") + " · "
                     + WidgetKit.fill(k.label("laterTpl", "{d} 후"), "d", k.duration(start - k.nowMin));
                 s.nextBoundaryAt = Math.min(s.nextBoundaryAt, WidgetKit.atMinute(k.now, start));
@@ -136,6 +157,7 @@ public class NowWidgetProvider extends AppWidgetProvider {
                         if (!isClass(first)) continue;
                         String when = i == todayIndex + 1 ? k.label("tomorrow", "내일") : day.optString("dateLabel");
                         s.nextTitle = first.optString("t");
+                        s.nextKind = first.optString("k");
                         s.nextTime = when + " " + first.optString("s");
                         break;
                     }

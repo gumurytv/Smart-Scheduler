@@ -37,7 +37,6 @@ public class MonthCalendarWidgetProvider extends AppWidgetProvider {
             return v;
         }
 
-        k.text(v, R.id.wd_title, month.optString("title"), k.text(), 13);
         String[] names = {k.label("school", "학교"), k.label("academy", "학원"), k.label("other", "기타")};
         SpannableStringBuilder legend = new SpannableStringBuilder();
         for (int i = 0; i < 3; i++) {
@@ -45,7 +44,7 @@ public class MonthCalendarWidgetProvider extends AppWidgetProvider {
             dot(legend, DOT_COLORS[i]);
             legend.append(" ").append(names[i]);
         }
-        k.text(v, R.id.wd_right, legend, k.sub(), 10);
+        k.header(v, R.drawable.ic_wd_calendar, R.drawable.wd_icon_bg_other, month.optString("title"), legend);
         v.removeAllViews(R.id.wd_body);
 
         RemoteViews head = new RemoteViews(pkg, R.layout.wd_row_head);

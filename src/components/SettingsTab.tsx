@@ -37,6 +37,9 @@ import {
   IdCard,
   UserRound,
   PenLine,
+  CalendarDays,
+  StickyNote,
+  Eraser,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -54,6 +57,7 @@ import {
   HomeWidgetId,
   WidgetConfig,
   WidgetFontScale,
+  WIDGET_BG_OPACITIES,
   UserProfile,
   TextScale,
   TEXT_SCALES,
@@ -61,6 +65,7 @@ import {
 import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { API_BASE_URL, isNativeApp } from '../native/androidShell';
 import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
+import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/appReset';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
@@ -594,6 +599,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [copySourceDay, setCopySourceDay] = useState<DayOfWeek>('월');
   const [copyTargetDay, setCopyTargetDay] = useState<DayOfWeek>('화');
   const [masterFeedback, setMasterFeedback] = useState<string | null>(null);
+
+  // --- 앱 초기화 (top card): pick what to clear ---
+  const [isResetSheetOpen, setIsResetSheetOpen] = useState(false);
+  const [resetParts, setResetParts] = useState<ResetPart[]>([]);
+  const [resetMode, setResetMode] = useState<ResetMode>('empty');
+  const [resetConfirming, setResetConfirming] = useState(false);
   // null = auto (show 토/일 columns only when a weekend day has school periods)
   const [showWeekendPref, setShowWeekendPref] = useState<boolean | null>(null);
   const [schoolSheet, setSchoolSheet] = useState<
@@ -679,6 +690,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const widgetConfig = getWidgetConfig(state);
   const widgetTheme = widgetConfig.theme;
   const widgetFontScale: WidgetFontScale = widgetConfig.fontScale ?? 'md';
+  const widgetBgOpacity = widgetConfig.bgOpacity ?? 100;
   const widgetPreviewData = buildHomeWidgetsData(state, widgetNow);
   const updateWidgetConfig = (patch: Partial<WidgetConfig>) => {
     onUpdateState((prev) => {
@@ -1596,8 +1608,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               },
               {
                 key: 'widgets',
-                value: widgetConfig.enabled.length,
-                label: tr(lang, '위젯', 'Widgets', '小组件'),
+                value: isNativeApp ? placedTotal : HOME_WIDGET_IDS.length,
+                label: isNativeApp
+                  ? tr(lang, '홈 화면 위젯', 'On home', '主屏幕小组件')
+                  : tr(lang, '위젯 종류', 'Widgets', '小组件种类'),
                 tone: 'text-other-700',
                 card: 'widgets' as SettingsCardId,
               },
@@ -1701,6 +1715,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             )}
           </p>
         </div>
+
+        {/* 앱 초기화: choose which parts to clear */}
+        <button
+          type="button"
+          onClick={() => {
+            setResetParts([]);
+            setResetMode('empty');
+            setResetConfirming(false);
+            setIsResetSheetOpen(true);
+          }}
+          className="w-full h-10 rounded-full border-[1.5px] border-accent-800 text-accent-800 text-[0.75rem] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-100"
+        >
+          <Eraser strokeWidth={2.5} className="w-3.5 h-3.5" />
+          {tr(lang, '앱 초기화 · 항목 골라서 지우기', 'Reset app · choose what to clear', '重置应用 · 选择要清除的内容')}
+        </button>
       </section>
 
       {/* ===== 내 정보 (profile shown on the timetable's 지금 card) ===== */}
@@ -3770,6 +3799,229 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </SettingsCard>
       </div>
 
+      {/* 앱 초기화 시트 */}
+      {isResetSheetOpen && (() => {
+        const filledSchool = DAYS_OF_WEEK.reduce(
+          (n, d) => n + (state.masterTimetable[d]?.school || []).filter((p) => p.subject.trim()).length,
+          0
+        );
+        const academyCount = DAYS_OF_WEEK.reduce((n, d) => n + (state.masterTimetable[d]?.academy || []).length, 0);
+        const memoCount = Object.values(state.memos).filter((m) => m.content.trim()).length;
+        const parts: Record<ResetPart, { icon: LucideIcon; tone: string; label: string; detail: string }> = {
+          school: {
+            icon: GraduationCap,
+            tone: 'bg-sage-700',
+            label: tr(lang, '학교 시간표', 'School timetable', '学校课表'),
+            detail: tr(lang, `과목 ${filledSchool}칸 · 날짜별 변경 포함`, `${filledSchool} periods · incl. daily changes`, `${filledSchool} 节 · 含每日变更`),
+          },
+          academy: {
+            icon: Building2,
+            tone: 'bg-accent-700',
+            label: tr(lang, '학원 시간표', 'Academy timetable', '补习班课表'),
+            detail: tr(lang, `수업 ${academyCount}개 · 보강·휴강 포함`, `${academyCount} classes · incl. makeups`, `${academyCount} 节课 · 含补课停课`),
+          },
+          schedules: {
+            icon: CalendarDays,
+            tone: 'bg-other-600',
+            label: tr(lang, '일정', 'Schedule', '日程'),
+            detail: tr(lang, `일정 ${state.schedules.length}개`, `${state.schedules.length} events`, `${state.schedules.length} 个日程`),
+          },
+          attendance: {
+            icon: CheckCircle2,
+            tone: 'bg-sage-600',
+            label: tr(lang, '출석 기록', 'Attendance', '出勤记录'),
+            detail: tr(
+              lang,
+              `${Object.keys(state.attendance).length}일 기록 · 보강 목록 포함`,
+              `${Object.keys(state.attendance).length} days · incl. makeups`,
+              `${Object.keys(state.attendance).length} 天记录 · 含补课`
+            ),
+          },
+          memos: {
+            icon: StickyNote,
+            tone: 'bg-accent-600',
+            label: tr(lang, '메모', 'Memos', '备忘录'),
+            detail: tr(lang, `메모 ${memoCount}개`, `${memoCount} memos`, `${memoCount} 条备忘`),
+          },
+          profile: {
+            icon: IdCard,
+            tone: 'bg-sage-800',
+            label: tr(lang, '내 정보', 'My profile', '我的信息'),
+            detail: profile.name.trim() || tr(lang, '이름·학교·학년', 'Name, school, grade', '姓名、学校、年级'),
+          },
+          settings: {
+            icon: Settings2,
+            tone: 'bg-slate-600',
+            label: tr(lang, '앱 설정', 'App settings', '应用设置'),
+            detail: tr(
+              lang,
+              '과목 후보·수업 시간·표시 범위·글자 크기·위젯 (언어는 유지)',
+              'Subjects, class times, range, text size, widgets (language kept)',
+              '候选科目、上课时间、显示范围、字体、小组件（保留语言）'
+            ),
+          },
+        };
+        const allOn = resetParts.length === RESET_PARTS.length;
+        const togglePart = (part: ResetPart) => {
+          setResetConfirming(false);
+          setResetParts((prev) => (prev.includes(part) ? prev.filter((x) => x !== part) : [...prev, part]));
+        };
+        const applyReset = () => {
+          onUpdateState((prev) => resetPlannerParts(prev, resetParts, resetMode));
+          if (resetParts.includes('profile')) setLastGradeChip(null);
+          setIsResetSheetOpen(false);
+          showMasterToast(
+            resetMode === 'sample'
+              ? tr(lang, `${resetParts.length}개 항목을 예시 데이터로 되돌렸어요`, `${resetParts.length} item(s) restored to sample data`, `已将 ${resetParts.length} 项恢复为示例数据`)
+              : tr(lang, `${resetParts.length}개 항목을 초기화했어요`, `${resetParts.length} item(s) cleared`, `已清除 ${resetParts.length} 项`)
+          );
+        };
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
+            onClick={() => setIsResetSheetOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={tr(lang, '앱 초기화', 'Reset app', '重置应用')}
+          >
+            <div
+              className="w-full max-w-md max-h-[92vh] bg-paper rounded-t-[28px] shadow-2xl flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 pt-2.5 pb-3 border-b border-divider space-y-2.5 shrink-0">
+                <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-[1rem] font-bold text-ink">{tr(lang, '앱 초기화', 'Reset app', '重置应用')}</h3>
+                    <p className="text-[0.6875rem] text-slate-600">
+                      {tr(lang, '지울 항목을 고르세요. 되돌릴 수 없어요.', 'Pick what to clear. This cannot be undone.', '请选择要清除的内容，无法撤销。')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsResetSheetOpen(false)}
+                    aria-label={tr(lang, '닫기', 'Close', '关闭')}
+                    className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink hover:bg-slate-200 shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetConfirming(false);
+                    setResetParts(allOn ? [] : [...RESET_PARTS]);
+                  }}
+                  className="h-8 px-3 rounded-full border border-divider bg-paper text-[0.75rem] font-bold text-ink inline-flex items-center gap-1.5 hover:bg-slate-100"
+                >
+                  <Check strokeWidth={3} className="w-3.5 h-3.5" />
+                  {allOn ? tr(lang, '모두 해제', 'Clear selection', '全部取消') : tr(lang, '모두 선택', 'Select all', '全选')}
+                </button>
+
+                {RESET_PARTS.map((part) => {
+                  const meta = parts[part];
+                  const Icon = meta.icon;
+                  const on = resetParts.includes(part);
+                  return (
+                    <button
+                      key={part}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      onClick={() => togglePart(part)}
+                      className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
+                        on ? 'bg-accent-100 ring-2 ring-accent-600' : 'bg-surface hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 text-paper ${meta.tone}`}>
+                        <Icon strokeWidth={2.5} className="w-4 h-4" />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[0.875rem] font-bold text-ink">{meta.label}</span>
+                        <span className="block text-[0.6875rem] text-slate-600 truncate">{meta.detail}</span>
+                      </span>
+                      <span
+                        className={`w-6 h-6 rounded-lg grid place-items-center shrink-0 border-2 ${
+                          on ? 'bg-accent-700 border-accent-700 text-paper' : 'border-slate-400 bg-paper'
+                        }`}
+                      >
+                        {on && <Check strokeWidth={3.5} className="w-3.5 h-3.5" />}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                <div className="pt-2 space-y-1.5">
+                  <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '초기화 방식', 'How to reset', '重置方式')}</span>
+                  <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-surface" role="radiogroup">
+                    {(
+                      [
+                        ['empty', tr(lang, '빈 상태로', 'Empty', '清空'), tr(lang, '내용을 모두 지워요', 'Remove everything', '全部删除')],
+                        ['sample', tr(lang, '예시 데이터로', 'Sample data', '示例数据'), tr(lang, '처음 예시로 되돌려요', 'Back to the examples', '恢复为示例')],
+                      ] as Array<[ResetMode, string, string]>
+                    ).map(([mode, label, hint]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="radio"
+                        aria-checked={resetMode === mode}
+                        onClick={() => {
+                          setResetConfirming(false);
+                          setResetMode(mode);
+                        }}
+                        className={`rounded-xl px-2 py-2 text-center transition-colors ${
+                          resetMode === mode ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className="block text-[0.8125rem] font-bold">{label}</span>
+                        <span className={`block text-[0.625rem] ${resetMode === mode ? 'text-paper/80' : 'text-slate-600'}`}>{hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[0.6875rem] text-slate-600 leading-snug">
+                    {tr(
+                      lang,
+                      '지우기 전에 「데이터 → 백업 · 복원」에서 내보내 두면 나중에 되살릴 수 있어요.',
+                      'Export a backup first (Data → Backup & Restore) if you may want it back.',
+                      '清除前可在「数据 → 备份与恢复」中导出，以便日后恢复。'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-4 pt-3 pb-5 border-t border-divider shrink-0 space-y-2">
+                {resetConfirming && (
+                  <p role="alert" className="rounded-xl bg-accent-100 border border-accent-300 px-3 py-2 text-[0.75rem] font-semibold text-accent-900 leading-snug">
+                    {tr(
+                      lang,
+                      `선택한 ${resetParts.length}개 항목을 정말 ${resetMode === 'sample' ? '예시 데이터로 되돌릴까요' : '지울까요'}? 되돌릴 수 없어요.`,
+                      `Really ${resetMode === 'sample' ? 'restore sample data for' : 'clear'} ${resetParts.length} item(s)? This cannot be undone.`,
+                      `确定要${resetMode === 'sample' ? '将所选 ' + resetParts.length + ' 项恢复为示例数据' : '清除所选 ' + resetParts.length + ' 项'}吗？无法撤销。`
+                    )}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={resetParts.length === 0}
+                  onClick={() => (resetConfirming ? applyReset() : setResetConfirming(true))}
+                  className="w-full h-12 rounded-full bg-accent-800 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-900 disabled:opacity-40"
+                >
+                  <RotateCcw strokeWidth={2.5} className="w-4 h-4" />
+                  {resetParts.length === 0
+                    ? tr(lang, '초기화할 항목을 고르세요', 'Pick something to reset', '请选择要重置的内容')
+                    : resetConfirming
+                    ? tr(lang, '네, 초기화할게요', 'Yes, reset', '确认重置')
+                    : tr(lang, `선택한 ${resetParts.length}개 초기화`, `Reset ${resetParts.length} item(s)`, `重置所选 ${resetParts.length} 项`)}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 위젯 시트: 테마·글자 크기 + 위젯별 미리보기와 "홈 화면에 추가" */}
       {isWidgetSheetOpen && (
         <div
@@ -3871,6 +4123,46 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   ))}
                 </div>
               </div>
+              {/* 위젯 배경 투명도 */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
+                  {tr(lang, '배경 투명도', 'Background', '背景透明度')}
+                </span>
+                <div
+                  className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+                  role="radiogroup"
+                  aria-label={tr(lang, '위젯 배경 투명도', 'Widget background transparency', '小组件背景透明度')}
+                >
+                  {WIDGET_BG_OPACITIES.map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      role="radio"
+                      aria-checked={widgetBgOpacity === op}
+                      onClick={() => updateWidgetConfig({ bgOpacity: op })}
+                      className={`h-[30px] px-2 text-[0.6875rem] font-semibold whitespace-nowrap transition-colors ${
+                        widgetBgOpacity === op ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                      }`}
+                    >
+                      {op === 100
+                        ? tr(lang, '불투명', 'Solid', '不透明')
+                        : op === 0
+                        ? tr(lang, '투명', 'Clear', '透明')
+                        : `${100 - op}%`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {widgetBgOpacity < 50 && (
+                <p className="text-[0.6875rem] text-slate-600 leading-snug -mt-1">
+                  {tr(
+                    lang,
+                    '배경이 많이 투명할 때는 배경화면이 밝으면 「밝은 테마」, 어두우면 「어두운 테마」가 잘 보여요.',
+                    'With a see-through background, pick Light on bright wallpapers and Dark on dark ones.',
+                    '背景较透明时，浅色壁纸建议用「浅色」，深色壁纸建议用「深色」。'
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -3914,9 +4206,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
                     <div
                       data-widget-preview={id}
-                      className={`p-3 rounded-2xl transition-colors ${widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'}`}
+                      className={`p-3 rounded-2xl transition-colors ${
+                        widgetBgOpacity < 100
+                          ? 'bg-gradient-to-br from-other-500 via-sage-500 to-accent-500'
+                          : widgetTheme === 'dark'
+                          ? 'bg-slate-800'
+                          : 'bg-slate-200/60'
+                      }`}
                     >
-                      <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
+                      <HomeWidgetPreview
+                        id={id}
+                        data={widgetPreviewData}
+                        theme={widgetTheme}
+                        lang={lang}
+                        bgOpacity={widgetBgOpacity / 100}
+                      />
                     </div>
                     {pinMessage?.id === id && (
                       <p aria-live="polite" className="rounded-xl bg-sage-100 text-sage-800 px-3 py-2 text-[0.75rem] font-semibold leading-snug">
