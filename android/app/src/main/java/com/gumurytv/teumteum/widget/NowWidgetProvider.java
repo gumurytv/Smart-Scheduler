@@ -34,7 +34,7 @@ public class NowWidgetProvider extends AppWidgetProvider {
         k.text(v, R.id.now_date, s.dateLabel, k.sub(), 12);
         v.setTextColor(R.id.now_clock, k.text());
         k.size(v, R.id.now_clock, 15);
-        k.text(v, R.id.now_title, s.title, k.text(), 20);
+        k.text(v, R.id.now_title, s.title, k.text(), 18);
         k.text(v, R.id.now_subtitle, s.subtitle, k.sub(), 13);
         v.setViewVisibility(R.id.now_subtitle, s.subtitle.isEmpty() ? View.GONE : View.VISIBLE);
 

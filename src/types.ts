@@ -141,7 +141,7 @@ export const HOME_WIDGET_IDS: HomeWidgetId[] = ['weeklySchool', 'weeklyAcademy',
 
 // Text size inside the home-screen widgets (Settings → 홈 화면 위젯)
 export type WidgetFontScale = 'sm' | 'md' | 'lg' | 'xl';
-export const WIDGET_FONT_SCALES: Record<WidgetFontScale, number> = { sm: 0.9, md: 1, lg: 1.15, xl: 1.3 };
+export const WIDGET_FONT_SCALES: Record<WidgetFontScale, number> = { sm: 0.95, md: 1.15, lg: 1.4, xl: 1.7 };
 
 export interface WidgetConfig {
   enabled: HomeWidgetId[]; // widgets the user chose to add to the home screen (order = display order)

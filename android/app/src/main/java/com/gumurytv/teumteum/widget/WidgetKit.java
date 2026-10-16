@@ -65,7 +65,7 @@ final class WidgetKit {
         this.today = dateKey(now);
         this.dark = data != null && "dark".equals(data.optString("theme"));
         float f = data == null ? 1f : (float) data.optDouble("font", 1.0);
-        this.font = (f < 0.7f || f > 1.6f) ? 1f : f;
+        this.font = (f < 0.7f || f > 2.0f) ? 1f : f;
         this.labels = data == null ? null : data.optJSONObject("labels");
         this.dur = data == null ? null : data.optJSONObject("dur");
     }
