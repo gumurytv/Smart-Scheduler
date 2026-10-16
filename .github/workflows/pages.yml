@@ -1,0 +1,50 @@
+# GitHub Pages: privacy policy (docs/) + a web build of the app for previewing changes.
+#   https://gumurytv.github.io/Smart-Scheduler/              → docs/index.html
+#   https://gumurytv.github.io/Smart-Scheduler/privacy.html  → privacy policy (Play Console URL)
+#   https://gumurytv.github.io/Smart-Scheduler/app/          → latest main, as a web app
+# Requires Settings → Pages → Source: "GitHub Actions".
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vite build --base /Smart-Scheduler/app/
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -R docs/. _site/
+          cp -R dist _site/app
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

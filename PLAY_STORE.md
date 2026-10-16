@@ -108,10 +108,15 @@ Play Console에 그대로 복사해서 쓰는 문구와 설문 답변입니다. 
 
 ---
 
-## 3. 개인정보처리방침 공개하기 (GitHub Pages, 처음 한 번)
+## 3. GitHub Pages (개인정보처리방침 + 웹 미리보기)
 
-1. GitHub에서 저장소 `gumurytv/Smart-Scheduler` → **Settings** → 왼쪽 **Pages**
-2. **Build and deployment** → Source: **Deploy from a branch**
-3. Branch: **main**, 폴더: **/docs** → **Save**
-4. 1~2분 뒤 `https://gumurytv.github.io/Smart-Scheduler/privacy.html` 이 열리는지 확인
-5. 이 주소를 Play Console의 개인정보처리방침 칸에 입력
+main에 머지될 때마다 `.github/workflows/pages.yml`이 자동으로 배포해요.
+
+| 주소 | 내용 |
+|---|---|
+| `https://gumurytv.github.io/Smart-Scheduler/privacy.html` | 개인정보처리방침 (Play Console에 입력) |
+| `https://gumurytv.github.io/Smart-Scheduler/app/` | 최신 main을 웹으로 열어보는 미리보기 |
+
+처음 한 번만: 저장소 **Settings → Pages → Build and deployment → Source: GitHub Actions** 로 바꿔 주세요.
+
+웹 미리보기의 데이터는 브라우저에 따로 저장돼요. 휴대폰 앱의 데이터와 섞이지 않아요.
