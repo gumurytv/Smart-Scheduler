@@ -6,6 +6,7 @@ import {
   AcademyOverrideItem,
   SlotStatus,
   ScheduleItem,
+  SchoolTimeConfig,
 } from '../types';
 import { getDayOfWeekKor } from '../data/initialData';
 
@@ -285,4 +286,26 @@ export function findTimeConflicts(opts: {
     if (overlaps(t, t + 1)) out.push({ kind: 'schedule', name: it.title, startTime: it.time });
   });
   return out.sort((a, b) => a.startTime.localeCompare(b.startTime));
+}
+
+/**
+ * Lunch break on a school day: preset mode puts it after `lunchAfterPeriod` for `lunchMinutes`;
+ * custom mode uses the start/end the user set. Null on days without school periods.
+ */
+export function getLunchRange(
+  config: SchoolTimeConfig | undefined,
+  school: Array<{ period: number; endTime: string; subject: string }>
+): { start: string; end: string } | null {
+  if (!config || !school.some((p) => p.subject.trim())) return null;
+  if (config.mode === 'custom') {
+    const l = config.customLunch;
+    if (!l?.enabled || timeToMinutes(l.end) <= timeToMinutes(l.start)) return null;
+    return { start: l.start, end: l.end };
+  }
+  const before = school.find((p) => p.period === config.lunchAfterPeriod);
+  if (!before || config.lunchMinutes <= 0 || config.lunchAfterPeriod >= config.periodCount) return null;
+  const start = timeToMinutes(before.endTime);
+  const end = Math.min(1440, start + config.lunchMinutes);
+  const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return { start: before.endTime, end: fmt(end) };
 }

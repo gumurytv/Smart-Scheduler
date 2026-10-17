@@ -2292,14 +2292,78 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </p>
                 </div>
               ) : (
-                <p className="text-[0.6875rem] text-slate-600 px-3 py-2 rounded-xl bg-paper">
-                  {tr(
-                    lang,
-                    '아래 표에서 왼쪽 교시 칸을 누르면 그 교시의 시작·종료 시간을 바꿀 수 있어요. 요일마다 다르게 정할 수도 있습니다.',
-                    'Tap a period label on the left of the table below to change its start/end time — for all days or a single day.',
-                    '点击下方表格左侧的节次即可修改该节的开始与结束时间，也可按星期分别设置。'
-                  )}
-                </p>
+                <div className="space-y-2.5">
+                  <p className="text-[0.6875rem] text-slate-600 px-3 py-2 rounded-xl bg-paper">
+                    {tr(
+                      lang,
+                      '아래 표에서 왼쪽 교시 칸을 누르면 그 교시의 시작·종료 시간을 바꿀 수 있어요. 요일마다 다르게 정할 수도 있습니다.',
+                      'Tap a period label on the left of the table below to change its start/end time — for all days or a single day.',
+                      '点击下方表格左侧的节次即可修改该节的开始与结束时间，也可按星期分别设置。'
+                    )}
+                  </p>
+
+                  {/* 점심시간 (custom mode): shown on the daily timetable of school days */}
+                  {(() => {
+                    const lunch = schoolTimeConfig.customLunch ?? { enabled: false, start: '12:30', end: '13:20' };
+                    const invalid = lunch.enabled && lunch.end <= lunch.start;
+                    const setLunch = (patch: Partial<typeof lunch>) =>
+                      updateSchoolTimeConfig({ customLunch: { ...lunch, ...patch } });
+                    return (
+                      <div className="rounded-2xl bg-paper p-3 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[0.8125rem] font-bold text-ink">🍱 {tr(lang, '점심시간', 'Lunch break', '午休时间')}</div>
+                            <div className="text-[0.6875rem] text-slate-600">
+                              {tr(
+                                lang,
+                                '학교 수업이 있는 날 시간표에 점심시간으로 표시돼요',
+                                'Shown on the timetable of school days',
+                                '在有课的日子里显示为午休时间'
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={lunch.enabled}
+                            onClick={() => setLunch({ enabled: !lunch.enabled })}
+                            className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${lunch.enabled ? 'bg-sage-700' : 'bg-slate-300'}`}
+                          >
+                            <span
+                              className={`block w-6 h-6 rounded-full bg-paper shadow-xs transition-transform ${
+                                lunch.enabled ? 'translate-x-5' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        {lunch.enabled && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={lunch.start}
+                              onChange={(e) => e.target.value && setLunch({ start: e.target.value })}
+                              aria-label={tr(lang, '점심 시작', 'Lunch starts', '午休开始')}
+                              className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-sage-500"
+                            />
+                            <span className="text-sm font-bold text-slate-500">–</span>
+                            <input
+                              type="time"
+                              value={lunch.end}
+                              onChange={(e) => e.target.value && setLunch({ end: e.target.value })}
+                              aria-label={tr(lang, '점심 끝', 'Lunch ends', '午休结束')}
+                              className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-sage-500"
+                            />
+                          </div>
+                        )}
+                        {invalid && (
+                          <p className="text-[0.6875rem] font-semibold text-accent-800">
+                            {tr(lang, '끝나는 시간이 시작보다 늦어야 해요', 'End must be after start', '结束时间须晚于开始时间')}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
 

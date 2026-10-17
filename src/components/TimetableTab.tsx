@@ -27,6 +27,7 @@ import {
 import {
   DAYS_OF_WEEK,
   UserProfile,
+  SchoolTimeConfig,
   MasterTimetable,
   DailyOverrides,
   SubjectPool,
@@ -53,6 +54,7 @@ import {
   ResolvedAcademyItem,
   findTimeConflicts,
   TimeConflict,
+  getLunchRange,
 } from '../utils/timetableHelpers';
 import { ConflictDialog } from './ConflictDialog';
 import { tr, translateDay, translateSubject, translateSampleText } from '../i18n/translations';
@@ -71,6 +73,7 @@ interface TimetableTabProps {
   onUpdateAttendance?: (updater: (prev: AttendanceMap) => AttendanceMap) => void;
   profile?: UserProfile;
   onEditProfile?: () => void;
+  schoolTimeConfig?: SchoolTimeConfig;
 }
 
 const HOUR_HEIGHT_PX = 84;
@@ -314,6 +317,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   onUpdateAttendance,
   profile,
   onEditProfile,
+  schoolTimeConfig,
 }) => {
   const lang = language;
   const startHour = timelineConfig?.startHour ?? 8;
@@ -539,7 +543,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       }
     }
 
-    const sorted = [...activeIntervals].sort((a, b) => a.start - b.start);
+    // Lunch is neither a class nor free time.
+    const lunchRange = getLunchRange(schoolTimeConfig, dailyData.school);
+    const lunch = lunchRange
+      ? {
+          start: timeToMinutes(lunchRange.start),
+          end: timeToMinutes(lunchRange.end),
+          startTime: lunchRange.start,
+          endTime: lunchRange.end,
+        }
+      : null;
+    const sorted = [...activeIntervals, ...(lunch ? [{ start: lunch.start, end: lunch.end }] : [])].sort(
+      (a, b) => a.start - b.start
+    );
     const mergedOccupied: Array<{ start: number; end: number }> = [];
     for (const interval of sorted) {
       if (mergedOccupied.length === 0) {
@@ -695,8 +711,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       schoolMinutesTotal: Math.max(0, schoolMinutesTotal),
       academyMinutesTotal: Math.max(0, academyMinutesTotal),
       totalFreeMin,
+      lunch: lunch
+        ? {
+            ...lunch,
+            topPx: ((lunch.start - timelineStartMin) / 60) * HOUR_HEIGHT_PX,
+            heightPx: Math.max(24, ((lunch.end - lunch.start) / 60) * HOUR_HEIGHT_PX - 6),
+          }
+        : null,
     };
-  }, [dailyData, timelineStartMin, timelineEndMin, totalTimelineMinutes, lang, overlapBadgeLabel]);
+  }, [dailyData, timelineStartMin, timelineEndMin, totalTimelineMinutes, lang, overlapBadgeLabel, schoolTimeConfig]);
 
   // Daily view steps one day, weekly view steps one week
   const handleStep = (delta: number) => {
@@ -2685,6 +2708,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         </button>
                       );
                     })}
+
+                    {/* Lunch break */}
+                    {timelineLayout.lunch && (
+                      <div
+                        style={{ top: `${timelineLayout.lunch.topPx + 3}px`, height: `${timelineLayout.lunch.heightPx}px` }}
+                        className="absolute left-[3px] right-[3px] rounded-xl bg-sage-100/70 border border-sage-300 px-3 flex items-center gap-2 overflow-hidden"
+                      >
+                        <span className="text-[0.75rem] font-bold text-sage-800">🍱 {tr(lang, '점심시간', 'Lunch', '午休')}</span>
+                        <span className="font-mono text-[0.6875rem] tabular-nums text-sage-700">
+                          {timelineLayout.lunch.startTime} – {timelineLayout.lunch.endTime}
+                        </span>
+                      </div>
+                    )}
 
                     {/* School blocks */}
                     {timelineLayout.schoolLayout.map(({ item, topPx, heightPx, totalCols, colIndex }) =>

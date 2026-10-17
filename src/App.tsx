@@ -251,6 +251,7 @@ export default function App() {
             attendance={state.attendance}
             onUpdateAttendance={handleUpdateAttendance}
             profile={state.profile}
+            schoolTimeConfig={state.schoolTimeConfig}
             onEditProfile={() => {
               setSettingsFocus('profile');
               setActiveTab('settings');

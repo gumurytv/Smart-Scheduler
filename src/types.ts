@@ -117,6 +117,8 @@ export interface SchoolTimeConfig {
   lunchAfterPeriod: number; // lunch break comes after this period, e.g. 4
   lunchMinutes: number; // e.g. 60
   periodCount: number; // e.g. 7
+  /** 'custom' mode: lunch break set directly (start–end), shown on the daily timetable. */
+  customLunch?: { enabled: boolean; start: string; end: string };
 }
 
 export const DEFAULT_SCHOOL_TIME_CONFIG: SchoolTimeConfig = {
