@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Shared frame for the list/grid widgets. wd_bg is a separate image so its transparency
-  (Settings → 배경 투명도) can change without touching the content. Header: icon badge ·
-  title · right pill; the body is filled in code.
+  Shared frame for the list/grid widgets: themed background image, header (icon badge ·
+  title · right pill) and a body filled in code.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/wd_root"

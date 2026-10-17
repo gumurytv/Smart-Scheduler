@@ -147,11 +147,7 @@ export interface WidgetConfig {
   enabled: HomeWidgetId[]; // widgets the user chose to add to the home screen (order = display order)
   theme: 'light' | 'dark';
   fontScale?: WidgetFontScale;
-  /** Background opacity in percent (100 = opaque, 0 = fully transparent). */
-  bgOpacity?: number;
 }
-
-export const WIDGET_BG_OPACITIES = [100, 75, 50, 25, 0];
 
 export const DEFAULT_WIDGET_CONFIG: WidgetConfig = { enabled: ['now'], theme: 'light' };
 

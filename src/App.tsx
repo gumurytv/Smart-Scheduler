@@ -148,17 +148,6 @@ export default function App() {
     }));
   };
 
-  const handleResetSampleData = () => {
-    const fresh = createInitialPlannerState(new Date());
-    setState((prev) => ({
-      ...fresh,
-      language: prev.language || 'ko',
-      schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
-      profile: prev.profile,
-      textScale: prev.textScale,
-    }));
-  };
-
   const today = new Date();
   const todayFormatted = formatDateLabel(today, lang);
 
@@ -302,7 +291,6 @@ export default function App() {
           <SettingsTab
             state={state}
             onUpdateState={setState}
-            onResetSampleData={handleResetSampleData}
             focusSection={settingsFocus}
             onFocusHandled={() => setSettingsFocus(null)}
           />

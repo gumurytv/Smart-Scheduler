@@ -30,7 +30,6 @@ import {
   Tags,
   ScanLine,
   DatabaseBackup,
-  ShieldAlert,
   type LucideIcon,
   FlaskConical,
   Lock,
@@ -57,7 +56,6 @@ import {
   HomeWidgetId,
   WidgetConfig,
   WidgetFontScale,
-  WIDGET_BG_OPACITIES,
   UserProfile,
   TextScale,
   TEXT_SCALES,
@@ -80,7 +78,6 @@ import { HOME_WIDGET_META, HomeWidgetPreview } from './HomeWidgets';
 interface SettingsTabProps {
   state: PlannerState;
   onUpdateState: (updater: (prev: PlannerState) => PlannerState) => void;
-  onResetSampleData: () => void;
   focusSection?: 'profile' | null;
   onFocusHandled?: () => void;
 }
@@ -487,7 +484,6 @@ function createSampleTimetableImageBase64(lang: AppLanguage): string {
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   state,
   onUpdateState,
-  onResetSampleData,
   focusSection,
   onFocusHandled,
 }) => {
@@ -587,7 +583,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   }, [focusSection]);
 
   // In-page confirmations (no window.confirm)
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [removePeriodConfirm, setRemovePeriodConfirm] = useState(false);
 
   // --- SECTION 1: SUBJECT POOL STATE ---
@@ -690,7 +685,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const widgetConfig = getWidgetConfig(state);
   const widgetTheme = widgetConfig.theme;
   const widgetFontScale: WidgetFontScale = widgetConfig.fontScale ?? 'md';
-  const widgetBgOpacity = widgetConfig.bgOpacity ?? 100;
   const widgetPreviewData = buildHomeWidgetsData(state, widgetNow);
   const updateWidgetConfig = (patch: Partial<WidgetConfig>) => {
     onUpdateState((prev) => {
@@ -3544,69 +3538,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </button>
             </div>
 
-            <div className="pt-4 border-t border-divider space-y-2">
-              <div className="flex items-center gap-1.5">
-                <ShieldAlert strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-800" />
-                <span className="text-[0.75rem] font-bold text-accent-800">
-                  {tr(lang, '초기화', 'Danger zone', '重置')}
-                </span>
-              </div>
-              {!resetConfirmOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setResetConfirmOpen(true)}
-                  className="w-full h-10 rounded-full border-[1.5px] border-accent-800 bg-transparent text-accent-800 inline-flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-accent-100"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  {tr(
-                    lang,
-                    '초기 샘플 데이터로 전체 리셋',
-                    'Reset All to Initial Sample Data',
-                    '全部重置为初始示例数据'
-                  )}
-                </button>
-              ) : (
-                <div role="alert" className="rounded-xl bg-accent-100 border border-accent-300 p-3 space-y-2.5">
-                  <p className="text-[0.75rem] font-semibold text-accent-900 leading-snug">
-                    {tr(
-                      lang,
-                      '모든 시간표·일정·출석·메모가 샘플 데이터로 바뀌어요. 되돌릴 수 없으니 먼저 백업을 권장합니다.',
-                      'All timetables, schedules, attendance and memos will be replaced with sample data. This cannot be undone — back up first.',
-                      '所有课表、日程、出勤和备忘都将被示例数据替换，且无法撤销，建议先备份。'
-                    )}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setResetConfirmOpen(false)}
-                      className="flex-1 h-9 rounded-full border border-divider bg-paper text-ink text-xs font-semibold hover:bg-slate-100"
-                    >
-                      {tr(lang, '취소', 'Cancel', '取消')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onResetSampleData();
-                        setResetConfirmOpen(false);
-                        setBackupFeedback({
-                          type: 'success',
-                          message: tr(
-                            lang,
-                            '초기 샘플 데이터 상태로 초기화되었습니다.',
-                            'Reset to initial sample data.',
-                            '已重置为初始示例数据状态。'
-                          ),
-                        });
-                      }}
-                      className="flex-1 h-9 rounded-full bg-accent-800 text-paper text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-900"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      {tr(lang, '리셋하기', 'Reset', '确认重置')}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </SettingsCard>
       </div>
@@ -4123,46 +4054,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   ))}
                 </div>
               </div>
-              {/* 위젯 배경 투명도 */}
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.6875rem] font-semibold text-slate-600">
-                  {tr(lang, '배경 투명도', 'Background', '背景透明度')}
-                </span>
-                <div
-                  className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
-                  role="radiogroup"
-                  aria-label={tr(lang, '위젯 배경 투명도', 'Widget background transparency', '小组件背景透明度')}
-                >
-                  {WIDGET_BG_OPACITIES.map((op) => (
-                    <button
-                      key={op}
-                      type="button"
-                      role="radio"
-                      aria-checked={widgetBgOpacity === op}
-                      onClick={() => updateWidgetConfig({ bgOpacity: op })}
-                      className={`h-[30px] px-2 text-[0.6875rem] font-semibold whitespace-nowrap transition-colors ${
-                        widgetBgOpacity === op ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
-                      }`}
-                    >
-                      {op === 100
-                        ? tr(lang, '불투명', 'Solid', '不透明')
-                        : op === 0
-                        ? tr(lang, '투명', 'Clear', '透明')
-                        : `${100 - op}%`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {widgetBgOpacity < 50 && (
-                <p className="text-[0.6875rem] text-slate-600 leading-snug -mt-1">
-                  {tr(
-                    lang,
-                    '배경이 많이 투명할 때는 배경화면이 밝으면 「밝은 테마」, 어두우면 「어두운 테마」가 잘 보여요.',
-                    'With a see-through background, pick Light on bright wallpapers and Dark on dark ones.',
-                    '背景较透明时，浅色壁纸建议用「浅色」，深色壁纸建议用「深色」。'
-                  )}
-                </p>
-              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -4206,20 +4097,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
                     <div
                       data-widget-preview={id}
-                      className={`p-3 rounded-2xl transition-colors ${
-                        widgetBgOpacity < 100
-                          ? 'bg-gradient-to-br from-other-500 via-sage-500 to-accent-500'
-                          : widgetTheme === 'dark'
-                          ? 'bg-slate-800'
-                          : 'bg-slate-200/60'
-                      }`}
+                      className={`p-3 rounded-2xl transition-colors ${widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'}`}
                     >
                       <HomeWidgetPreview
                         id={id}
                         data={widgetPreviewData}
                         theme={widgetTheme}
                         lang={lang}
-                        bgOpacity={widgetBgOpacity / 100}
                       />
                     </div>
                     {pinMessage?.id === id && (

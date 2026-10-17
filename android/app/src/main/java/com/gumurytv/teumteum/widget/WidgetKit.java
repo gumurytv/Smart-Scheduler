@@ -51,8 +51,6 @@ final class WidgetKit {
     final JSONObject data; // null when the app hasn't sent anything yet
     final boolean dark;
     final float font;
-    /** Background opacity 0–255 (Settings → 배경 투명도). */
-    final int bgAlpha;
     final Calendar now;
     final int nowMin;
     final String today;
@@ -68,8 +66,6 @@ final class WidgetKit {
         this.dark = data != null && "dark".equals(data.optString("theme"));
         float f = data == null ? 1f : (float) data.optDouble("font", 1.0);
         this.font = (f < 0.7f || f > 2.0f) ? 1f : f;
-        double bg = data == null ? 1.0 : data.optDouble("bg", 1.0);
-        this.bgAlpha = (int) Math.round(255 * Math.max(0.0, Math.min(1.0, bg)));
         this.labels = data == null ? null : data.optJSONObject("labels");
         this.dur = data == null ? null : data.optJSONObject("dur");
     }
@@ -136,10 +132,9 @@ final class WidgetKit {
         size(v, viewId, sp);
     }
 
-    /** Themed background (with the chosen transparency) and the click-to-open handler. */
+    /** Themed background and the click-to-open handler. */
     void frame(Context context, RemoteViews v) {
         v.setImageViewResource(R.id.wd_bg, res(R.drawable.wd_frame_l, R.drawable.wd_frame_d));
-        v.setInt(R.id.wd_bg, "setImageAlpha", bgAlpha);
         v.setOnClickPendingIntent(R.id.wd_root, openApp(context));
     }
 
