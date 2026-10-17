@@ -211,7 +211,7 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
         },
       },
       {
-        title: { ko: '과목 후보군 · 색상', en: 'Subjects and colours', zh: '候选科目与颜色' },
+        title: { ko: '과목/수업 설정 · 색상', en: 'Subjects and colours', zh: '科目/课程设置与颜色' },
         desc: {
           ko: '자주 쓰는 과목을 모아 두고, 동그라미를 눌러 과목마다 색을 정하면 시간표에 그 색으로 보여요.',
           en: 'Keep your usual subjects here; tap the dot to give each a colour used across the timetable.',
@@ -271,6 +271,16 @@ export const SETUP_GUIDE: SetupGuideStep[] = [
     },
   },
   {
+    target: 'pool',
+    title: { ko: '과목/수업 정하기', en: 'Set up subjects', zh: '设置科目/课程' },
+    where: { ko: '설정 → 과목/수업 설정', en: 'Settings → Subjects & classes', zh: '设置 → 科目/课程设置' },
+    desc: {
+      ko: '자주 쓰는 학교 과목과 학원을 등록해요. 시간표를 채울 때 빠른 선택 버튼으로 나와요. 동그라미를 눌러 과목마다 색도 정할 수 있어요.',
+      en: 'Add your school subjects and academies; they appear as quick picks when filling timetables. Tap the dot to give each a colour.',
+      zh: '登记常用的学校科目和补习班，填写课表时会作为快捷按钮出现。点击圆点可为每个科目设置颜色。',
+    },
+  },
+  {
     target: 'school',
     title: { ko: '학교 수업 시간', en: 'School class times', zh: '学校上课时间' },
     where: { ko: '설정 → 학교 시간표 → 수업 시간', en: 'Settings → School timetable → Class times', zh: '设置 → 学校课表 → 上课时间' },
@@ -298,17 +308,6 @@ export const SETUP_GUIDE: SetupGuideStep[] = [
       ko: '요일을 고르고 학원 이름과 시작·끝 시간을 넣어요. 매주 반복돼요.',
       en: 'Pick a day and enter the academy and its start and end time. It repeats every week.',
       zh: '选择星期，填写补习班名称和起止时间，每周重复。',
-    },
-  },
-  {
-    target: 'pool',
-    optional: true,
-    title: { ko: '과목 색상 정하기', en: 'Colour your subjects', zh: '设置科目颜色' },
-    where: { ko: '설정 → 과목 후보군', en: 'Settings → Subjects', zh: '设置 → 候选科目' },
-    desc: {
-      ko: '과목 옆 동그라미를 눌러 색을 고르면 시간표에서 과목을 색으로 구분할 수 있어요.',
-      en: 'Tap the dot beside a subject and pick a colour to tell subjects apart at a glance.',
-      zh: '点击科目旁的圆点选择颜色，课表中即可按颜色区分科目。',
     },
   },
   {

@@ -87,7 +87,7 @@ export const ImportSheet: React.FC<ImportSheetProps> = ({ lang, fileName, parsed
     subjects: {
       icon: Tags,
       tone: 'bg-slate-600',
-      label: tr(lang, '과목 후보군 · 색상', 'Subjects & colours', '候选科目 · 颜色'),
+      label: tr(lang, '과목/수업 설정 · 색상', 'Subjects & colours', '科目/课程设置 · 颜色'),
       detail: tr(lang, `과목 ${counts.subjects}개`, `${counts.subjects} subjects`, `${counts.subjects} 个科目`),
     },
     app: {

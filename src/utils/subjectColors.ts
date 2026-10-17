@@ -1,4 +1,4 @@
-// Settings → 과목 후보군: an optional colour per subject, used wherever the subject is shown.
+// Settings → 과목/수업 설정: an optional colour per subject, used wherever the subject is shown.
 // Pastel background + dark text (readable, AA) + a saturated dot/strip colour.
 
 export type SubjectColorKey =

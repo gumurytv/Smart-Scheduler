@@ -289,37 +289,69 @@ interface SectionResetButtonProps {
   onConfirm: () => void;
   confirmText?: string;
   confirmLabel?: string;
+  /** Optional second action next to "restore defaults": empty the section completely. */
+  onClear?: () => void;
+  clearText?: string;
 }
 
-/** Per-section "restore defaults" row with an inline (in-page) confirmation step. */
-const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, onConfirm, confirmText, confirmLabel }) => {
-  const [confirming, setConfirming] = useState(false);
+/** Per-section "restore defaults" (and optional "clear all") row with an inline (in-page) confirmation step. */
+const SectionResetButton: React.FC<SectionResetButtonProps> = ({
+  lang,
+  label,
+  onConfirm,
+  confirmText,
+  confirmLabel,
+  onClear,
+  clearText,
+}) => {
+  const [confirming, setConfirming] = useState<'restore' | 'clear' | null>(null);
+  const isClear = confirming === 'clear';
   return (
     <div className="pt-3 border-t border-divider">
       {!confirming ? (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
-          {label}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirming('restore')}
+            className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors whitespace-nowrap"
+          >
+            <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
+            {label}
+          </button>
+          {onClear && (
+            <button
+              type="button"
+              onClick={() => setConfirming('clear')}
+              className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors whitespace-nowrap"
+            >
+              <Eraser className="w-3.5 h-3.5" strokeWidth={2.5} />
+              {tr(lang, '모든 설정값 지우기', 'Clear everything', '清除全部设置')}
+            </button>
+          )}
+        </div>
       ) : (
         <div role="alertdialog" className="flex flex-wrap items-center gap-2">
           <p className="flex-1 min-w-[180px] text-[0.6875rem] font-semibold text-accent-900 leading-snug">
-            {confirmText ??
-              tr(
-                lang,
-                '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
-                'Restore defaults? Only this section’s settings will change.',
-                '确定要恢复吗？只有本部分的设置会恢复为默认值。'
-              )}
+            {isClear
+              ? clearText ??
+                tr(
+                  lang,
+                  '정말 지울까요? 이 섹션의 내용이 모두 비워져요. 되돌릴 수 없어요.',
+                  'Clear everything? This section will be emptied. This cannot be undone.',
+                  '确定要清除吗？本部分内容将全部清空，无法撤销。'
+                )
+              : confirmText ??
+                tr(
+                  lang,
+                  '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
+                  'Restore defaults? Only this section’s settings will change.',
+                  '确定要恢复吗？只有本部分的设置会恢复为默认值。'
+                )}
           </p>
           <div className="flex gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => setConfirming(false)}
+              onClick={() => setConfirming(null)}
               className="h-8 px-3 rounded-full border border-divider text-ink text-[0.6875rem] font-semibold hover:bg-slate-100"
             >
               {tr(lang, '취소', 'Cancel', '取消')}
@@ -327,13 +359,14 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
             <button
               type="button"
               onClick={() => {
-                setConfirming(false);
-                onConfirm();
+                setConfirming(null);
+                if (isClear) onClear?.();
+                else onConfirm();
               }}
               className="h-8 px-3 rounded-full bg-accent-800 text-paper text-[0.6875rem] font-bold inline-flex items-center gap-1 hover:bg-accent-900"
             >
-              <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
-              {confirmLabel ?? tr(lang, '되돌리기', 'Restore', '恢复')}
+              {isClear ? <Eraser className="w-3.5 h-3.5" strokeWidth={2.5} /> : <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />}
+              {isClear ? tr(lang, '지우기', 'Clear', '清除') : confirmLabel ?? tr(lang, '되돌리기', 'Restore', '恢复')}
             </button>
           </div>
         </div>
@@ -877,8 +910,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setNewSchoolSubject('');
     setNewAcademySubject('');
     showMasterToast(
-      tr(lang, '과목 후보군을 기본값으로 되돌렸어요', 'Subject pool restored to defaults', '候选科目库已恢复默认')
+      tr(lang, '과목/수업 설정을 기본값으로 되돌렸어요', 'Subjects restored to defaults', '科目/课程设置已恢复默认')
     );
+  };
+
+  // 모든 설정값 지우기: empty the section (school keeps its class times so the grid stays in place)
+  const handleClearSchoolSection = () => {
+    onUpdateState((prev) => resetPlannerParts(prev, ['school'], 'empty'));
+    setSchoolSheet(null);
+    setRemovePeriodConfirm(false);
+    showMasterToast(tr(lang, '학교 시간표의 과목을 모두 지웠어요', 'All school subjects cleared', '已清除全部学校科目'));
+  };
+
+  const handleClearAcademySection = () => {
+    onUpdateState((prev) => resetPlannerParts(prev, ['academy'], 'empty'));
+    showMasterToast(tr(lang, '학원 시간표를 모두 지웠어요', 'Academy timetable cleared', '已清除补习班课表'));
+  };
+
+  const handleClearSubjectPool = () => {
+    onUpdateState((prev) => ({ ...prev, subjectPool: { school: [], academy: [] }, subjectColors: undefined }));
+    setNewSchoolSubject('');
+    setNewAcademySubject('');
+    setColorPickFor(null);
+    showMasterToast(tr(lang, '과목/수업 목록을 모두 지웠어요', 'All subjects cleared', '已清除全部科目'));
   };
 
   const handleResetWidgets = () => {
@@ -2048,6 +2102,250 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </SettingsCard>
 
         <SettingsCard
+          id="pool"
+          open={!!openCards.pool}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={Tags}
+          title={tr(lang, '과목/수업 설정', 'Subjects & classes', '科目/课程设置')}
+          summary={tr(
+            lang,
+            `학교 ${state.subjectPool.school.length}개 · 학원 ${state.subjectPool.academy.length}개`,
+            `${state.subjectPool.school.length} school · ${state.subjectPool.academy.length} academy`,
+            `学校 ${state.subjectPool.school.length} 个 · 补习班 ${state.subjectPool.academy.length} 个`
+          )}
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
+              {tr(
+                lang,
+                '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요. 이름 앞 동그라미를 누르면 과목마다 색을 정할 수 있고, 시간표에 그 색으로 표시돼요.',
+                'Subjects and academies offered when editing timetables. Tap the circle before a name to give it a colour; timetables show it in that colour.',
+                '修改课表时作为快捷按钮显示的学校科目与补习班列表。点击名称前的圆点可为科目设置颜色，课表会以该颜色显示。'
+              )}
+            </p>
+            {/* School Subject Pool */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-sage-800">
+                  {tr(
+                    lang,
+                    `학교 과목 후보군 (${state.subjectPool.school.length}종)`,
+                    `School Subjects (${state.subjectPool.school.length})`,
+                    `学校候选科目 (${state.subjectPool.school.length}种)`
+                  )}
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {state.subjectPool.school.map((subj) => (
+                  <span
+                    key={subj}
+                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-semibold"
+                    style={
+                      subjectColor(state.subjectColors, subj)
+                        ? { backgroundColor: subjectColor(state.subjectColors, subj)!.bg, color: subjectColor(state.subjectColors, subj)!.fg }
+                        : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setColorPickFor(colorPickFor === subj ? null : subj)}
+                      aria-label={tr(lang, `${subj} 색상 고르기`, `Colour for ${translateSubject(subj, lang)}`, `为${translateSubject(subj, lang)}选择颜色`)}
+                      aria-expanded={colorPickFor === subj}
+                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === subj ? 'ring-2 ring-ink' : ''}`}
+                      style={{ backgroundColor: subjectColor(state.subjectColors, subj)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, subj) ? 'solid' : 'dashed' }}
+                    />
+                    {translateSubject(subj, lang)}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSchoolSubject(subj)}
+                      className="text-sage-600 hover:text-accent-800"
+                      aria-label={tr(
+                        lang,
+                        `${subj} 삭제`,
+                        `Delete ${translateSubject(subj, lang)}`,
+                        `删除${translateSubject(subj, lang)}`
+                      )}
+                    >
+                      <X className="w-3 h-3" strokeWidth={2.75} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              {colorPickFor && state.subjectPool.school.includes(colorPickFor) && (
+                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
+                  <div className="text-[0.6875rem] font-bold text-ink">
+                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUBJECT_COLOR_KEYS.map((key) => {
+                      const c = SUBJECT_COLORS[key];
+                      const active = state.subjectColors?.[colorPickFor] === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSubjectColor(colorPickFor, key)}
+                          aria-label={key}
+                          aria-pressed={active}
+                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
+                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
+                        >
+                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSubjectColor(colorPickFor, null)}
+                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
+                    >
+                      {tr(lang, '기본색', 'Default', '默认')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={handleAddSchoolSubject} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={tr(
+                    lang,
+                    '새 학교 과목 입력 (예: 제2외국어, 진로)',
+                    'Add new school subject (e.g. Physics, Spanish)',
+                    '输入新学校科目（如：物理、第二外语）'
+                  )}
+                  value={newSchoolSubject}
+                  onChange={(e) => setNewSchoolSubject(e.target.value)}
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="submit"
+                  className="h-9 px-3 rounded-full bg-sage-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-sage-800 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
+                </button>
+              </form>
+            </div>
+
+            {/* Academy Subject Pool */}
+            <div className="space-y-2.5 pt-3 border-t border-divider">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-accent-800">
+                  {tr(
+                    lang,
+                    `학원 후보군 (${state.subjectPool.academy.length}종)`,
+                    `Academies (${state.subjectPool.academy.length})`,
+                    `补习班候选库 (${state.subjectPool.academy.length}家)`
+                  )}
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {state.subjectPool.academy.map((acName) => (
+                  <span
+                    key={acName}
+                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-semibold"
+                    style={
+                      subjectColor(state.subjectColors, acName)
+                        ? { backgroundColor: subjectColor(state.subjectColors, acName)!.bg, color: subjectColor(state.subjectColors, acName)!.fg }
+                        : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setColorPickFor(colorPickFor === acName ? null : acName)}
+                      aria-label={tr(lang, `${acName} 색상 고르기`, `Colour for ${translateSubject(acName, lang)}`, `为${translateSubject(acName, lang)}选择颜色`)}
+                      aria-expanded={colorPickFor === acName}
+                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === acName ? 'ring-2 ring-ink' : ''}`}
+                      style={{ backgroundColor: subjectColor(state.subjectColors, acName)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, acName) ? 'solid' : 'dashed' }}
+                    />
+                    {translateSubject(acName, lang)}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAcademySubject(acName)}
+                      className="text-accent-600 hover:text-accent-900"
+                      aria-label={tr(
+                        lang,
+                        `${acName} 삭제`,
+                        `Delete ${translateSubject(acName, lang)}`,
+                        `删除${translateSubject(acName, lang)}`
+                      )}
+                    >
+                      <X className="w-3 h-3" strokeWidth={2.75} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              {colorPickFor && state.subjectPool.academy.includes(colorPickFor) && (
+                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
+                  <div className="text-[0.6875rem] font-bold text-ink">
+                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUBJECT_COLOR_KEYS.map((key) => {
+                      const c = SUBJECT_COLORS[key];
+                      const active = state.subjectColors?.[colorPickFor] === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSubjectColor(colorPickFor, key)}
+                          aria-label={key}
+                          aria-pressed={active}
+                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
+                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
+                        >
+                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSubjectColor(colorPickFor, null)}
+                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
+                    >
+                      {tr(lang, '기본색', 'Default', '默认')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={handleAddAcademySubject} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={tr(
+                    lang,
+                    '새 학원명 입력 (예: 피아노학원, 국어학원)',
+                    'Add new academy (e.g. Piano Academy)',
+                    '输入新补习班名称（如：钢琴班、语文班）'
+                  )}
+                  value={newAcademySubject}
+                  onChange={(e) => setNewAcademySubject(e.target.value)}
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="submit"
+                  className="h-9 px-3 rounded-full bg-accent-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-accent-800 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
+                </button>
+              </form>
+            </div>
+
+            <SectionResetButton
+              lang={lang}
+              label={sectionResetLabel}
+              onConfirm={handleResetSubjectPool}
+              onClear={handleClearSubjectPool}
+              clearText={tr(
+                lang,
+                '학교 과목과 학원 목록, 과목 색상을 모두 지워요. 시간표에 넣은 과목은 그대로예요.',
+                'Removes every school subject, academy and colour from the list. Timetables keep their subjects.',
+                '将清除所有学校科目、补习班和颜色。课表中已填的科目保留。'
+              )}
+            />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
           id="school"
           open={!!openCards.school}
           onToggle={toggleCard}
@@ -2667,7 +2965,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
             </div>
 
-            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSchoolSection} />
+            <SectionResetButton
+              lang={lang}
+              label={sectionResetLabel}
+              onConfirm={handleResetSchoolSection}
+              onClear={handleClearSchoolSection}
+              clearText={tr(
+                lang,
+                '모든 요일·교시의 과목과 날짜별 변경을 지워요. 수업 시간 설정은 남아요. 되돌릴 수 없어요.',
+                'Clears every subject and day-by-day change. Class times stay. This cannot be undone.',
+                '将清除所有科目和按日期的变更，上课时间保留。无法撤销。'
+              )}
+            />
           </div>
         </SettingsCard>
 
@@ -2797,242 +3106,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               )}
             </button>
 
-            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetAcademySection} />
-          </div>
-        </SettingsCard>
-
-        <SettingsCard
-          id="pool"
-          open={!!openCards.pool}
-          onToggle={toggleCard}
-          tone="neutral"
-          icon={Tags}
-          title={tr(lang, '과목 후보군', 'Subject Pool', '候选科目库')}
-          summary={tr(
-            lang,
-            `학교 ${state.subjectPool.school.length}개 · 학원 ${state.subjectPool.academy.length}개`,
-            `${state.subjectPool.school.length} school · ${state.subjectPool.academy.length} academy`,
-            `学校 ${state.subjectPool.school.length} 个 · 补习班 ${state.subjectPool.academy.length} 个`
-          )}
-        >
-          <div className="p-4 space-y-4">
-            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
-              {tr(
+            <SectionResetButton
+              lang={lang}
+              label={sectionResetLabel}
+              onConfirm={handleResetAcademySection}
+              onClear={handleClearAcademySection}
+              clearText={tr(
                 lang,
-                '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요. 이름 앞 동그라미를 누르면 과목마다 색을 정할 수 있고, 시간표에 그 색으로 표시돼요.',
-                'Subjects and academies offered when editing timetables. Tap the circle before a name to give it a colour; timetables show it in that colour.',
-                '修改课表时作为快捷按钮显示的学校科目与补习班列表。点击名称前的圆点可为科目设置颜色，课表会以该颜色显示。'
+                '모든 학원 수업과 보강·휴강 기록을 지워요. 되돌릴 수 없어요.',
+                'Removes every academy class, makeup and cancellation. This cannot be undone.',
+                '将删除所有补习班课程及补课、停课记录。无法撤销。'
               )}
-            </p>
-            {/* School Subject Pool */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-sage-800">
-                  {tr(
-                    lang,
-                    `학교 과목 후보군 (${state.subjectPool.school.length}종)`,
-                    `School Subjects (${state.subjectPool.school.length})`,
-                    `学校候选科目 (${state.subjectPool.school.length}种)`
-                  )}
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {state.subjectPool.school.map((subj) => (
-                  <span
-                    key={subj}
-                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-semibold"
-                    style={
-                      subjectColor(state.subjectColors, subj)
-                        ? { backgroundColor: subjectColor(state.subjectColors, subj)!.bg, color: subjectColor(state.subjectColors, subj)!.fg }
-                        : undefined
-                    }
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setColorPickFor(colorPickFor === subj ? null : subj)}
-                      aria-label={tr(lang, `${subj} 색상 고르기`, `Colour for ${translateSubject(subj, lang)}`, `为${translateSubject(subj, lang)}选择颜色`)}
-                      aria-expanded={colorPickFor === subj}
-                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === subj ? 'ring-2 ring-ink' : ''}`}
-                      style={{ backgroundColor: subjectColor(state.subjectColors, subj)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, subj) ? 'solid' : 'dashed' }}
-                    />
-                    {translateSubject(subj, lang)}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSchoolSubject(subj)}
-                      className="text-sage-600 hover:text-accent-800"
-                      aria-label={tr(
-                        lang,
-                        `${subj} 삭제`,
-                        `Delete ${translateSubject(subj, lang)}`,
-                        `删除${translateSubject(subj, lang)}`
-                      )}
-                    >
-                      <X className="w-3 h-3" strokeWidth={2.75} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              {colorPickFor && state.subjectPool.school.includes(colorPickFor) && (
-                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
-                  <div className="text-[0.6875rem] font-bold text-ink">
-                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SUBJECT_COLOR_KEYS.map((key) => {
-                      const c = SUBJECT_COLORS[key];
-                      const active = state.subjectColors?.[colorPickFor] === key;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setSubjectColor(colorPickFor, key)}
-                          aria-label={key}
-                          aria-pressed={active}
-                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
-                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
-                        >
-                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => setSubjectColor(colorPickFor, null)}
-                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
-                    >
-                      {tr(lang, '기본색', 'Default', '默认')}
-                    </button>
-                  </div>
-                </div>
-              )}
-              <form onSubmit={handleAddSchoolSubject} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder={tr(
-                    lang,
-                    '새 학교 과목 입력 (예: 제2외국어, 진로)',
-                    'Add new school subject (e.g. Physics, Spanish)',
-                    '输入新学校科目（如：物理、第二外语）'
-                  )}
-                  value={newSchoolSubject}
-                  onChange={(e) => setNewSchoolSubject(e.target.value)}
-                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
-                />
-                <button
-                  type="submit"
-                  className="h-9 px-3 rounded-full bg-sage-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-sage-800 shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
-                </button>
-              </form>
-            </div>
-
-            {/* Academy Subject Pool */}
-            <div className="space-y-2.5 pt-3 border-t border-divider">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-accent-800">
-                  {tr(
-                    lang,
-                    `학원 후보군 (${state.subjectPool.academy.length}종)`,
-                    `Academies (${state.subjectPool.academy.length})`,
-                    `补习班候选库 (${state.subjectPool.academy.length}家)`
-                  )}
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {state.subjectPool.academy.map((acName) => (
-                  <span
-                    key={acName}
-                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-semibold"
-                    style={
-                      subjectColor(state.subjectColors, acName)
-                        ? { backgroundColor: subjectColor(state.subjectColors, acName)!.bg, color: subjectColor(state.subjectColors, acName)!.fg }
-                        : undefined
-                    }
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setColorPickFor(colorPickFor === acName ? null : acName)}
-                      aria-label={tr(lang, `${acName} 색상 고르기`, `Colour for ${translateSubject(acName, lang)}`, `为${translateSubject(acName, lang)}选择颜色`)}
-                      aria-expanded={colorPickFor === acName}
-                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === acName ? 'ring-2 ring-ink' : ''}`}
-                      style={{ backgroundColor: subjectColor(state.subjectColors, acName)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, acName) ? 'solid' : 'dashed' }}
-                    />
-                    {translateSubject(acName, lang)}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAcademySubject(acName)}
-                      className="text-accent-600 hover:text-accent-900"
-                      aria-label={tr(
-                        lang,
-                        `${acName} 삭제`,
-                        `Delete ${translateSubject(acName, lang)}`,
-                        `删除${translateSubject(acName, lang)}`
-                      )}
-                    >
-                      <X className="w-3 h-3" strokeWidth={2.75} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              {colorPickFor && state.subjectPool.academy.includes(colorPickFor) && (
-                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
-                  <div className="text-[0.6875rem] font-bold text-ink">
-                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SUBJECT_COLOR_KEYS.map((key) => {
-                      const c = SUBJECT_COLORS[key];
-                      const active = state.subjectColors?.[colorPickFor] === key;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setSubjectColor(colorPickFor, key)}
-                          aria-label={key}
-                          aria-pressed={active}
-                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
-                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
-                        >
-                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => setSubjectColor(colorPickFor, null)}
-                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
-                    >
-                      {tr(lang, '기본색', 'Default', '默认')}
-                    </button>
-                  </div>
-                </div>
-              )}
-              <form onSubmit={handleAddAcademySubject} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder={tr(
-                    lang,
-                    '새 학원명 입력 (예: 피아노학원, 국어학원)',
-                    'Add new academy (e.g. Piano Academy)',
-                    '输入新补习班名称（如：钢琴班、语文班）'
-                  )}
-                  value={newAcademySubject}
-                  onChange={(e) => setNewAcademySubject(e.target.value)}
-                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
-                />
-                <button
-                  type="submit"
-                  className="h-9 px-3 rounded-full bg-accent-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-accent-800 shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
-                </button>
-              </form>
-            </div>
-
-            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSubjectPool} />
+            />
           </div>
         </SettingsCard>
+
       </div>
 
       {/* School table editor bottom sheet */}
