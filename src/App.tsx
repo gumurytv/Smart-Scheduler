@@ -27,6 +27,7 @@ import { AttendanceTab } from './components/AttendanceTab';
 import { MemoTab } from './components/MemoTab';
 import { SettingsTab } from './components/SettingsTab';
 import { syncWidgetData } from './utils/widgetSync';
+import { syncMakeupReminders } from './native/reminders';
 import { registerBackButton, keepRepainted } from './native/androidShell';
 import { ChildrenSheet, childFallbackName } from './components/ChildrenSheet';
 import { childName, listChildren } from './utils/children';
@@ -86,6 +87,7 @@ export default function App() {
       console.error('Failed to save state to localStorage:', e);
     }
     syncWidgetData(state);
+    syncMakeupReminders(state);
   }, [state]);
 
   // 글자 크기: every text size is in rem, so scaling the root font size scales all text.

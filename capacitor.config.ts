@@ -17,6 +17,11 @@ const config: CapacitorConfig = {
       // Dark status-bar icons on the light paper header.
       style: 'LIGHT',
     },
+    LocalNotifications: {
+      // 보강 알림: white bell in the status bar, tinted with the app's terracotta.
+      smallIcon: 'ic_stat_teumteum',
+      iconColor: '#8c491a',
+    },
   },
 };
 

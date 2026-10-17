@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   Users,
+  Bell,
+  BellRing,
   X,
   Copy,
   Camera,
@@ -60,6 +62,9 @@ import {
   UserProfile,
   TextScale,
   TEXT_SCALES,
+  REMINDER_LEADS,
+  ReminderConfig,
+  ReminderLead,
 } from '../types';
 import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { API_BASE_URL, isNativeApp } from '../native/androidShell';
@@ -67,6 +72,7 @@ import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
 import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/appReset';
 import { ParsedBackup, parseBackup } from '../utils/backupImport';
 import { ImportSheet } from './ImportSheet';
+import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
 import { childFallbackName } from './ChildrenSheet';
 import { childName, listChildren } from '../utils/children';
 import { SUBJECT_COLORS, SUBJECT_COLOR_KEYS, SubjectColorKey, subjectColor } from '../utils/subjectColors';
@@ -202,8 +208,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'widgets' | 'guide';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'widgets', 'guide'];
+type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'guide';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'guide'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -646,6 +652,19 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
+  const [reminderDenied, setReminderDenied] = useState(false);
+  const reminders = state.reminders ?? { enabled: false, leadMinutes: 60 as ReminderLead };
+  const setReminders = (patch: Partial<ReminderConfig>) =>
+    onUpdateState((prev) => ({ ...prev, reminders: { ...(prev.reminders ?? { enabled: false, leadMinutes: 60 }), ...patch } }));
+  const toggleReminders = async () => {
+    if (reminders.enabled) {
+      setReminders({ enabled: false });
+      return;
+    }
+    const ok = await requestReminderPermission();
+    setReminderDenied(!ok);
+    if (ok) setReminders({ enabled: true });
+  };
   // Native app: how many of each widget are on the home screen, and the last "홈 화면에 추가" result
   const [placedWidgets, setPlacedWidgets] = useState<Partial<Record<HomeWidgetId, number>>>({});
   const [pinMessage, setPinMessage] = useState<{ id: HomeWidgetId; text: string } | null>(null);
@@ -3717,6 +3736,115 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       {/* ===== GROUP: 앱 ===== */}
       <div className="space-y-2">
         <GroupHeader label={tr(lang, '앱', 'App', '应用')} />
+
+        <SettingsCard
+          id="reminders"
+          open={!!openCards.reminders}
+          onToggle={toggleCard}
+          tone="accent"
+          icon={BellRing}
+          title={tr(lang, '보강 알림', 'Makeup reminders', '补课提醒')}
+          summary={
+            reminders.enabled
+              ? tr(lang, `켜짐 · ${reminderLeadLabel(reminders.leadMinutes, lang)}`, `On · ${reminderLeadLabel(reminders.leadMinutes, lang)}`, `已开启 · ${reminderLeadLabel(reminders.leadMinutes, lang)}`)
+              : tr(lang, '꺼짐 · 보강·특강 전에 휴대폰 알림', 'Off · a phone alert before each makeup', '已关闭 · 补课前手机提醒')
+          }
+        >
+          <div className="p-3.5 space-y-3">
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-paper px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-[0.875rem] font-bold text-ink">{tr(lang, '보강·특강 알림 받기', 'Remind me of makeups', '接收补课提醒')}</div>
+                <div className="text-[0.6875rem] text-slate-600 leading-snug">
+                  {tr(
+                    lang,
+                    '시간표에 등록한 보강·특강 시작 전에 휴대폰으로 알려줘요',
+                    'A phone notification before each makeup/special class you add',
+                    '在已登记的补课/特讲开始前发送手机通知'
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={reminders.enabled}
+                aria-label={tr(lang, '보강 알림', 'Makeup reminders', '补课提醒')}
+                onClick={() => void toggleReminders()}
+                className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${reminders.enabled ? 'bg-accent-700' : 'bg-slate-300'}`}
+              >
+                <span className={`block w-6 h-6 rounded-full bg-paper shadow-xs transition-transform ${reminders.enabled ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+
+            {reminderDenied && (
+              <p role="alert" className="rounded-xl bg-accent-100 border border-accent-300 px-3 py-2 text-[0.75rem] font-semibold text-accent-900 leading-snug">
+                {tr(
+                  lang,
+                  '알림 권한이 꺼져 있어요. 휴대폰 설정 → 애플리케이션 → 틈틈 → 알림에서 허용한 뒤 다시 켜 주세요.',
+                  'Notifications are blocked. Allow them in phone Settings → Apps → TeumTeum → Notifications, then try again.',
+                  '通知权限已关闭。请在手机设置 → 应用 → TeumTeum → 通知中允许后再开启。'
+                )}
+              </p>
+            )}
+
+            <div className={`space-y-1.5 ${reminders.enabled ? '' : 'opacity-50 pointer-events-none'}`}>
+              <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '언제 알려줄까요?', 'When?', '何时提醒？')}</span>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={tr(lang, '알림 시간', 'Reminder time', '提醒时间')}>
+                {REMINDER_LEADS.map((lead) => (
+                  <button
+                    key={lead}
+                    type="button"
+                    role="radio"
+                    aria-checked={reminders.leadMinutes === lead}
+                    onClick={() => setReminders({ leadMinutes: lead })}
+                    className={`h-9 px-3.5 rounded-full text-[0.8125rem] font-bold ${
+                      reminders.leadMinutes === lead ? 'bg-accent-700 text-paper' : 'bg-paper text-ink hover:bg-slate-100'
+                    }`}
+                  >
+                    {reminderLeadLabel(lead, lang)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {reminders.enabled && (() => {
+              const next = planMakeupReminders(state).slice(0, 3);
+              return (
+                <div className="rounded-2xl bg-paper p-3 space-y-1.5">
+                  <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '다가오는 알림', 'Coming up', '即将提醒')}</span>
+                  {next.length === 0 ? (
+                    <p className="text-[0.75rem] text-slate-600">
+                      {tr(lang, '예정된 보강·특강이 없어요. 시간표에서 「보강/특강 추가」로 등록해 보세요.', 'No upcoming makeups. Add one with “Add makeup” on the timetable.', '暂无补课安排。可在课表中用「添加补课/特讲」登记。')}
+                    </p>
+                  ) : (
+                    next.map((r) => (
+                      <div key={r.id} className="flex items-start gap-2">
+                        <Bell className="w-3.5 h-3.5 text-accent-700 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <div className="text-[0.75rem] font-bold text-ink truncate">{r.title}</div>
+                          <div className="text-[0.6875rem] text-slate-600 truncate">
+                            {tr(lang, '알림', 'Alert', '提醒')} {formatDateKey(r.at).slice(5).replace('-', '/')}{' '}
+                            {String(r.at.getHours()).padStart(2, '0')}:{String(r.at.getMinutes()).padStart(2, '0')} · {r.body}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })()}
+
+            <p className="text-[0.6875rem] text-slate-600 leading-snug">
+              {isNativeApp
+                ? tr(
+                    lang,
+                    '보강을 추가·수정·취소하면 알림도 바로 바뀌어요. 자녀가 여럿이면 모든 자녀의 보강을 알려줘요. 배터리 절약 상태에서는 몇 분 늦게 올 수 있어요.',
+                    'Reminders update as soon as you add, change or cancel a makeup, for every child. Battery saving may delay them by a few minutes.',
+                    '新增、修改或取消补课后提醒会立即更新，所有孩子的补课都会提醒。省电模式下可能延迟几分钟。'
+                  )
+                : tr(lang, '알림은 안드로이드 앱에서 와요. 웹 미리보기에서는 설정만 저장돼요.', 'Reminders arrive in the Android app; the web preview only saves the setting.', '提醒仅在安卓应用中发送，网页预览只保存设置。')}
+            </p>
+          </div>
+        </SettingsCard>
 
         <SettingsCard
           id="widgets"

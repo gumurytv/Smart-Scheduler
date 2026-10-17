@@ -69,6 +69,7 @@ export function resetPlannerParts(prev: PlannerState, parts: ResetPart[], mode: 
       widgetConfig: { ...DEFAULT_WIDGET_CONFIG, enabled: [...DEFAULT_WIDGET_CONFIG.enabled] },
       textScale: undefined,
       subjectColors: undefined,
+      reminders: undefined,
     };
   }
   return next;
