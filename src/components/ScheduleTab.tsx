@@ -34,6 +34,7 @@ import {
 import { tr, translateDay, translateSampleText } from '../i18n/translations';
 import { findTimeConflicts, TimeConflict } from '../utils/timetableHelpers';
 import { ConflictDialog } from './ConflictDialog';
+import { usePersistentState } from '../utils/usePersistentState';
 
 interface ScheduleTabProps {
   language?: AppLanguage;
@@ -216,8 +217,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => formatDateKey(today), [today]);
 
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | ScheduleCategory>('all');
+  const [viewMode, setViewMode] = usePersistentState<'month' | 'week' | 'day'>('schedule.mode', 'month', ['month', 'week', 'day']);
+  const [categoryFilter, setCategoryFilter] = usePersistentState<'all' | ScheduleCategory>('schedule.category', 'all', ['all', 'school', 'academy', 'other']);
   const [cursorDate, setCursorDate] = useState<Date>(today);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
 
@@ -478,7 +479,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     if (editingItem?.id === item.id && sheetDateStr) resetFormForDate(sheetDateStr);
   };
 
-  const [showPast, setShowPast] = useState<boolean>(false);
+  const [showPast, setShowPast] = usePersistentState<boolean>('schedule.showPast', false, [true, false]);
 
   const calendarWeekHeader = [0, 1, 2, 3, 4, 5, 6].map((i) =>
     translateDay(['일', '월', '화', '수', '목', '금', '토'][i], lang).replace('周', '')

@@ -56,6 +56,7 @@ import {
 } from '../utils/timetableHelpers';
 import { ConflictDialog } from './ConflictDialog';
 import { tr, translateDay, translateSubject, translateSampleText } from '../i18n/translations';
+import { usePersistentState } from '../utils/usePersistentState';
 
 interface TimetableTabProps {
   language?: AppLanguage;
@@ -334,8 +335,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   const todayStr = formatDateKey(now);
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
-  const [dailySubMode, setDailySubMode] = useState<'timeline' | 'list'>('timeline');
+  const [viewMode, setViewMode] = usePersistentState<'daily' | 'weekly' | 'monthly'>('timetable.mode', 'daily', [
+    'daily',
+    'weekly',
+    'monthly',
+  ]);
+  const [dailySubMode, setDailySubMode] = usePersistentState<'timeline' | 'list'>('timetable.dailySub', 'timeline', ['timeline', 'list']);
 
   // Edit / add sheet targets (keyed by date so they work from the weekly view and the "Now" card too)
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
@@ -695,7 +700,14 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
   // Daily view steps one day, weekly view steps one week
   const handleStep = (delta: number) => {
-    setSelectedDate((prev) => addDays(prev, viewMode === 'daily' ? delta : delta * 7));
+    setSelectedDate((prev) => {
+      if (viewMode === 'monthly') {
+        // Same day of the month, clamped (Jan 31 → Feb 28)
+        const lastDay = new Date(prev.getFullYear(), prev.getMonth() + delta + 1, 0).getDate();
+        return new Date(prev.getFullYear(), prev.getMonth() + delta, Math.min(prev.getDate(), lastDay));
+      }
+      return addDays(prev, viewMode === 'daily' ? delta : delta * 7);
+    });
   };
 
   const handleGoToday = () => {
@@ -1329,6 +1341,35 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     const f = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
     return `${f(mon)} – ${f(sun)}`;
   }, [weekDays]);
+
+  // ---- Monthly view: Mon-first grid of the selected month, each day resolved ----
+  const monthCells = useMemo(() => {
+    if (viewMode !== 'monthly') return [];
+    const y = selectedDate.getFullYear();
+    const m = selectedDate.getMonth();
+    const first = new Date(y, m, 1);
+    const lead = (first.getDay() + 6) % 7; // Monday = 0
+    const days = new Date(y, m + 1, 0).getDate();
+    const count = Math.ceil((lead + days) / 7) * 7;
+    return Array.from({ length: count }, (_, i) => {
+      const d = new Date(y, m, 1 - lead + i);
+      const dateStr = formatDateKey(d);
+      const resolved = resolveDailyTimetable(dateStr, masterTimetable, dailyOverrides);
+      const school = resolved.school.filter((p) => p.subject.trim());
+      return {
+        dateObj: d,
+        dateStr,
+        inMonth: d.getMonth() === m,
+        dayLabel: getDayOfWeekKor(d),
+        school,
+        schoolActive: school.filter((p) => !p.isCancelled).length,
+        academy: resolved.academy,
+        changed: school.some((p) => p.isModified || p.status) || resolved.academy.some((a) => a.isModified || a.status),
+        schedules: getSchedulesForDate(schedules, dateStr),
+      };
+    });
+  }, [viewMode, selectedDate, masterTimetable, dailyOverrides, schedules]);
+  const selectedMonthCell = monthCells.find((c) => c.dateStr === selectedDateStr);
 
   const navBtn =
     'w-[34px] h-[34px] rounded-full border border-divider bg-paper flex items-center justify-center text-ink hover:bg-slate-100 active:scale-95 transition-transform shrink-0';
@@ -1964,7 +2005,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       {/* CONTROLS: view segment + date row + week strip */}
       <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3.5">
         <div
-          className="grid grid-cols-2 p-1 rounded-full bg-paper"
+          className="grid grid-cols-3 p-1 rounded-full bg-paper"
           role="tablist"
           aria-label={tr(lang, '보기 방식', 'View', '视图')}
         >
@@ -1972,6 +2013,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             [
               { key: 'daily', icon: CalendarDays, label: tr(lang, '일별', 'Daily', '每日') },
               { key: 'weekly', icon: LayoutGrid, label: tr(lang, '주간', 'Weekly', '每周') },
+              { key: 'monthly', icon: CalendarRange, label: tr(lang, '월별', 'Monthly', '每月') },
             ] as const
           ).map(({ key, icon: Icon, label }) => {
             const active = viewMode === key;
@@ -2014,6 +2056,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       const w = FULL_WEEKDAYS[selectedDate.getDay()];
                       return `${tr(lang, w.ko, w.en, w.zh)} · ${selectedDate.getFullYear()}`;
                     })()
+                  : viewMode === 'monthly'
+                  ? `${tr(lang, '월별 보기', 'Month view', '月视图')} · ${selectedDate.getFullYear()}`
                   : `${tr(lang, '이번 주', 'Week', '本周')} · ${weekRangeLabel}`}
               </div>
             </div>
@@ -2027,6 +2071,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               aria-label={
                 viewMode === 'daily'
                   ? tr(lang, '이전 날짜', 'Previous day', '前一天')
+                  : viewMode === 'monthly'
+                  ? tr(lang, '이전 달', 'Previous month', '上个月')
                   : tr(lang, '이전 주', 'Previous week', '上一周')
               }
             >
@@ -2051,6 +2097,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               aria-label={
                 viewMode === 'daily'
                   ? tr(lang, '다음 날짜', 'Next day', '后一天')
+                  : viewMode === 'monthly'
+                  ? tr(lang, '다음 달', 'Next month', '下个月')
                   : tr(lang, '다음 주', 'Next week', '下一周')
               }
             >
@@ -2059,7 +2107,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           </div>
         </div>
 
-        {/* Week strip (Mon–Sun) */}
+        {/* Week strip (Mon–Sun) — the monthly view has its own calendar */}
+        {viewMode !== 'monthly' && (
+        <>
         <div className="grid grid-cols-7 gap-1" role="group" aria-label={tr(lang, '이번 주', 'This week', '本周')}>
           {weekDays.map((wd) => {
             const mk = weekMarkers[wd.dateStr] || { makeup: false, changed: false, schedule: false };
@@ -2123,10 +2173,224 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             {tr(lang, '일정', 'Schedule', '日程')}
           </span>
         </div>
+        </>
+        )}
       </section>
 
-      {/* VIEW MODE 1: DAILY DETAILED VIEW */}
-      {viewMode === 'daily' ? (
+      {/* VIEW MODE 3: MONTHLY — school + academies for every day, tap a day to edit/add */}
+      {viewMode === 'monthly' ? (
+        <div className="space-y-4">
+          <section className="bg-surface rounded-2xl p-3 shadow-xs space-y-2">
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {(['월', '화', '수', '목', '금', '토', '일'] as const).map((d) => (
+                <span key={d} className={`text-[0.6875rem] font-bold ${weekendTint(d) || 'text-slate-600'}`}>
+                  {translateDay(d, lang)}
+                </span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {monthCells.map((cell) => {
+                const isSel = cell.dateStr === selectedDateStr;
+                const isToday = cell.dateStr === todayStr;
+                const academies = cell.academy.filter((a) => !a.isCancelled);
+                const shown = academies.slice(0, 2);
+                const more = academies.length - shown.length;
+                const hasMakeup = cell.academy.some((a) => a.isAdded);
+                return (
+                  <button
+                    key={cell.dateStr}
+                    type="button"
+                    onClick={() => setSelectedDate(cell.dateObj)}
+                    aria-pressed={isSel}
+                    aria-label={`${formatDateLabel(cell.dateStr, lang)} · ${tr(
+                      lang,
+                      `학교 ${cell.schoolActive}교시, 학원 ${academies.length}개`,
+                      `school ${cell.schoolActive} periods, ${academies.length} academy classes`,
+                      `学校 ${cell.schoolActive} 节，补习班 ${academies.length} 个`
+                    )}`}
+                    className={`min-h-[76px] rounded-xl p-1 flex flex-col items-stretch gap-0.5 text-left transition-colors min-w-0 ${
+                      isSel
+                        ? 'bg-paper ring-2 ring-accent-700'
+                        : isToday
+                        ? 'bg-paper ring-1 ring-accent'
+                        : cell.inMonth
+                        ? 'bg-paper/70 hover:bg-paper'
+                        : 'bg-paper/30 opacity-50'
+                    }`}
+                  >
+                    <span className="flex items-center justify-between gap-0.5">
+                      <span
+                        className={`font-mono text-[0.8125rem] leading-none tabular-nums ${
+                          isToday ? 'text-accent-700' : weekendTint(cell.dayLabel) || 'text-ink'
+                        }`}
+                      >
+                        {cell.dateObj.getDate()}
+                      </span>
+                      <span className="flex items-center gap-0.5" aria-hidden="true">
+                        {hasMakeup && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
+                        {cell.changed && <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />}
+                        {cell.schedules.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-other" />}
+                      </span>
+                    </span>
+                    {cell.schoolActive > 0 && (
+                      <span className="rounded-md bg-sage-100 text-sage-800 text-[0.5625rem] font-bold leading-tight px-1 py-px truncate">
+                        {tr(lang, `학교 ${cell.schoolActive}`, `Sch ${cell.schoolActive}`, `学校${cell.schoolActive}`)}
+                      </span>
+                    )}
+                    {shown.map((a) => (
+                      <span
+                        key={a.id}
+                        className={`rounded-md text-[0.5625rem] font-bold leading-tight px-1 py-px truncate ${
+                          a.isAdded ? 'bg-accent-700 text-paper' : 'bg-accent-100 text-accent-800'
+                        }`}
+                      >
+                        {translateSubject(a.subject, lang).replace(/\s*(학원|Academy|补习班)$/i, '') ||
+                          translateSubject(a.subject, lang)}
+                      </span>
+                    ))}
+                    {more > 0 && (
+                      <span className="text-[0.5625rem] font-bold text-slate-600 leading-tight px-1">+{more}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-center gap-3 text-[0.6875rem] font-semibold text-slate-600 flex-wrap pt-1">
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-sage-100 ring-1 ring-sage-300" />
+                {tr(lang, '학교 교시 수', 'School periods', '学校课节数')}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-accent-100 ring-1 ring-accent-300" />
+                {tr(lang, '학원', 'Academy', '补习班')}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-accent-700" />
+                {tr(lang, '보강/특강', 'Makeup', '补课/特讲')}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-other" />
+                {tr(lang, '일정', 'Schedule', '日程')}
+              </span>
+            </div>
+          </section>
+
+          {/* Selected day: tap a class to edit, or add a makeup / event */}
+          {selectedMonthCell && (
+            <section className="bg-surface rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {renderDateBlock(selectedMonthCell.dateStr, 'accent', 'sm')}
+                  <div className="min-w-0">
+                    <h2 className="text-[0.9375rem] font-bold text-ink truncate">
+                      {formatDateLabel(selectedMonthCell.dateStr, lang)}
+                    </h2>
+                    <p className="text-[0.6875rem] text-slate-600">
+                      {tr(lang, '수업을 누르면 이 날만 바꿀 수 있어요', 'Tap a class to change it for this day', '点击课程可仅修改当天')}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('daily')}
+                  className="h-8 px-3 rounded-full border border-divider bg-paper text-[0.75rem] font-bold text-ink hover:bg-slate-100 shrink-0"
+                >
+                  {tr(lang, '일별로 보기', 'Open day', '查看当天')}
+                </button>
+              </div>
+
+              {selectedMonthCell.school.length + selectedMonthCell.academy.length + selectedMonthCell.schedules.length === 0 ? (
+                <p className="px-4 py-3 rounded-2xl bg-paper text-[0.8125rem] text-slate-600">
+                  {tr(lang, '이 날은 수업과 일정이 없어요', 'Nothing on this day', '这一天没有课程和日程')}
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {[
+                    ...selectedMonthCell.school.map((p) => ({ sort: p.startTime, kind: 'school' as const, p })),
+                    ...selectedMonthCell.academy.map((a) => ({ sort: a.startTime, kind: 'academy' as const, a })),
+                    ...selectedMonthCell.schedules.map((sc) => ({ sort: sc.time || '99:99', kind: 'schedule' as const, sc })),
+                  ]
+                    .sort((x, y) => x.sort.localeCompare(y.sort))
+                    .map((row) => {
+                      if (row.kind === 'schedule') {
+                        return (
+                          <div key={`sc-${row.sc.id}`} className="flex items-center gap-2.5 rounded-xl bg-paper px-3 py-2">
+                            <span className="w-1 self-stretch rounded-full bg-other shrink-0" />
+                            <span className="font-mono text-[0.75rem] tabular-nums text-slate-700 w-[86px] shrink-0">
+                              {row.sc.time || tr(lang, '종일', 'All day', '全天')}
+                            </span>
+                            <span className="flex-1 min-w-0 text-[0.8125rem] font-bold text-ink truncate">
+                              {translateSampleText(row.sc.title, lang)}
+                            </span>
+                            <span className="text-[0.625rem] font-bold text-other-700 shrink-0">{tr(lang, '일정', 'Event', '日程')}</span>
+                          </div>
+                        );
+                      }
+                      const isSchool = row.kind === 'school';
+                      const item = isSchool ? row.p : row.a;
+                      const cancelled = item.isCancelled;
+                      const status = item.status && item.status !== 'cancelled' ? statusLabel(item.status, lang) : null;
+                      return (
+                        <button
+                          key={isSchool ? `p-${row.p.period}` : `a-${row.a.id}`}
+                          type="button"
+                          onClick={() =>
+                            isSchool
+                              ? openSchoolEdit(row.p, selectedMonthCell.dateStr)
+                              : openEditAcademyModal(row.a, selectedMonthCell.dateStr)
+                          }
+                          className="w-full flex items-center gap-2.5 rounded-xl bg-paper px-3 py-2 text-left hover:bg-slate-100"
+                        >
+                          <span className={`w-1 self-stretch rounded-full shrink-0 ${isSchool ? 'bg-sage' : 'bg-accent'}`} />
+                          <span className="font-mono text-[0.75rem] tabular-nums text-slate-700 w-[86px] shrink-0">
+                            {item.startTime}~{item.endTime}
+                          </span>
+                          <span className={`flex-1 min-w-0 text-[0.8125rem] font-bold text-ink truncate ${cancelled ? 'line-through opacity-60' : ''}`}>
+                            {isSchool
+                              ? `${tr(lang, `${row.p.period}교시`, `P${row.p.period}`, `第${row.p.period}节`)} · ${translateSubject(row.p.subject, lang)}`
+                              : translateSubject(row.a.subject, lang)}
+                          </span>
+                          {!isSchool && row.a.isAdded && (
+                            <span className="px-1.5 py-px rounded-full bg-accent-700 text-paper text-[0.625rem] font-bold shrink-0">
+                              {tr(lang, '보강', 'Makeup', '补课')}
+                            </span>
+                          )}
+                          {(cancelled || status) && (
+                            <span className="text-[0.625rem] font-bold text-slate-600 shrink-0">
+                              {cancelled ? tr(lang, '휴강', 'Off', '停课') : status}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => openAddAcademyModal('18:00', '20:00', 'button', selectedMonthCell.dateStr)}
+                  className="h-11 rounded-full bg-accent-700 text-paper text-[0.8125rem] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-800"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.75} />
+                  {tr(lang, '보강/특강', 'Makeup', '补课/特讲')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    openAddAcademyModal('18:00', '19:00', 'canvas', selectedMonthCell.dateStr);
+                    setAddKind('schedule');
+                  }}
+                  className="h-11 rounded-full border border-divider bg-paper text-ink text-[0.8125rem] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-slate-100"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.75} />
+                  {tr(lang, '일정', 'Event', '日程')}
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
+      ) : viewMode === 'daily' ? (
         <div className="space-y-4">
           {/* Day summary: spectrum + stat tiles + conflicts */}
           <section className="bg-surface rounded-2xl p-4 shadow-xs space-y-3.5">
