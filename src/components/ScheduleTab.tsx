@@ -32,6 +32,8 @@ import {
   getDayOfWeekKor,
 } from '../data/initialData';
 import { tr, translateDay, translateSampleText } from '../i18n/translations';
+import { findTimeConflicts, TimeConflict } from '../utils/timetableHelpers';
+import { ConflictDialog } from './ConflictDialog';
 
 interface ScheduleTabProps {
   language?: AppLanguage;
@@ -207,6 +209,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   language = 'ko',
   schedules,
   onUpdateSchedules,
+  masterTimetable,
+  dailyOverrides,
 }) => {
   const lang = language;
   const today = useMemo(() => new Date(), []);
@@ -219,6 +223,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   // Date popup (bottom sheet) state: the date it shows + shared add/edit form
   const [sheetDateStr, setSheetDateStr] = useState<string | null>(null);
+  // Save that lands on a class / another event: ask first
+  const [pendingConflict, setPendingConflict] = useState<{ conflicts: TimeConflict[]; proceed: () => void } | null>(null);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [formTitle, setFormTitle] = useState<string>('');
   const [formCategory, setFormCategory] = useState<ScheduleCategory>('school');
@@ -423,19 +429,39 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       memo: formMemo.trim(),
     };
 
-    onUpdateSchedules((prev) => {
-      if (editingItem) {
-        return prev.map((it) => (it.id === editingItem.id ? cleanItem : it));
-      }
-      return [...prev, cleanItem];
-    });
+    const save = () => {
+      onUpdateSchedules((prev) => {
+        if (editingItem) {
+          return prev.map((it) => (it.id === editingItem.id ? cleanItem : it));
+        }
+        return [...prev, cleanItem];
+      });
 
-    // Keep the popup open on the date the event now covers, ready for another entry
-    const nextSheetDate =
-      sheetDateStr && isDateWithinSchedule(sheetDateStr, cleanItem) ? sheetDateStr : formDate;
-    setSelectedDateStr(nextSheetDate);
-    setSheetDateStr(nextSheetDate);
-    resetFormForDate(nextSheetDate);
+      // Keep the popup open on the date the event now covers, ready for another entry
+      const nextSheetDate =
+        sheetDateStr && isDateWithinSchedule(sheetDateStr, cleanItem) ? sheetDateStr : formDate;
+      setSelectedDateStr(nextSheetDate);
+      setSheetDateStr(nextSheetDate);
+      resetFormForDate(nextSheetDate);
+    };
+
+    // Warn when the time lands on a class or another event (only if the time changed when editing).
+    const timeChanged = !editingItem || editingItem.time !== cleanItem.time || editingItem.date !== cleanItem.date;
+    if (cleanItem.time && timeChanged && masterTimetable && dailyOverrides) {
+      const conflicts = findTimeConflicts({
+        dateStr: cleanItem.date,
+        start: cleanItem.time,
+        masterTimetable,
+        dailyOverrides,
+        schedules,
+        ignoreScheduleId: editingItem?.id,
+      });
+      if (conflicts.length > 0) {
+        setPendingConflict({ conflicts, proceed: save });
+        return;
+      }
+    }
+    save();
   };
 
   const handleDeleteSchedule = (item: ScheduleItem) => {
@@ -1689,6 +1715,19 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {pendingConflict && (
+        <ConflictDialog
+          lang={lang}
+          conflicts={pendingConflict.conflicts}
+          onCancel={() => setPendingConflict(null)}
+          onConfirm={() => {
+            const go = pendingConflict.proceed;
+            setPendingConflict(null);
+            go();
+          }}
+        />
       )}
     </div>
   );

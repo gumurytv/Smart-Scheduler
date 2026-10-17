@@ -51,7 +51,10 @@ import {
   timeToMinutes,
   ResolvedSchoolPeriod,
   ResolvedAcademyItem,
+  findTimeConflicts,
+  TimeConflict,
 } from '../utils/timetableHelpers';
+import { ConflictDialog } from './ConflictDialog';
 import { tr, translateDay, translateSubject, translateSampleText } from '../i18n/translations';
 
 interface TimetableTabProps {
@@ -336,7 +339,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
   // Edit / add sheet targets (keyed by date so they work from the weekly view and the "Now" card too)
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
-  const [addTarget, setAddTarget] = useState<{ date: string } | null>(null);
+  // source 'button' = top 보강/특강 추가 button (academy only, any date); 'canvas' = empty time slot
+  const [addTarget, setAddTarget] = useState<{ date: string; source: 'button' | 'canvas' } | null>(null);
+  // Save that overlaps something: ask before going ahead
+  const [pendingConflict, setPendingConflict] = useState<{ conflicts: TimeConflict[]; proceed: () => void } | null>(null);
   const [addKind, setAddKind] = useState<'academy' | 'schedule'>('academy');
   const [tempStartTime, setTempStartTime] = useState<string>('17:00');
   const [tempEndTime, setTempEndTime] = useState<string>('19:00');
@@ -699,6 +705,52 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   const closeEditSheet = () => setEditTarget(null);
   const closeAddSheet = () => setAddTarget(null);
 
+  // 보강/특강 registered on any date (for the 보강/특강 추가 sheet): upcoming first, then the last two weeks.
+  const registeredMakeups = useMemo(() => {
+    const twoWeeksAgo = formatDateKey(addDays(new Date(), -14));
+    const rows: Array<{ date: string; item: AcademyOverrideItem }> = [];
+    Object.entries(dailyOverrides).forEach(([date, ov]) => {
+      if (date < twoWeeksAgo) return;
+      (ov.academy || []).forEach((item) => {
+        if (item.isAdded) rows.push({ date, item });
+      });
+    });
+    rows.sort((a, b) => (a.date + a.item.startTime).localeCompare(b.date + b.item.startTime));
+    return {
+      upcoming: rows.filter((r) => r.date >= todayStr),
+      past: rows.filter((r) => r.date < todayStr).reverse(),
+    };
+  }, [dailyOverrides, todayStr]);
+
+  const openRegisteredMakeup = (date: string, id: string) => {
+    const resolved = resolveDailyTimetable(date, masterTimetable, dailyOverrides).academy.find((a) => a.id === id);
+    if (!resolved) return;
+    setSelectedDate(parseDateKey(date));
+    openEditAcademyModal(resolved, date);
+  };
+
+  /** Run `proceed` now, or after the user confirms when start–end overlaps something on that date. */
+  const guardOverlap = (
+    dateStr: string,
+    start: string,
+    end: string | undefined,
+    proceed: () => void,
+    ignore: { academyId?: string; scheduleId?: string } = {}
+  ) => {
+    const conflicts = findTimeConflicts({
+      dateStr,
+      start,
+      end,
+      masterTimetable,
+      dailyOverrides,
+      schedules,
+      ignoreAcademyId: ignore.academyId,
+      ignoreScheduleId: ignore.scheduleId,
+    });
+    if (conflicts.length === 0) proceed();
+    else setPendingConflict({ conflicts, proceed });
+  };
+
   const openSchoolEdit = (item: ResolvedSchoolPeriod, dateStr: string = selectedDateStr) => {
     setAddTarget(null);
     setEditTarget({ kind: 'school', date: dateStr, period: item.period });
@@ -714,14 +766,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     setTempNote(item.note ?? '');
   };
 
-  const openAddAcademyModal = (defaultStart = '18:00', defaultEnd = '20:00') => {
+  const openAddAcademyModal = (
+    defaultStart = '18:00',
+    defaultEnd = '20:00',
+    source: 'button' | 'canvas' = 'canvas',
+    dateStr: string = selectedDateStr
+  ) => {
     const startMin = timeToMinutes(defaultStart);
     const rawEndMin = timeToMinutes(defaultEnd);
     const reasonableEndMin =
       rawEndMin - startMin > 120 ? Math.min(1440, startMin + 120) : rawEndMin;
 
     setEditTarget(null);
-    setAddTarget({ date: selectedDateStr });
+    setAddTarget({ date: dateStr, source });
     setAddKind('academy');
     setTempStartTime(defaultStart);
     setTempEndTime(minutesToTimeStr(reasonableEndMin));
@@ -955,10 +1012,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         isAdded: true,
       };
       const dateStr = addTarget.date;
-      onUpdateDailyOverrides((prev) =>
-        getUpdatedAcademyOverrides(prev, dateStr, (list) => [...list, newItem])
-      );
-      closeAddSheet();
+      guardOverlap(dateStr, tempStartTime, tempEndTime, () => {
+        onUpdateDailyOverrides((prev) =>
+          getUpdatedAcademyOverrides(prev, dateStr, (list) => [...list, newItem])
+        );
+        closeAddSheet();
+      });
       return;
     }
 
@@ -969,8 +1028,18 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       subject: chosenSubject,
     };
     if (editingAcademyItem.status === 'cancelled') patch.status = undefined;
-    upsertAcademyOverride(editDateStr, editingAcademyItem, patch);
-    closeEditSheet();
+    const item = editingAcademyItem;
+    const dateStr = editDateStr;
+    const save = () => {
+      upsertAcademyOverride(dateStr, item, patch);
+      closeEditSheet();
+    };
+    // Only ask about overlaps when the time actually moves.
+    if (tempStartTime !== item.startTime || tempEndTime !== item.endTime) {
+      guardOverlap(dateStr, tempStartTime, tempEndTime, save, { academyId: item.id });
+    } else {
+      save();
+    }
   };
 
   const handleSaveAcademyTimeOnly = () => {
@@ -1031,8 +1100,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       category: newScheduleCategory,
       memo: newScheduleMemo.trim(),
     };
-    onUpdateSchedules((prev) => [...prev, item]);
-    closeAddSheet();
+    const save = () => {
+      onUpdateSchedules((prev) => [...prev, item]);
+      closeAddSheet();
+    };
+    if (item.time) guardOverlap(item.date, item.time, undefined, save);
+    else save();
   };
 
   // ---- "Now" card data (always today) ----
@@ -1879,11 +1952,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           )}
           <button
             type="button"
-            onClick={() => openAddAcademyModal('18:00', '20:00')}
+            onClick={() => openAddAcademyModal('18:00', '20:00', 'button', todayStr)}
             className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.9375rem] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-800 shadow-xs"
           >
             <Plus className="w-4 h-4" strokeWidth={2.75} />
-            {tr(lang, '당일 보강/특강 추가', 'Add makeup / special class', '添加当天补课/特讲')}
+            {tr(lang, '보강/특강 추가', 'Add makeup / special class', '添加补课/特讲')}
           </button>
         </div>
       </section>
@@ -3110,7 +3183,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 {renderDateBlock(addTarget.date, 'accent')}
                 <div className="min-w-0">
                   <h3 className="text-[1rem] font-bold text-ink truncate">
-                    {tr(lang, '이 시간에 추가하기', 'Add at this time', '在此时间添加')}
+                    {addTarget.source === 'button'
+                      ? tr(lang, '보강/특강 추가', 'Add makeup / special class', '添加补课/特讲')
+                      : tr(lang, '이 시간에 추가하기', 'Add at this time', '在此时间添加')}
                   </h3>
                   <div className="text-[0.75rem] font-semibold text-slate-600 truncate">
                     {formatDateLabel(addTarget.date, lang)}
@@ -3127,7 +3202,23 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </button>
             </div>
 
-            {onUpdateSchedules && (
+            {addTarget.source === 'button' && (
+              <label className="block space-y-1.5">
+                <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
+                  <CalendarClock className="w-4 h-4 text-accent-700" />
+                  {tr(lang, '날짜', 'Date', '日期')}
+                </span>
+                <input
+                  type="date"
+                  value={addTarget.date}
+                  onChange={(e) => e.target.value && setAddTarget({ ...addTarget, date: e.target.value })}
+                  aria-label={tr(lang, '보강 날짜', 'Makeup date', '补课日期')}
+                  className="w-full h-11 px-4 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-accent"
+                />
+              </label>
+            )}
+
+            {onUpdateSchedules && addTarget.source !== 'button' && (
               <div className="grid grid-cols-2 p-1 rounded-full bg-surface" role="tablist">
                 {(
                   [
@@ -3155,7 +3246,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </div>
             )}
 
-            {addKind === 'academy' || !onUpdateSchedules ? (
+            {addKind === 'academy' || !onUpdateSchedules || addTarget.source === 'button' ? (
               <>
                 <div className="space-y-2">
                   <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
@@ -3216,6 +3307,67 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                     </div>
                   )}
                 </div>
+
+                {addTarget.source === 'button' && (
+                  <div className="space-y-2 pt-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-[0.8125rem] font-bold text-ink">
+                        {tr(lang, '등록된 보강/특강', 'Registered makeups', '已登记的补课/特讲')}
+                      </span>
+                      <span className="text-[0.6875rem] font-semibold text-slate-600">
+                        {tr(lang, '누르면 수정할 수 있어요', 'Tap to edit', '点击可修改')}
+                      </span>
+                    </span>
+                    {registeredMakeups.upcoming.length + registeredMakeups.past.length === 0 ? (
+                      <p className="px-4 py-3 rounded-2xl bg-surface text-[0.75rem] text-slate-600">
+                        {tr(lang, '아직 등록된 보강/특강이 없어요', 'No makeups registered yet', '还没有登记补课/特讲')}
+                      </p>
+                    ) : (
+                      [
+                        ...registeredMakeups.upcoming.map((r) => ({ ...r, past: false })),
+                        ...registeredMakeups.past.slice(0, 5).map((r) => ({ ...r, past: true })),
+                      ].map(({ date, item, past }) => (
+                        <button
+                          key={`${date}-${item.id}`}
+                          type="button"
+                          onClick={() => openRegisteredMakeup(date, item.id)}
+                          className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-slate-200 ${
+                            past ? 'bg-surface/60 opacity-70' : 'bg-surface'
+                          }`}
+                        >
+                          <span className="w-12 shrink-0 text-center">
+                            <span className="block font-mono text-[0.9375rem] leading-none tabular-nums text-accent-700">
+                              {Number(date.slice(8, 10))}
+                            </span>
+                            <span className="block text-[0.625rem] font-semibold text-slate-600 mt-0.5">
+                              {translateDay(getDayOfWeekKor(parseDateKey(date)), lang)}
+                              {` · ${Number(date.slice(5, 7))}${tr(lang, '월', '/', '月')}`}
+                            </span>
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span
+                              className={`block text-[0.875rem] font-bold text-ink truncate ${item.isCancelled ? 'line-through opacity-70' : ''}`}
+                            >
+                              {translateSubject(item.subject, lang)}
+                            </span>
+                            <span className="block font-mono text-[0.75rem] tabular-nums text-slate-600">
+                              {item.startTime}~{item.endTime}
+                            </span>
+                          </span>
+                          {past ? (
+                            <span className="text-[0.6875rem] font-bold text-slate-600 shrink-0">
+                              {tr(lang, '지난 보강', 'Past', '已过')}
+                            </span>
+                          ) : date === todayStr ? (
+                            <span className="px-2 py-0.5 rounded-full bg-accent-700 text-paper text-[0.6875rem] font-bold shrink-0">
+                              {tr(lang, '오늘', 'Today', '今天')}
+                            </span>
+                          ) : null}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <div className="space-y-3">
@@ -3286,6 +3438,19 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {pendingConflict && (
+        <ConflictDialog
+          lang={lang}
+          conflicts={pendingConflict.conflicts}
+          onCancel={() => setPendingConflict(null)}
+          onConfirm={() => {
+            const go = pendingConflict.proceed;
+            setPendingConflict(null);
+            go();
+          }}
+        />
       )}
     </div>
   );

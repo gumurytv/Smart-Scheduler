@@ -5,6 +5,7 @@ import {
   SchoolPeriod,
   AcademyOverrideItem,
   SlotStatus,
+  ScheduleItem,
 } from '../types';
 import { getDayOfWeekKor } from '../data/initialData';
 
@@ -227,4 +228,61 @@ export function resolveDailyTimetable(
   });
 
   return { dayOfWeek, school, academy };
+}
+
+// ===================== Time overlap check (보강·일정 등록 시 겹침 알림) =====================
+
+export interface TimeConflict {
+  kind: 'school' | 'academy' | 'schedule';
+  /** Untranslated subject / title; the caller localizes it. */
+  name: string;
+  period?: number;
+  startTime: string;
+  endTime?: string;
+}
+
+function scheduleOnDate(dateStr: string, item: ScheduleItem): boolean {
+  if (!item.endDate || item.endDate <= item.date) return item.date === dateStr;
+  return dateStr >= item.date && dateStr <= item.endDate;
+}
+
+/**
+ * What already takes place on `dateStr` during start–end (or at `start` when there's no end):
+ * school periods and academy classes that aren't cancelled, and events with a time.
+ */
+export function findTimeConflicts(opts: {
+  dateStr: string;
+  start: string;
+  end?: string;
+  masterTimetable: MasterTimetable;
+  dailyOverrides: DailyOverrides;
+  schedules?: ScheduleItem[];
+  ignoreAcademyId?: string;
+  ignoreScheduleId?: string;
+}): TimeConflict[] {
+  const s = timeToMinutes(opts.start);
+  const rawEnd = opts.end ? timeToMinutes(opts.end) : s;
+  const e = rawEnd > s ? rawEnd : s + 1;
+  const overlaps = (a: number, b: number) => s < b && a < e;
+  const day = resolveDailyTimetable(opts.dateStr, opts.masterTimetable, opts.dailyOverrides);
+  const out: TimeConflict[] = [];
+
+  day.school.forEach((p) => {
+    if (p.isCancelled || !p.subject.trim()) return;
+    if (overlaps(timeToMinutes(p.startTime), timeToMinutes(p.endTime))) {
+      out.push({ kind: 'school', name: p.subject, period: p.period, startTime: p.startTime, endTime: p.endTime });
+    }
+  });
+  day.academy.forEach((a) => {
+    if (a.isCancelled || a.id === opts.ignoreAcademyId) return;
+    if (overlaps(timeToMinutes(a.startTime), timeToMinutes(a.endTime))) {
+      out.push({ kind: 'academy', name: a.subject, startTime: a.startTime, endTime: a.endTime });
+    }
+  });
+  (opts.schedules || []).forEach((it) => {
+    if (!it.time || it.id === opts.ignoreScheduleId || !scheduleOnDate(opts.dateStr, it)) return;
+    const t = timeToMinutes(it.time);
+    if (overlaps(t, t + 1)) out.push({ kind: 'schedule', name: it.title, startTime: it.time });
+  });
+  return out.sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
