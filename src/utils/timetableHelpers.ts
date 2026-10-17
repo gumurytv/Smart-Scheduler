@@ -65,7 +65,11 @@ export function resolveDailyTimetable(
   const dayOverride = dailyOverrides[dateStr];
 
   // 1. Resolve raw School Periods
-  const rawSchool: Omit<ResolvedSchoolPeriod, 'isOverlapping'>[] = dayMaster.school.map((item) => {
+  // Periods with no subject (an empty timetable, e.g. a newly added child) aren't classes.
+  const rawSchool: Omit<ResolvedSchoolPeriod, 'isOverlapping'>[] = dayMaster.school.flatMap((item) => {
+    const ov = dayOverride?.school?.[item.period];
+    return (ov?.subject ?? item.subject).trim() ? [item] : [];
+  }).map((item) => {
     const ov = dayOverride?.school?.[item.period];
     if (!ov) {
       return {

@@ -6,6 +6,8 @@ import {
   StickyNote,
   Settings,
   WifiOff,
+  UserRound,
+  ChevronDown,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -26,6 +28,8 @@ import { MemoTab } from './components/MemoTab';
 import { SettingsTab } from './components/SettingsTab';
 import { syncWidgetData } from './utils/widgetSync';
 import { registerBackButton, keepRepainted } from './native/androidShell';
+import { ChildrenSheet, childFallbackName } from './components/ChildrenSheet';
+import { childName, listChildren } from './utils/children';
 
 const STORAGE_KEY = 'smart_school_academy_planner_v1';
 
@@ -67,6 +71,7 @@ export default function App() {
   // Settings section to open when arriving from another tab (e.g. "내 정보" from the 지금 card)
   const [settingsFocus, setSettingsFocus] = useState<'profile' | null>(null);
   const [state, setState] = useState<PlannerState>(() => loadInitialState());
+  const [isChildSheetOpen, setIsChildSheetOpen] = useState(false);
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
@@ -160,6 +165,13 @@ export default function App() {
     return acc + countInDay;
   }, 0);
 
+  const children = listChildren(state);
+  const multiChild = children.length > 1;
+  // Remount the tabs on a child switch so no sheet or selection carries over.
+  const childKey = state.children?.activeId || 'c1';
+  const activeIdx = Math.max(0, children.findIndex((c) => c.isActive));
+  const activeChildName = childName(children[activeIdx].data, activeIdx, childFallbackName(lang));
+
   const navTabs: Array<{
     id: TabKey;
     label: string;
@@ -203,10 +215,26 @@ export default function App() {
             <span className="text-[1.25rem] font-extrabold tracking-tight text-accent-700 shrink-0">
               {tr(lang, '틈틈', 'TeumTeum', 'TeumTeum')}
             </span>
-            <span className="text-[0.6875rem] font-semibold text-slate-600 truncate">
-              {tr(lang, '학교·학원 플래너', 'school & academy planner', '学校·补习班计划本')}
-            </span>
+            {!multiChild && (
+              <span className="text-[0.6875rem] font-semibold text-slate-600 truncate">
+                {tr(lang, '학교·학원 플래너', 'school & academy planner', '学校·补习班计划本')}
+              </span>
+            )}
           </h1>
+          {multiChild && (
+            <button
+              type="button"
+              onClick={() => setIsChildSheetOpen(true)}
+              aria-label={tr(lang, `자녀 선택 · 지금 ${activeChildName}`, `Choose child · now ${activeChildName}`, `选择孩子 · 当前 ${activeChildName}`)}
+              className="min-w-0 h-8 pl-1 pr-2 rounded-full bg-paper border border-divider inline-flex items-center gap-1 text-[0.75rem] font-bold text-ink hover:bg-slate-100"
+            >
+              <span className="w-6 h-6 rounded-full bg-accent-700 text-paper grid place-items-center shrink-0">
+                <UserRound className="w-3.5 h-3.5" />
+              </span>
+              <span className="truncate max-w-[5.5rem]">{activeChildName}</span>
+              <ChevronDown className="w-3.5 h-3.5 shrink-0 text-slate-600" />
+            </button>
+          )}
           {isOffline && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-100 text-accent-900 text-[0.625rem] font-bold shrink-0">
               <WifiOff className="w-3 h-3" />{' '}
@@ -240,6 +268,7 @@ export default function App() {
       <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-paper p-3.5 pb-6">
         {activeTab === 'timetable' && (
           <TimetableTab
+            key={childKey}
             language={lang}
             subjectPool={state.subjectPool}
             masterTimetable={state.masterTimetable}
@@ -262,6 +291,7 @@ export default function App() {
 
         {activeTab === 'schedule' && (
           <ScheduleTab
+            key={childKey}
             language={lang}
             schedules={state.schedules}
             onUpdateSchedules={handleUpdateSchedules}
@@ -272,6 +302,7 @@ export default function App() {
 
         {activeTab === 'attendance' && (
           <AttendanceTab
+            key={childKey}
             language={lang}
             attendance={state.attendance}
             masterTimetable={state.masterTimetable}
@@ -283,6 +314,7 @@ export default function App() {
 
         {activeTab === 'memo' && (
           <MemoTab
+            key={childKey}
             language={lang}
             memos={state.memos}
             onUpdateMemos={handleUpdateMemos}
@@ -295,9 +327,14 @@ export default function App() {
             onUpdateState={setState}
             focusSection={settingsFocus}
             onFocusHandled={() => setSettingsFocus(null)}
+            onOpenChildren={() => setIsChildSheetOpen(true)}
           />
         )}
       </main>
+
+      {isChildSheetOpen && (
+        <ChildrenSheet lang={lang} state={state} onUpdateState={setState} onClose={() => setIsChildSheetOpen(false)} />
+      )}
 
       {/* Bottom 5-Tab Navigation Bar (in flow, below the scroll area) */}
       <nav

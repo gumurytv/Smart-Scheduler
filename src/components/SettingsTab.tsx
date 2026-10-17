@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
+  Users,
   X,
   Copy,
   Camera,
@@ -64,6 +65,10 @@ import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { API_BASE_URL, isNativeApp } from '../native/androidShell';
 import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
 import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/appReset';
+import { ParsedBackup, parseBackup } from '../utils/backupImport';
+import { ImportSheet } from './ImportSheet';
+import { childFallbackName } from './ChildrenSheet';
+import { childName, listChildren } from '../utils/children';
 import { SUBJECT_COLORS, SUBJECT_COLOR_KEYS, SubjectColorKey, subjectColor } from '../utils/subjectColors';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
@@ -81,6 +86,8 @@ interface SettingsTabProps {
   onUpdateState: (updater: (prev: PlannerState) => PlannerState) => void;
   focusSection?: 'profile' | null;
   onFocusHandled?: () => void;
+  /** Opens the 자녀 선택 sheet (owned by App so the header can open it too). */
+  onOpenChildren?: () => void;
 }
 
 function minutesToTimeStr(total: number): string {
@@ -487,6 +494,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onUpdateState,
   focusSection,
   onFocusHandled,
+  onOpenChildren,
 }) => {
   const lang: AppLanguage = state.language || 'ko';
 
@@ -634,6 +642,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     message: string;
   } | null>(null);
   const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importDraft, setImportDraft] = useState<{ fileName: string; parsed: ParsedBackup } | null>(null);
 
   // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
@@ -1405,74 +1414,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result as string);
-
-        if (
-          !parsed ||
-          typeof parsed !== 'object' ||
-          !parsed.subjectPool ||
-          !Array.isArray(parsed.subjectPool.school) ||
-          !Array.isArray(parsed.subjectPool.academy) ||
-          !parsed.masterTimetable ||
-          !Array.isArray(parsed.schedules) ||
-          typeof parsed.attendance !== 'object' ||
-          typeof parsed.memos !== 'object'
-        ) {
-          throw new Error(
-            tr(
-              lang,
-              '유효한 틈틈 백업 JSON 파일 형식이 아닙니다.',
-              'Invalid TeumTeum backup JSON file format.',
-              '无效的 TeumTeum 备份 JSON 文件格式。'
-            )
-          );
-        }
-
-        const now = new Date();
-        const timestamp = `${formatDateKey(now)} ${String(now.getHours()).padStart(
-          2,
-          '0'
-        )}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-        onUpdateState((prev) => ({
-          language: parsed.language || prev.language || 'ko',
-          subjectPool: parsed.subjectPool,
-          masterTimetable: parsed.masterTimetable,
-          dailyOverrides: parsed.dailyOverrides || {},
-          schedules: parsed.schedules,
-          attendance: parsed.attendance,
-          memos: parsed.memos,
-          backupMeta: {
-            lastBackupDate: parsed.backupMeta?.lastBackupDate || timestamp,
-          },
-          timelineConfig: parsed.timelineConfig || {
-            startHour: 8,
-            endHour: 24,
-          },
-          schoolTimeConfig: parsed.schoolTimeConfig || prev.schoolTimeConfig,
-        }));
-
-        setBackupFeedback({
-          type: 'success',
-          message: tr(
-            lang,
-            '백업 파일 검증이 완료되어 모든 시간표·일정·출석·메모 데이터가 100% 복원되었습니다!',
-            'Backup verified! All timetable, schedule, attendance, and memo data restored 100%.',
-            '备份文件验证通过，所有课表、日程、出勤及备忘数据已 100% 恢复！'
-          ),
-        });
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : tr(lang, '파일을 읽는 중 오류가 발생했습니다.', 'Failed to read file.', '读取文件时出错。');
+      const parsed = parseBackup(String(reader.result ?? ''));
+      if (!parsed) {
         setBackupFeedback({
           type: 'error',
-          message: msg,
+          message: tr(
+            lang,
+            '틈틈 백업 파일이 아니에요. 「데이터 내보내기」로 만든 .json 파일을 골라 주세요.',
+            'Not a TeumTeum backup. Pick a .json file made with “Export Backup”.',
+            '这不是 TeumTeum 备份文件，请选择用「导出备份」生成的 .json 文件。'
+          ),
         });
+        return;
       }
+      setBackupFeedback(null);
+      setImportDraft({ fileName: file.name, parsed });
     };
+    reader.onerror = () =>
+      setBackupFeedback({
+        type: 'error',
+        message: tr(lang, '파일을 읽는 중 오류가 발생했습니다.', 'Failed to read file.', '读取文件时出错。'),
+      });
     reader.readAsText(file);
     e.target.value = '';
   };
@@ -1721,6 +1683,42 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             )}
           </p>
         </div>
+
+        {/* 자녀 선택: one planner per child */}
+        {(() => {
+          const kids = listChildren(state);
+          const names = kids.map((c, i) => childName(c.data, i, childFallbackName(lang)));
+          const active = Math.max(0, kids.findIndex((c) => c.isActive));
+          return (
+            <button
+              type="button"
+              onClick={onOpenChildren}
+              className="w-full rounded-2xl bg-paper px-3 py-2.5 flex items-center gap-3 text-left hover:bg-slate-100"
+            >
+              <span className="w-9 h-9 rounded-xl bg-accent-700 text-paper grid place-items-center shrink-0">
+                <Users strokeWidth={2.5} className="w-4 h-4" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[0.8125rem] font-bold text-ink">
+                  {tr(lang, '자녀 선택', 'Children', '选择孩子')}
+                  {kids.length > 1 && (
+                    <span className="ml-1.5 text-accent-700">
+                      {tr(lang, `지금 ${names[active]}`, `now ${names[active]}`, `当前 ${names[active]}`)}
+                    </span>
+                  )}
+                </span>
+                <span className="block text-[0.6875rem] text-slate-600 truncate">
+                  {kids.length > 1
+                    ? names.join(' · ')
+                    : tr(lang, '자녀가 여럿이면 자녀별로 따로 관리해요', 'Several children? Keep a planner for each', '有多个孩子时可分别管理')}
+                </span>
+              </span>
+              <span className="h-8 px-3 rounded-full border border-divider text-[0.6875rem] font-bold text-ink inline-flex items-center gap-1 shrink-0">
+                {kids.length > 1 ? tr(lang, '바꾸기', 'Switch', '切换') : <><Plus className="w-3.5 h-3.5" />{tr(lang, '추가', 'Add', '添加')}</>}
+              </span>
+            </button>
+          );
+        })()}
 
         {/* 앱 초기화: choose which parts to clear */}
         <button
@@ -3652,9 +3650,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
               {tr(
                 lang,
-                '휴대폰 교체나 브라우저 초기화에 대비해 플래너 전체를 JSON 파일로 보관하고 언제든 복원하세요.',
-                'Keep your whole planner as a JSON file and restore it anytime — handy when switching phones or clearing the browser.',
-                '将整个规划器保存为 JSON 文件，更换手机或重置浏览器后可随时恢复。'
+                '플래너 전체를 JSON 파일로 보관해요. 불러올 때는 원하는 항목만 골라 적용할 수 있고, 친구·가족이 보낸 파일도 쓸 수 있어요.',
+                'Keep the whole planner as a JSON file. When importing, pick just the parts you want — files from friends or family work too.',
+                '将整个规划器保存为 JSON 文件。导入时可只选择需要的内容，也可以使用朋友或家人发来的文件。'
               )}
             </p>
             <div className="px-3.5 py-2.5 rounded-xl bg-paper flex items-center justify-between gap-2">
@@ -3903,6 +3901,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </SettingsCard>
       </div>
+
+      {importDraft && (
+        <ImportSheet
+          lang={lang}
+          fileName={importDraft.fileName}
+          parsed={importDraft.parsed}
+          state={state}
+          onUpdateState={onUpdateState}
+          onClose={() => setImportDraft(null)}
+          onDone={(message) => {
+            setImportDraft(null);
+            setBackupFeedback({ type: 'success', message });
+          }}
+        />
+      )}
 
       {/* 앱 초기화 시트 */}
       {isResetSheetOpen && (() => {

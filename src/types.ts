@@ -180,6 +180,44 @@ export interface PlannerState {
   profile?: UserProfile;
   /** Settings → 과목 후보군 colours (subject name → colour key in utils/subjectColors). */
   subjectColors?: Record<string, string>;
+  /** 자녀 선택 (parents with several children). The active child's data lives in the fields above. */
+  children?: ChildrenState;
+  /** 보강 알림: phone notification before each makeup/special class. */
+  reminders?: ReminderConfig;
+}
+
+/** The part of the planner that belongs to one child; everything else (language, text size, widgets…) is shared. */
+export const CHILD_DATA_KEYS = [
+  'subjectPool',
+  'masterTimetable',
+  'dailyOverrides',
+  'schedules',
+  'attendance',
+  'memos',
+  'profile',
+  'schoolTimeConfig',
+  'subjectColors',
+] as const;
+export type ChildData = Pick<PlannerState, (typeof CHILD_DATA_KEYS)[number]>;
+
+export interface ChildEntry {
+  id: string;
+  /** Saved data of a child who isn't selected. The selected child's data is the top-level state. */
+  data?: ChildData;
+}
+
+export interface ChildrenState {
+  activeId: string;
+  list: ChildEntry[];
+}
+
+/** Minutes before the class; 1440 = the day before at the same time. */
+export const REMINDER_LEADS = [10, 30, 60, 120, 1440] as const;
+export type ReminderLead = (typeof REMINDER_LEADS)[number];
+
+export interface ReminderConfig {
+  enabled: boolean;
+  leadMinutes: ReminderLead;
 }
 
 export interface AIExtractedEntry {
