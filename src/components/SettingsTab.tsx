@@ -3689,11 +3689,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 '将整个规划器保存为 JSON 文件。导入时可只选择需要的内容，也可以使用朋友或家人发来的文件。'
               )}
             </p>
-            <div className="px-3.5 py-2.5 rounded-xl bg-paper flex items-center justify-between gap-2">
-              <span className="text-[0.75rem] font-semibold text-slate-600">
-                {tr(lang, '마지막 백업 일시', 'Last Backup Date', '上次备份时间')}
+            <div className="px-3.5 py-2.5 rounded-xl bg-paper flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+              <span className="text-[0.75rem] font-semibold text-slate-600 whitespace-nowrap">
+                {tr(lang, '마지막 백업', 'Last backup', '上次备份')}
               </span>
-              <span className="text-[0.8125rem] font-mono text-ink tabular-nums">
+              <span className="text-[0.8125rem] font-mono text-ink tabular-nums whitespace-nowrap">
                 {state.backupMeta.lastBackupDate ||
                   tr(lang, '백업 기록 없음', 'Never backed up', '暂无备份记录')}
               </span>
@@ -3724,22 +3724,23 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               className="hidden"
             />
 
-            <div className="grid grid-cols-2 gap-2.5">
+            {/* Stacked full-width buttons so the labels stay on one line at large text sizes */}
+            <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
                 onClick={handleExportBackupJson}
-                className="min-h-[40px] px-3 py-2 rounded-full bg-accent-700 text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-800"
+                className="min-h-[44px] px-4 py-2 rounded-full bg-accent-700 text-paper text-[0.8125rem] font-bold flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-accent-800"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-4 h-4 shrink-0" />
                 {tr(lang, '데이터 내보내기 (저장)', 'Export Backup (.json)', '导出备份文件')}
               </button>
 
               <button
                 type="button"
                 onClick={() => restoreFileInputRef.current?.click()}
-                className="min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100"
+                className="min-h-[44px] px-4 py-2 rounded-full bg-transparent text-ink border border-divider text-[0.8125rem] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-slate-100"
               >
-                <FileUp className="w-4 h-4" />
+                <FileUp className="w-4 h-4 shrink-0" />
                 {tr(lang, '데이터 불러오기 (복원)', 'Import Backup (.json)', '导入恢复数据')}
               </button>
             </div>
