@@ -18,8 +18,9 @@ android {
         applicationId "com.gumurytv.teumteum"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
-        versionName "1.2.1"
+        // The GitHub "Android release" workflow passes VERSION_CODE / VERSION_NAME; local builds use these values.
+        versionCode((System.getenv("VERSION_CODE") ?: "5").toInteger())
+        versionName(System.getenv("VERSION_NAME") ?: "1.2.1")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
