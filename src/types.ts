@@ -184,6 +184,41 @@ export interface PlannerState {
   children?: ChildrenState;
   /** 보강 알림: phone notification before each makeup/special class. */
   reminders?: ReminderConfig;
+  /** 시간표 화면 구성: order and visibility of the timetable tab's sections. */
+  timetableLayout?: TimetableLayout;
+}
+
+// 시간표 화면 구성 (Settings): sections are reordered within their group, and some can be hidden.
+export type TimetableBlockId = 'now' | 'main' | 'daySummary' | 'dayDetail' | 'weekSchool' | 'weekAcademy';
+export type TimetableBlockGroup = 'screen' | 'daily' | 'weekly';
+export const TIMETABLE_BLOCK_GROUPS: Record<TimetableBlockGroup, TimetableBlockId[]> = {
+  screen: ['now', 'main'],
+  daily: ['daySummary', 'dayDetail'],
+  weekly: ['weekSchool', 'weekAcademy'],
+};
+/** Sections that can't be hidden (the timetable itself and the day's classes). */
+export const TIMETABLE_FIXED_BLOCKS: TimetableBlockId[] = ['main', 'dayDetail'];
+
+export interface TimetableLayout {
+  /** Every block in display order; only the order within a group matters. */
+  order: TimetableBlockId[];
+  hidden: TimetableBlockId[];
+}
+
+export const DEFAULT_TIMETABLE_LAYOUT: TimetableLayout = {
+  order: ['now', 'main', 'daySummary', 'dayDetail', 'weekSchool', 'weekAcademy'],
+  hidden: [],
+};
+
+/** Position of a block within its group (0 = top). Unknown/missing blocks keep the default order. */
+export function timetableBlockRank(layout: TimetableLayout | undefined, id: TimetableBlockId): number {
+  const order = layout?.order ?? DEFAULT_TIMETABLE_LAYOUT.order;
+  const i = order.indexOf(id);
+  return i < 0 ? DEFAULT_TIMETABLE_LAYOUT.order.indexOf(id) : i;
+}
+
+export function isTimetableBlockShown(layout: TimetableLayout | undefined, id: TimetableBlockId): boolean {
+  return TIMETABLE_FIXED_BLOCKS.includes(id) || !(layout?.hidden ?? []).includes(id);
 }
 
 /** The part of the planner that belongs to one child; everything else (language, text size, widgets…) is shared. */

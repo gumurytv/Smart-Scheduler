@@ -205,9 +205,9 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
       {
         title: { ko: '시간표 설정', en: 'Timetable setup', zh: '课表设置' },
         desc: {
-          ko: '학교 수업 시간(자동 계산 또는 교시별 직접 입력·점심시간), 학교·학원 기본 시간표, 표시 범위를 정해요.',
-          en: 'Class times (auto or per period, with lunch), the weekly school and academy timetables, and the visible time range.',
-          zh: '设置上课时间（自动计算或逐节输入，含午休）、学校和补习班固定课表、显示时间范围。',
+          ko: '학교 수업 시간(자동 계산 또는 교시별 직접 입력·점심시간), 학교·학원 기본 시간표, 표시 범위를 정해요. 「시간표 화면 구성」에서 시간표 메뉴의 칸 순서를 바꾸거나 숨길 수 있어요.',
+          en: 'Class times (auto or per period, with lunch), the weekly school and academy timetables, and the visible time range. “Timetable layout” reorders or hides the timetable’s sections.',
+          zh: '设置上课时间（自动计算或逐节输入，含午休）、学校和补习班固定课表、显示时间范围。在「课表画面布局」中可调整或隐藏课表板块。',
         },
       },
       {

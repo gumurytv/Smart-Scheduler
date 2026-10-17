@@ -9,7 +9,7 @@ export interface ParsedBackup {
   /** One entry per child saved in the file (a single-child file has one). */
   children: { id: string; data: ChildData }[];
   /** Shared settings: language, text size, widgets, timeline range, reminders. */
-  app: Pick<PlannerState, 'language' | 'textScale' | 'widgetConfig' | 'timelineConfig' | 'reminders'>;
+  app: Pick<PlannerState, 'language' | 'textScale' | 'widgetConfig' | 'timelineConfig' | 'reminders' | 'timetableLayout'>;
 }
 
 function looksLikeChild(d: unknown): d is ChildData {
@@ -64,6 +64,7 @@ export function parseBackup(text: string): ParsedBackup | null {
       widgetConfig: parsed.widgetConfig,
       timelineConfig: parsed.timelineConfig,
       reminders: parsed.reminders,
+      timetableLayout: parsed.timetableLayout,
     },
   };
 }

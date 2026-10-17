@@ -39,6 +39,10 @@ import {
   AttendanceMap,
   SlotStatus,
   SchoolPeriodOverride,
+  TimetableLayout,
+  TimetableBlockId,
+  timetableBlockRank,
+  isTimetableBlockShown,
 } from '../types';
 import {
   formatDateKey,
@@ -76,6 +80,7 @@ interface TimetableTabProps {
   onEditProfile?: () => void;
   schoolTimeConfig?: SchoolTimeConfig;
   subjectColors?: Record<string, string>;
+  layout?: TimetableLayout;
 }
 
 const HOUR_HEIGHT_PX = 84;
@@ -321,6 +326,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   onEditProfile,
   schoolTimeConfig,
   subjectColors,
+  layout,
 }) => {
   const lang = language;
   const startHour = timelineConfig?.startHour ?? 8;
@@ -1730,10 +1736,16 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     isSelectedToday && nowMinutes >= timelineStartMin && nowMinutes <= timelineEndMin;
   const liveNowTopPx = ((nowMinutes - timelineStartMin) / 60) * HOUR_HEIGHT_PX;
 
+  // 시간표 화면 구성: CSS order places each section within its group; hidden ones aren't rendered.
+  const blockOrder = (id: TimetableBlockId) => ({ order: timetableBlockRank(layout, id) });
+  const shown = (id: TimetableBlockId) => isTimetableBlockShown(layout, id);
+
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* NOW CARD (hero): live clock + current / next item + today's makeup classes (always today) */}
+      {shown('now') && (
       <section
+        style={blockOrder('now')}
         aria-label={tr(lang, '지금', 'Now', '现在')}
         className="bg-ink text-paper rounded-[32px] p-5 shadow-md space-y-4"
       >
@@ -2053,7 +2065,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           </button>
         </div>
       </section>
+      )}
 
+      {/* The timetable itself (controls + the chosen view) moves as one block */}
+      <div className="flex flex-col gap-4" style={blockOrder('main')}>
       {/* CONTROLS: view segment + date row + week strip */}
       <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3.5">
         <div
@@ -2226,6 +2241,49 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           </span>
         </div>
         </>
+        )}
+
+        {/* 일별: timeline / list switch (kept with the controls so it stays above the day, whatever the order) */}
+        {viewMode === 'daily' && (
+        <div className="flex items-center gap-2">
+          <div
+            className="flex-1 grid grid-cols-2 p-1 rounded-full bg-paper"
+            role="tablist"
+            aria-label={tr(lang, '표시 방식', 'Display', '显示方式')}
+          >
+            {(
+              [
+                { key: 'timeline', icon: CalendarRange, label: tr(lang, '타임라인', 'Timeline', '时间轴') },
+                { key: 'list', icon: AlignJustify, label: tr(lang, '목록형', 'List', '列表') },
+              ] as const
+            ).map(({ key, icon: Icon, label }) => {
+              const active = dailySubMode === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setDailySubMode(key)}
+                  className={`h-8 rounded-full text-[0.75rem] font-bold inline-flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
+                    active ? 'bg-ink text-paper' : 'text-slate-700 hover:text-ink'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => openAddAcademyModal('18:00', '20:00')}
+            className="h-10 px-3.5 rounded-full border border-divider bg-paper text-accent-800 text-[0.75rem] font-bold inline-flex items-center gap-1 hover:bg-accent-100 whitespace-nowrap shrink-0"
+          >
+            <Plus className="w-4 h-4" strokeWidth={2.75} />
+            {tr(lang, '보강 추가', 'Makeup', '加补课')}
+          </button>
+        </div>
         )}
       </section>
 
@@ -2447,9 +2505,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           )}
         </div>
       ) : viewMode === 'daily' ? (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {/* Day summary: spectrum + stat tiles + conflicts */}
-          <section className="bg-surface rounded-2xl p-4 shadow-xs space-y-3.5">
+          {shown('daySummary') && (
+          <section className="bg-surface rounded-2xl p-4 shadow-xs space-y-3.5" style={blockOrder('daySummary')}>
             <div className="flex items-center justify-between gap-2">
               <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink min-w-0">
                 <Clock className="w-4 h-4 text-accent-700 shrink-0" strokeWidth={2.5} />
@@ -2584,50 +2643,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </div>
             )}
 
-            <div className="flex items-center gap-2">
-              <div
-                className="flex-1 grid grid-cols-2 p-1 rounded-full bg-paper"
-                role="tablist"
-                aria-label={tr(lang, '표시 방식', 'Display', '显示方式')}
-              >
-                {(
-                  [
-                    { key: 'timeline', icon: CalendarRange, label: tr(lang, '타임라인', 'Timeline', '时间轴') },
-                    { key: 'list', icon: AlignJustify, label: tr(lang, '목록형', 'List', '列表') },
-                  ] as const
-                ).map(({ key, icon: Icon, label }) => {
-                  const active = dailySubMode === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setDailySubMode(key)}
-                      className={`h-8 rounded-full text-[0.75rem] font-bold inline-flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
-                        active ? 'bg-ink text-paper' : 'text-slate-700 hover:text-ink'
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={() => openAddAcademyModal('18:00', '20:00')}
-                className="h-10 px-3.5 rounded-full border border-divider bg-paper text-accent-800 text-[0.75rem] font-bold inline-flex items-center gap-1 hover:bg-accent-100 whitespace-nowrap shrink-0"
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.75} />
-                {tr(lang, '보강 추가', 'Makeup', '加补课')}
-              </button>
-            </div>
           </section>
+          )}
 
           {dailySubMode === 'timeline' ? (
             /* VERTICAL TIMELINE VIEW */
-            <section className="bg-surface rounded-2xl shadow-xs overflow-hidden">
+            <section className="bg-surface rounded-2xl shadow-xs overflow-hidden" style={blockOrder('dayDetail')}>
               <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2 flex-wrap">
                 <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                   <CalendarRange className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
@@ -2865,7 +2886,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             </section>
           ) : (
             /* LIST VIEW */
-            <div className="space-y-4">
+            <div className="space-y-4" style={blockOrder('dayDetail')}>
               <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
@@ -3030,8 +3051,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         </div>
       ) : (
         /* VIEW MODE 2: WEEKLY OVERVIEW */
-        <div className="space-y-4">
-          <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+        <div className="flex flex-col gap-4">
+          {shown('weekSchool') && (
+          <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3" style={blockOrder('weekSchool')}>
             <div className="flex items-center justify-between gap-2">
               <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink min-w-0">
                 <GraduationCap className="w-4 h-4 text-sage-700 shrink-0" strokeWidth={2.5} />
@@ -3161,8 +3183,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </span>
             </div>
           </section>
+          )}
 
-          <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
+          {shown('weekAcademy') && (
+          <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3" style={blockOrder('weekAcademy')}>
             <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
               <Building2 className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
               {tr(lang, '학원 · 월~일', 'Academies · Mon–Sun', '补习班 · 周一至周日')}
@@ -3236,8 +3260,20 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               ))}
             </div>
           </section>
+          )}
+          {!shown('weekSchool') && !shown('weekAcademy') && (
+            <p className="rounded-2xl bg-surface p-4 text-center text-[0.8125rem] text-slate-600">
+              {tr(
+                lang,
+                '주간 보기의 칸을 모두 숨겼어요. 설정 → 시간표 화면 구성에서 다시 켤 수 있어요.',
+                'All weekly sections are hidden. Turn them back on in Settings → Timetable layout.',
+                '周视图的所有板块都已隐藏，可在 设置 → 课表画面布局 中重新开启。'
+              )}
+            </p>
+          )}
         </div>
       )}
+      </div>
 
       {/* SHEET 1: SCHOOL PERIOD EDIT */}
       {editingSchoolPeriod && (

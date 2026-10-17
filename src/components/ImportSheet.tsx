@@ -94,7 +94,7 @@ export const ImportSheet: React.FC<ImportSheetProps> = ({ lang, fileName, parsed
       icon: Settings2,
       tone: 'bg-ink',
       label: tr(lang, '앱 설정', 'App settings', '应用设置'),
-      detail: tr(lang, '언어·글자 크기·위젯·표시 범위·보강 알림', 'Language, text size, widgets, range, reminders', '语言、字体、小组件、显示范围、补课提醒'),
+      detail: tr(lang, '언어·글자 크기·위젯·화면 구성·보강 알림', 'Language, text size, widgets, layout, reminders', '语言、字体、小组件、画面布局、补课提醒'),
     },
   };
 
