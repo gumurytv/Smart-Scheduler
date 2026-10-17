@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">틈틈</string>
+    <string name="title_activity_main">틈틈</string>
+    <!-- Home-screen widgets -->
+    <string name="widget_now_name">TeumTeum · Now</string>
+    <string name="widget_now_description">Your current class, time left and what\'s next</string>
+    <string name="widget_weekly_school_name">TeumTeum · Weekly school</string>
+    <string name="widget_weekly_school_description">Mon–Fri subjects by period, today highlighted</string>
+    <string name="widget_weekly_academy_name">TeumTeum · Weekly academy</string>
+    <string name="widget_weekly_academy_description">Academy classes Mon–Sun with makeups and cancellations</string>
+    <string name="widget_timeline_name">TeumTeum · Today\'s timeline</string>
+    <string name="widget_timeline_description">Today\'s classes, events and free time in order</string>
+    <string name="widget_month_calendar_name">TeumTeum · Monthly calendar</string>
+    <string name="widget_month_calendar_description">This month\'s events as coloured dots</string>
+    <string name="widget_empty_title">TeumTeum</string>
+    <string name="widget_empty_subtitle">Open the app once to show your timetable</string>
+</resources>

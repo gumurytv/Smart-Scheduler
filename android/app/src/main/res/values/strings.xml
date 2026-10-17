@@ -2,6 +2,19 @@
 <resources>
     <string name="app_name">틈틈</string>
     <string name="title_activity_main">틈틈</string>
-    <string name="package_name">com.gumurytv.teumteum</string>
-    <string name="custom_url_scheme">com.gumurytv.teumteum</string>
+    <string name="package_name" translatable="false">com.gumurytv.teumteum</string>
+    <string name="custom_url_scheme" translatable="false">com.gumurytv.teumteum</string>
+    <!-- Home-screen widgets -->
+    <string name="widget_now_name">틈틈 · 지금</string>
+    <string name="widget_now_description">지금 수업과 남은 시간, 다음 수업을 보여줘요</string>
+    <string name="widget_weekly_school_name">틈틈 · 주간 학교 시간표</string>
+    <string name="widget_weekly_school_description">이번 주 월~금 교시별 과목, 오늘 강조</string>
+    <string name="widget_weekly_academy_name">틈틈 · 주간 학원 시간표</string>
+    <string name="widget_weekly_academy_description">월~일 학원 수업 시간과 보강·휴강</string>
+    <string name="widget_timeline_name">틈틈 · 오늘 타임라인</string>
+    <string name="widget_timeline_description">오늘의 학교·학원·일정과 빈 시간을 시간순으로</string>
+    <string name="widget_month_calendar_name">틈틈 · 월간 캘린더</string>
+    <string name="widget_month_calendar_description">이번 달 일정을 날짜별 색 점으로</string>
+    <string name="widget_empty_title">틈틈</string>
+    <string name="widget_empty_subtitle">앱을 한 번 열면 시간표가 표시돼요</string>
 </resources>

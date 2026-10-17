@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
+  Users,
+  ChevronRight,
+  Bell,
+  BellRing,
   X,
   Copy,
   Camera,
@@ -18,7 +22,6 @@ import {
   Globe,
   Type,
   BookOpen,
-  Sparkles,
   Check,
   Smartphone,
   Sun,
@@ -30,13 +33,15 @@ import {
   Tags,
   ScanLine,
   DatabaseBackup,
-  ShieldAlert,
   type LucideIcon,
   FlaskConical,
   Lock,
   IdCard,
   UserRound,
   PenLine,
+  CalendarDays,
+  StickyNote,
+  Eraser,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -53,19 +58,31 @@ import {
   HOME_WIDGET_IDS,
   HomeWidgetId,
   WidgetConfig,
+  WidgetFontScale,
   UserProfile,
   TextScale,
   TEXT_SCALES,
+  REMINDER_LEADS,
+  ReminderConfig,
+  ReminderLead,
 } from '../types';
-import { isAiTimetableEnabled, HOME_WIDGETS_AVAILABLE } from '../utils/featureFlags';
-import { API_BASE_URL } from '../native/androidShell';
+import { isAiTimetableEnabled } from '../utils/featureFlags';
+import { API_BASE_URL, isNativeApp } from '../native/androidShell';
+import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
+import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/appReset';
+import { ParsedBackup, parseBackup } from '../utils/backupImport';
+import { ImportSheet } from './ImportSheet';
+import { GuideSheet } from './GuideSheet';
+import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
+import { childFallbackName } from './ChildrenSheet';
+import { childName, listChildren } from '../utils/children';
+import { SUBJECT_COLORS, SUBJECT_COLOR_KEYS, SubjectColorKey, subjectColor } from '../utils/subjectColors';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
   translateDay,
   translateSubject,
   translateSampleText,
-  USER_GUIDE_TOPICS,
 } from '../i18n/translations';
 import { buildHomeWidgetsData, getWidgetConfig, syncWidgetData } from '../utils/widgetSync';
 import { HOME_WIDGET_META, HomeWidgetPreview } from './HomeWidgets';
@@ -73,9 +90,10 @@ import { HOME_WIDGET_META, HomeWidgetPreview } from './HomeWidgets';
 interface SettingsTabProps {
   state: PlannerState;
   onUpdateState: (updater: (prev: PlannerState) => PlannerState) => void;
-  onResetSampleData: () => void;
   focusSection?: 'profile' | null;
   onFocusHandled?: () => void;
+  /** Opens the 자녀 선택 sheet (owned by App so the header can open it too). */
+  onOpenChildren?: () => void;
 }
 
 function minutesToTimeStr(total: number): string {
@@ -190,8 +208,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'widgets' | 'guide';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'widgets', 'guide'];
+type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -271,37 +289,69 @@ interface SectionResetButtonProps {
   onConfirm: () => void;
   confirmText?: string;
   confirmLabel?: string;
+  /** Optional second action next to "restore defaults": empty the section completely. */
+  onClear?: () => void;
+  clearText?: string;
 }
 
-/** Per-section "restore defaults" row with an inline (in-page) confirmation step. */
-const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, onConfirm, confirmText, confirmLabel }) => {
-  const [confirming, setConfirming] = useState(false);
+/** Per-section "restore defaults" (and optional "clear all") row with an inline (in-page) confirmation step. */
+const SectionResetButton: React.FC<SectionResetButtonProps> = ({
+  lang,
+  label,
+  onConfirm,
+  confirmText,
+  confirmLabel,
+  onClear,
+  clearText,
+}) => {
+  const [confirming, setConfirming] = useState<'restore' | 'clear' | null>(null);
+  const isClear = confirming === 'clear';
   return (
     <div className="pt-3 border-t border-divider">
       {!confirming ? (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
-          {label}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirming('restore')}
+            className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors whitespace-nowrap"
+          >
+            <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
+            {label}
+          </button>
+          {onClear && (
+            <button
+              type="button"
+              onClick={() => setConfirming('clear')}
+              className="h-8 px-3 rounded-full border border-accent-800 text-accent-800 text-[0.6875rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-100 transition-colors whitespace-nowrap"
+            >
+              <Eraser className="w-3.5 h-3.5" strokeWidth={2.5} />
+              {tr(lang, '모든 설정값 지우기', 'Clear everything', '清除全部设置')}
+            </button>
+          )}
+        </div>
       ) : (
         <div role="alertdialog" className="flex flex-wrap items-center gap-2">
           <p className="flex-1 min-w-[180px] text-[0.6875rem] font-semibold text-accent-900 leading-snug">
-            {confirmText ??
-              tr(
-                lang,
-                '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
-                'Restore defaults? Only this section’s settings will change.',
-                '确定要恢复吗？只有本部分的设置会恢复为默认值。'
-              )}
+            {isClear
+              ? clearText ??
+                tr(
+                  lang,
+                  '정말 지울까요? 이 섹션의 내용이 모두 비워져요. 되돌릴 수 없어요.',
+                  'Clear everything? This section will be emptied. This cannot be undone.',
+                  '确定要清除吗？本部分内容将全部清空，无法撤销。'
+                )
+              : confirmText ??
+                tr(
+                  lang,
+                  '정말 되돌릴까요? 이 섹션의 설정만 기본값으로 바뀌어요.',
+                  'Restore defaults? Only this section’s settings will change.',
+                  '确定要恢复吗？只有本部分的设置会恢复为默认值。'
+                )}
           </p>
           <div className="flex gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => setConfirming(false)}
+              onClick={() => setConfirming(null)}
               className="h-8 px-3 rounded-full border border-divider text-ink text-[0.6875rem] font-semibold hover:bg-slate-100"
             >
               {tr(lang, '취소', 'Cancel', '取消')}
@@ -309,13 +359,14 @@ const SectionResetButton: React.FC<SectionResetButtonProps> = ({ lang, label, on
             <button
               type="button"
               onClick={() => {
-                setConfirming(false);
-                onConfirm();
+                setConfirming(null);
+                if (isClear) onClear?.();
+                else onConfirm();
               }}
               className="h-8 px-3 rounded-full bg-accent-800 text-paper text-[0.6875rem] font-bold inline-flex items-center gap-1 hover:bg-accent-900"
             >
-              <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />
-              {confirmLabel ?? tr(lang, '되돌리기', 'Restore', '恢复')}
+              {isClear ? <Eraser className="w-3.5 h-3.5" strokeWidth={2.5} /> : <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.5} />}
+              {isClear ? tr(lang, '지우기', 'Clear', '清除') : confirmLabel ?? tr(lang, '되돌리기', 'Restore', '恢复')}
             </button>
           </div>
         </div>
@@ -480,14 +531,13 @@ function createSampleTimetableImageBase64(lang: AppLanguage): string {
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   state,
   onUpdateState,
-  onResetSampleData,
   focusSection,
   onFocusHandled,
+  onOpenChildren,
 }) => {
   const lang: AppLanguage = state.language || 'ko';
 
-  // Selected interactive guide topic (default to first topic so user immediately sees step-by-step instructions)
-  const [selectedGuideId, setSelectedGuideId] = useState<string>(USER_GUIDE_TOPICS[0].id);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Accordion open state (all collapsed by default; remembered per device)
   const [openCards, setOpenCards] = useState<Partial<Record<SettingsCardId, boolean>>>(loadOpenCards);
@@ -580,7 +630,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   }, [focusSection]);
 
   // In-page confirmations (no window.confirm)
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [removePeriodConfirm, setRemovePeriodConfirm] = useState(false);
 
   // --- SECTION 1: SUBJECT POOL STATE ---
@@ -592,6 +641,23 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [copySourceDay, setCopySourceDay] = useState<DayOfWeek>('월');
   const [copyTargetDay, setCopyTargetDay] = useState<DayOfWeek>('화');
   const [masterFeedback, setMasterFeedback] = useState<string | null>(null);
+  // 과목 후보군: which subject's colour palette is open
+  const [colorPickFor, setColorPickFor] = useState<string | null>(null);
+  const setSubjectColor = (subject: string, key: SubjectColorKey | null) => {
+    onUpdateState((prev) => {
+      const next = { ...(prev.subjectColors || {}) };
+      if (key) next[subject] = key;
+      else delete next[subject];
+      return { ...prev, subjectColors: next };
+    });
+    setColorPickFor(null);
+  };
+
+  // --- 앱 초기화 (top card): pick what to clear ---
+  const [isResetSheetOpen, setIsResetSheetOpen] = useState(false);
+  const [resetParts, setResetParts] = useState<ResetPart[]>([]);
+  const [resetMode, setResetMode] = useState<ResetMode>('empty');
+  const [resetConfirming, setResetConfirming] = useState(false);
   // null = auto (show 토/일 columns only when a weekend day has school periods)
   const [showWeekendPref, setShowWeekendPref] = useState<boolean | null>(null);
   const [schoolSheet, setSchoolSheet] = useState<
@@ -614,10 +680,60 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     message: string;
   } | null>(null);
   const restoreFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importDraft, setImportDraft] = useState<{ fileName: string; parsed: ParsedBackup } | null>(null);
 
   // --- SECTION 5: HOME SCREEN WIDGETS (gallery) ---
-  const [widgetSyncToast, setWidgetSyncToast] = useState<string | null>(null);
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
+  const [reminderDenied, setReminderDenied] = useState(false);
+  const reminders = state.reminders ?? { enabled: false, leadMinutes: 60 as ReminderLead };
+  const setReminders = (patch: Partial<ReminderConfig>) =>
+    onUpdateState((prev) => ({ ...prev, reminders: { ...(prev.reminders ?? { enabled: false, leadMinutes: 60 }), ...patch } }));
+  const toggleReminders = async () => {
+    if (reminders.enabled) {
+      setReminders({ enabled: false });
+      return;
+    }
+    const ok = await requestReminderPermission();
+    setReminderDenied(!ok);
+    if (ok) setReminders({ enabled: true });
+  };
+  // Native app: how many of each widget are on the home screen, and the last "홈 화면에 추가" result
+  const [placedWidgets, setPlacedWidgets] = useState<Partial<Record<HomeWidgetId, number>>>({});
+  const [pinMessage, setPinMessage] = useState<{ id: HomeWidgetId; text: string } | null>(null);
+  const refreshPlacedWidgets = () => {
+    void getPlacedHomeWidgets().then(setPlacedWidgets);
+  };
+  useEffect(() => {
+    if (!isNativeApp) return;
+    refreshPlacedWidgets();
+    // The launcher's "add widget" prompt pauses the app; recount when it comes back.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshPlacedWidgets();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+  const placedTotal = Object.values(placedWidgets).reduce((a, n) => a + (n ?? 0), 0);
+  const handlePinWidget = async (id: HomeWidgetId) => {
+    syncWidgetData(state);
+    const requested = await pinHomeWidget(id);
+    setPinMessage({
+      id,
+      text: requested
+        ? tr(
+            lang,
+            '홈 화면에 추가할지 묻는 창이 뜨면 「추가」를 눌러 주세요.',
+            'When your phone asks, tap "Add" to place the widget.',
+            '手机询问时，请点击「添加」。'
+          )
+        : tr(
+            lang,
+            `홈 화면 빈 곳을 길게 누른 뒤 「위젯」에서 「틈틈」을 찾아 「${HOME_WIDGET_META[id].name(lang)}」을 추가해 주세요.`,
+            `Long-press an empty spot on your home screen, open "Widgets", find "TeumTeum" and add "${HOME_WIDGET_META[id].name(lang)}".`,
+            `长按主屏幕空白处，打开「小组件」，找到「TeumTeum」并添加「${HOME_WIDGET_META[id].name(lang)}」。`
+          ),
+    });
+  };
 
   // 위젯 선택 시트: Esc로 닫기 + 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
@@ -640,6 +756,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   }, []);
   const widgetConfig = getWidgetConfig(state);
   const widgetTheme = widgetConfig.theme;
+  const widgetFontScale: WidgetFontScale = widgetConfig.fontScale ?? 'md';
   const widgetPreviewData = buildHomeWidgetsData(state, widgetNow);
   const updateWidgetConfig = (patch: Partial<WidgetConfig>) => {
     onUpdateState((prev) => {
@@ -650,12 +767,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         ...prev,
         widgetConfig: { ...next, enabled: HOME_WIDGET_IDS.filter((id) => enabledSet.has(id)) },
       };
-    });
-  };
-  const toggleWidget = (id: HomeWidgetId) => {
-    const isOn = widgetConfig.enabled.includes(id);
-    updateWidgetConfig({
-      enabled: isOn ? widgetConfig.enabled.filter((x) => x !== id) : [...widgetConfig.enabled, id],
     });
   };
 
@@ -670,8 +781,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const timelineStartHour = state.timelineConfig?.startHour ?? 8;
   const timelineEndHour = state.timelineConfig?.endHour ?? 24;
 
-  const activeGuideTopic =
-    USER_GUIDE_TOPICS.find((g) => g.id === selectedGuideId) || USER_GUIDE_TOPICS[0];
 
   const textScale: TextScale = TEXT_SCALES.includes(state.textScale ?? 100) ? state.textScale ?? 100 : 100;
   const handleSetTextScale = (next: TextScale) => {
@@ -801,8 +910,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setNewSchoolSubject('');
     setNewAcademySubject('');
     showMasterToast(
-      tr(lang, '과목 후보군을 기본값으로 되돌렸어요', 'Subject pool restored to defaults', '候选科目库已恢复默认')
+      tr(lang, '과목/수업 설정을 기본값으로 되돌렸어요', 'Subjects restored to defaults', '科目/课程设置已恢复默认')
     );
+  };
+
+  // 모든 설정값 지우기: empty the section (school keeps its class times so the grid stays in place)
+  const handleClearSchoolSection = () => {
+    onUpdateState((prev) => resetPlannerParts(prev, ['school'], 'empty'));
+    setSchoolSheet(null);
+    setRemovePeriodConfirm(false);
+    showMasterToast(tr(lang, '학교 시간표의 과목을 모두 지웠어요', 'All school subjects cleared', '已清除全部学校科目'));
+  };
+
+  const handleClearAcademySection = () => {
+    onUpdateState((prev) => resetPlannerParts(prev, ['academy'], 'empty'));
+    showMasterToast(tr(lang, '학원 시간표를 모두 지웠어요', 'Academy timetable cleared', '已清除补习班课表'));
+  };
+
+  const handleClearSubjectPool = () => {
+    onUpdateState((prev) => ({ ...prev, subjectPool: { school: [], academy: [] }, subjectColors: undefined }));
+    setNewSchoolSubject('');
+    setNewAcademySubject('');
+    setColorPickFor(null);
+    showMasterToast(tr(lang, '과목/수업 목록을 모두 지웠어요', 'All subjects cleared', '已清除全部科目'));
   };
 
   const handleResetWidgets = () => {
@@ -1354,74 +1484,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result as string);
-
-        if (
-          !parsed ||
-          typeof parsed !== 'object' ||
-          !parsed.subjectPool ||
-          !Array.isArray(parsed.subjectPool.school) ||
-          !Array.isArray(parsed.subjectPool.academy) ||
-          !parsed.masterTimetable ||
-          !Array.isArray(parsed.schedules) ||
-          typeof parsed.attendance !== 'object' ||
-          typeof parsed.memos !== 'object'
-        ) {
-          throw new Error(
-            tr(
-              lang,
-              '유효한 틈틈 백업 JSON 파일 형식이 아닙니다.',
-              'Invalid TeumTeum backup JSON file format.',
-              '无效的 TeumTeum 备份 JSON 文件格式。'
-            )
-          );
-        }
-
-        const now = new Date();
-        const timestamp = `${formatDateKey(now)} ${String(now.getHours()).padStart(
-          2,
-          '0'
-        )}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-        onUpdateState((prev) => ({
-          language: parsed.language || prev.language || 'ko',
-          subjectPool: parsed.subjectPool,
-          masterTimetable: parsed.masterTimetable,
-          dailyOverrides: parsed.dailyOverrides || {},
-          schedules: parsed.schedules,
-          attendance: parsed.attendance,
-          memos: parsed.memos,
-          backupMeta: {
-            lastBackupDate: parsed.backupMeta?.lastBackupDate || timestamp,
-          },
-          timelineConfig: parsed.timelineConfig || {
-            startHour: 8,
-            endHour: 24,
-          },
-          schoolTimeConfig: parsed.schoolTimeConfig || prev.schoolTimeConfig,
-        }));
-
-        setBackupFeedback({
-          type: 'success',
-          message: tr(
-            lang,
-            '백업 파일 검증이 완료되어 모든 시간표·일정·출석·메모 데이터가 100% 복원되었습니다!',
-            'Backup verified! All timetable, schedule, attendance, and memo data restored 100%.',
-            '备份文件验证通过，所有课表、日程、出勤及备忘数据已 100% 恢复！'
-          ),
-        });
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : tr(lang, '파일을 읽는 중 오류가 발생했습니다.', 'Failed to read file.', '读取文件时出错。');
+      const parsed = parseBackup(String(reader.result ?? ''));
+      if (!parsed) {
         setBackupFeedback({
           type: 'error',
-          message: msg,
+          message: tr(
+            lang,
+            '틈틈 백업 파일이 아니에요. 「데이터 내보내기」로 만든 .json 파일을 골라 주세요.',
+            'Not a TeumTeum backup. Pick a .json file made with “Export Backup”.',
+            '这不是 TeumTeum 备份文件，请选择用「导出备份」生成的 .json 文件。'
+          ),
         });
+        return;
       }
+      setBackupFeedback(null);
+      setImportDraft({ fileName: file.name, parsed });
     };
+    reader.onerror = () =>
+      setBackupFeedback({
+        type: 'error',
+        message: tr(lang, '파일을 읽는 중 오류가 발생했습니다.', 'Failed to read file.', '读取文件时出错。'),
+      });
     reader.readAsText(file);
     e.target.value = '';
   };
@@ -1563,8 +1646,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               },
               {
                 key: 'widgets',
-                value: widgetConfig.enabled.length,
-                label: tr(lang, '위젯', 'Widgets', '小组件'),
+                value: isNativeApp ? placedTotal : HOME_WIDGET_IDS.length,
+                label: isNativeApp
+                  ? tr(lang, '홈 화면 위젯', 'On home', '主屏幕小组件')
+                  : tr(lang, '위젯 종류', 'Widgets', '小组件种类'),
                 tone: 'text-other-700',
                 card: 'widgets' as SettingsCardId,
               },
@@ -1668,6 +1753,75 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             )}
           </p>
         </div>
+
+        {/* 자녀 선택: one planner per child */}
+        {(() => {
+          const kids = listChildren(state);
+          const names = kids.map((c, i) => childName(c.data, i, childFallbackName(lang)));
+          const active = Math.max(0, kids.findIndex((c) => c.isActive));
+          return (
+            <button
+              type="button"
+              onClick={onOpenChildren}
+              className="w-full rounded-2xl bg-paper px-3 py-2.5 flex items-center gap-3 text-left hover:bg-slate-100"
+            >
+              <span className="w-9 h-9 rounded-xl bg-accent-700 text-paper grid place-items-center shrink-0">
+                <Users strokeWidth={2.5} className="w-4 h-4" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[0.8125rem] font-bold text-ink">
+                  {tr(lang, '자녀 선택', 'Children', '选择孩子')}
+                  {kids.length > 1 && (
+                    <span className="ml-1.5 text-accent-700">
+                      {tr(lang, `지금 ${names[active]}`, `now ${names[active]}`, `当前 ${names[active]}`)}
+                    </span>
+                  )}
+                </span>
+                <span className="block text-[0.6875rem] text-slate-600 truncate">
+                  {kids.length > 1
+                    ? names.join(' · ')
+                    : tr(lang, '자녀가 여럿이면 자녀별로 따로 관리해요', 'Several children? Keep a planner for each', '有多个孩子时可分别管理')}
+                </span>
+              </span>
+              <span className="h-8 px-3 rounded-full border border-divider text-[0.6875rem] font-bold text-ink inline-flex items-center gap-1 shrink-0">
+                {kids.length > 1 ? tr(lang, '바꾸기', 'Switch', '切换') : <><Plus className="w-3.5 h-3.5" />{tr(lang, '추가', 'Add', '添加')}</>}
+              </span>
+            </button>
+          );
+        })()}
+
+        {/* 사용 가이드: by bottom menu, or the setup order */}
+        <button
+          type="button"
+          onClick={() => setIsGuideOpen(true)}
+          className="w-full rounded-2xl bg-paper px-3 py-2.5 flex items-center gap-3 text-left hover:bg-slate-100"
+        >
+          <span className="w-9 h-9 rounded-xl bg-sage-700 text-paper grid place-items-center shrink-0">
+            <BookOpen strokeWidth={2.5} className="w-4 h-4" />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[0.8125rem] font-bold text-ink">{tr(lang, '사용 가이드', 'User guide', '使用指南')}</span>
+            <span className="block text-[0.6875rem] text-slate-600 truncate">
+              {tr(lang, '메뉴별 기능 · 처음 설정 순서', 'Features by menu · setup steps', '按菜单功能 · 初次设置步骤')}
+            </span>
+          </span>
+          <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
+        </button>
+
+        {/* 앱 초기화: choose which parts to clear */}
+        <button
+          type="button"
+          onClick={() => {
+            setResetParts([]);
+            setResetMode('empty');
+            setResetConfirming(false);
+            setIsResetSheetOpen(true);
+          }}
+          className="w-full h-10 rounded-full border-[1.5px] border-accent-800 text-accent-800 text-[0.75rem] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-100"
+        >
+          <Eraser strokeWidth={2.5} className="w-3.5 h-3.5" />
+          {tr(lang, '앱 초기화 · 항목 골라서 지우기', 'Reset app · choose what to clear', '重置应用 · 选择要清除的内容')}
+        </button>
       </section>
 
       {/* ===== 내 정보 (profile shown on the timetable's 지금 card) ===== */}
@@ -1944,6 +2098,250 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
 
             <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetTimelineRange} />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="pool"
+          open={!!openCards.pool}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={Tags}
+          title={tr(lang, '과목/수업 설정', 'Subjects & classes', '科目/课程设置')}
+          summary={tr(
+            lang,
+            `학교 ${state.subjectPool.school.length}개 · 학원 ${state.subjectPool.academy.length}개`,
+            `${state.subjectPool.school.length} school · ${state.subjectPool.academy.length} academy`,
+            `学校 ${state.subjectPool.school.length} 个 · 补习班 ${state.subjectPool.academy.length} 个`
+          )}
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
+              {tr(
+                lang,
+                '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요. 이름 앞 동그라미를 누르면 과목마다 색을 정할 수 있고, 시간표에 그 색으로 표시돼요.',
+                'Subjects and academies offered when editing timetables. Tap the circle before a name to give it a colour; timetables show it in that colour.',
+                '修改课表时作为快捷按钮显示的学校科目与补习班列表。点击名称前的圆点可为科目设置颜色，课表会以该颜色显示。'
+              )}
+            </p>
+            {/* School Subject Pool */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-sage-800">
+                  {tr(
+                    lang,
+                    `학교 과목 후보군 (${state.subjectPool.school.length}종)`,
+                    `School Subjects (${state.subjectPool.school.length})`,
+                    `学校候选科目 (${state.subjectPool.school.length}种)`
+                  )}
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {state.subjectPool.school.map((subj) => (
+                  <span
+                    key={subj}
+                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-semibold"
+                    style={
+                      subjectColor(state.subjectColors, subj)
+                        ? { backgroundColor: subjectColor(state.subjectColors, subj)!.bg, color: subjectColor(state.subjectColors, subj)!.fg }
+                        : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setColorPickFor(colorPickFor === subj ? null : subj)}
+                      aria-label={tr(lang, `${subj} 색상 고르기`, `Colour for ${translateSubject(subj, lang)}`, `为${translateSubject(subj, lang)}选择颜色`)}
+                      aria-expanded={colorPickFor === subj}
+                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === subj ? 'ring-2 ring-ink' : ''}`}
+                      style={{ backgroundColor: subjectColor(state.subjectColors, subj)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, subj) ? 'solid' : 'dashed' }}
+                    />
+                    {translateSubject(subj, lang)}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSchoolSubject(subj)}
+                      className="text-sage-600 hover:text-accent-800"
+                      aria-label={tr(
+                        lang,
+                        `${subj} 삭제`,
+                        `Delete ${translateSubject(subj, lang)}`,
+                        `删除${translateSubject(subj, lang)}`
+                      )}
+                    >
+                      <X className="w-3 h-3" strokeWidth={2.75} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              {colorPickFor && state.subjectPool.school.includes(colorPickFor) && (
+                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
+                  <div className="text-[0.6875rem] font-bold text-ink">
+                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUBJECT_COLOR_KEYS.map((key) => {
+                      const c = SUBJECT_COLORS[key];
+                      const active = state.subjectColors?.[colorPickFor] === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSubjectColor(colorPickFor, key)}
+                          aria-label={key}
+                          aria-pressed={active}
+                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
+                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
+                        >
+                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSubjectColor(colorPickFor, null)}
+                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
+                    >
+                      {tr(lang, '기본색', 'Default', '默认')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={handleAddSchoolSubject} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={tr(
+                    lang,
+                    '새 학교 과목 입력 (예: 제2외국어, 진로)',
+                    'Add new school subject (e.g. Physics, Spanish)',
+                    '输入新学校科目（如：物理、第二外语）'
+                  )}
+                  value={newSchoolSubject}
+                  onChange={(e) => setNewSchoolSubject(e.target.value)}
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="submit"
+                  className="h-9 px-3 rounded-full bg-sage-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-sage-800 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
+                </button>
+              </form>
+            </div>
+
+            {/* Academy Subject Pool */}
+            <div className="space-y-2.5 pt-3 border-t border-divider">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-accent-800">
+                  {tr(
+                    lang,
+                    `학원 후보군 (${state.subjectPool.academy.length}종)`,
+                    `Academies (${state.subjectPool.academy.length})`,
+                    `补习班候选库 (${state.subjectPool.academy.length}家)`
+                  )}
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {state.subjectPool.academy.map((acName) => (
+                  <span
+                    key={acName}
+                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-semibold"
+                    style={
+                      subjectColor(state.subjectColors, acName)
+                        ? { backgroundColor: subjectColor(state.subjectColors, acName)!.bg, color: subjectColor(state.subjectColors, acName)!.fg }
+                        : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setColorPickFor(colorPickFor === acName ? null : acName)}
+                      aria-label={tr(lang, `${acName} 색상 고르기`, `Colour for ${translateSubject(acName, lang)}`, `为${translateSubject(acName, lang)}选择颜色`)}
+                      aria-expanded={colorPickFor === acName}
+                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === acName ? 'ring-2 ring-ink' : ''}`}
+                      style={{ backgroundColor: subjectColor(state.subjectColors, acName)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, acName) ? 'solid' : 'dashed' }}
+                    />
+                    {translateSubject(acName, lang)}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAcademySubject(acName)}
+                      className="text-accent-600 hover:text-accent-900"
+                      aria-label={tr(
+                        lang,
+                        `${acName} 삭제`,
+                        `Delete ${translateSubject(acName, lang)}`,
+                        `删除${translateSubject(acName, lang)}`
+                      )}
+                    >
+                      <X className="w-3 h-3" strokeWidth={2.75} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              {colorPickFor && state.subjectPool.academy.includes(colorPickFor) && (
+                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
+                  <div className="text-[0.6875rem] font-bold text-ink">
+                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUBJECT_COLOR_KEYS.map((key) => {
+                      const c = SUBJECT_COLORS[key];
+                      const active = state.subjectColors?.[colorPickFor] === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSubjectColor(colorPickFor, key)}
+                          aria-label={key}
+                          aria-pressed={active}
+                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
+                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
+                        >
+                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSubjectColor(colorPickFor, null)}
+                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
+                    >
+                      {tr(lang, '기본색', 'Default', '默认')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={handleAddAcademySubject} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={tr(
+                    lang,
+                    '새 학원명 입력 (예: 피아노학원, 국어학원)',
+                    'Add new academy (e.g. Piano Academy)',
+                    '输入新补习班名称（如：钢琴班、语文班）'
+                  )}
+                  value={newAcademySubject}
+                  onChange={(e) => setNewAcademySubject(e.target.value)}
+                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
+                />
+                <button
+                  type="submit"
+                  className="h-9 px-3 rounded-full bg-accent-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-accent-800 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
+                </button>
+              </form>
+            </div>
+
+            <SectionResetButton
+              lang={lang}
+              label={sectionResetLabel}
+              onConfirm={handleResetSubjectPool}
+              onClear={handleClearSubjectPool}
+              clearText={tr(
+                lang,
+                '학교 과목과 학원 목록, 과목 색상을 모두 지워요. 시간표에 넣은 과목은 그대로예요.',
+                'Removes every school subject, academy and colour from the list. Timetables keep their subjects.',
+                '将清除所有学校科目、补习班和颜色。课表中已填的科目保留。'
+              )}
+            />
           </div>
         </SettingsCard>
 
@@ -2236,14 +2634,78 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </p>
                 </div>
               ) : (
-                <p className="text-[0.6875rem] text-slate-600 px-3 py-2 rounded-xl bg-paper">
-                  {tr(
-                    lang,
-                    '아래 표에서 왼쪽 교시 칸을 누르면 그 교시의 시작·종료 시간을 바꿀 수 있어요. 요일마다 다르게 정할 수도 있습니다.',
-                    'Tap a period label on the left of the table below to change its start/end time — for all days or a single day.',
-                    '点击下方表格左侧的节次即可修改该节的开始与结束时间，也可按星期分别设置。'
-                  )}
-                </p>
+                <div className="space-y-2.5">
+                  <p className="text-[0.6875rem] text-slate-600 px-3 py-2 rounded-xl bg-paper">
+                    {tr(
+                      lang,
+                      '아래 표에서 왼쪽 교시 칸을 누르면 그 교시의 시작·종료 시간을 바꿀 수 있어요. 요일마다 다르게 정할 수도 있습니다.',
+                      'Tap a period label on the left of the table below to change its start/end time — for all days or a single day.',
+                      '点击下方表格左侧的节次即可修改该节的开始与结束时间，也可按星期分别设置。'
+                    )}
+                  </p>
+
+                  {/* 점심시간 (custom mode): shown on the daily timetable of school days */}
+                  {(() => {
+                    const lunch = schoolTimeConfig.customLunch ?? { enabled: false, start: '12:30', end: '13:20' };
+                    const invalid = lunch.enabled && lunch.end <= lunch.start;
+                    const setLunch = (patch: Partial<typeof lunch>) =>
+                      updateSchoolTimeConfig({ customLunch: { ...lunch, ...patch } });
+                    return (
+                      <div className="rounded-2xl bg-paper p-3 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[0.8125rem] font-bold text-ink">🍱 {tr(lang, '점심시간', 'Lunch break', '午休时间')}</div>
+                            <div className="text-[0.6875rem] text-slate-600">
+                              {tr(
+                                lang,
+                                '학교 수업이 있는 날 시간표에 점심시간으로 표시돼요',
+                                'Shown on the timetable of school days',
+                                '在有课的日子里显示为午休时间'
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={lunch.enabled}
+                            onClick={() => setLunch({ enabled: !lunch.enabled })}
+                            className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${lunch.enabled ? 'bg-sage-700' : 'bg-slate-300'}`}
+                          >
+                            <span
+                              className={`block w-6 h-6 rounded-full bg-paper shadow-xs transition-transform ${
+                                lunch.enabled ? 'translate-x-5' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        {lunch.enabled && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={lunch.start}
+                              onChange={(e) => e.target.value && setLunch({ start: e.target.value })}
+                              aria-label={tr(lang, '점심 시작', 'Lunch starts', '午休开始')}
+                              className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-sage-500"
+                            />
+                            <span className="text-sm font-bold text-slate-500">–</span>
+                            <input
+                              type="time"
+                              value={lunch.end}
+                              onChange={(e) => e.target.value && setLunch({ end: e.target.value })}
+                              aria-label={tr(lang, '점심 끝', 'Lunch ends', '午休结束')}
+                              className="flex-1 min-w-0 h-10 px-3 rounded-full border border-divider bg-surface text-[0.875rem] font-mono text-ink outline-none focus:border-sage-500"
+                            />
+                          </div>
+                        )}
+                        {invalid && (
+                          <p className="text-[0.6875rem] font-semibold text-accent-800">
+                            {tr(lang, '끝나는 시간이 시작보다 늦어야 해요', 'End must be after start', '结束时间须晚于开始时间')}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
 
@@ -2364,9 +2826,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                       cell
                                         ? cell.subject === '자습'
                                           ? 'bg-slate-200 text-ink hover:bg-slate-300'
+                                          : subjectColor(state.subjectColors, cell.subject)
+                                          ? 'font-semibold hover:brightness-95'
                                           : 'bg-sage-100 text-sage-900 font-semibold hover:bg-sage-200'
                                         : 'text-slate-400 hover:bg-sage-100 hover:text-sage-700'
                                     }`}
+                                    style={(() => {
+                                      const c = cell && cell.subject !== '자습' ? subjectColor(state.subjectColors, cell.subject) : undefined;
+                                      return c ? { backgroundColor: c.bg, color: c.fg } : undefined;
+                                    })()}
                                     aria-label={tr(
                                       lang,
                                       `${d}요일 ${periodNum}교시`,
@@ -2497,7 +2965,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
             </div>
 
-            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSchoolSection} />
+            <SectionResetButton
+              lang={lang}
+              label={sectionResetLabel}
+              onConfirm={handleResetSchoolSection}
+              onClear={handleClearSchoolSection}
+              clearText={tr(
+                lang,
+                '모든 요일·교시의 과목과 날짜별 변경을 지워요. 수업 시간 설정은 남아요. 되돌릴 수 없어요.',
+                'Clears every subject and day-by-day change. Class times stay. This cannot be undone.',
+                '将清除所有科目和按日期的变更，上课时间保留。无法撤销。'
+              )}
+            />
           </div>
         </SettingsCard>
 
@@ -2627,150 +3106,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               )}
             </button>
 
-            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetAcademySection} />
-          </div>
-        </SettingsCard>
-
-        <SettingsCard
-          id="pool"
-          open={!!openCards.pool}
-          onToggle={toggleCard}
-          tone="neutral"
-          icon={Tags}
-          title={tr(lang, '과목 후보군', 'Subject Pool', '候选科目库')}
-          summary={tr(
-            lang,
-            `학교 ${state.subjectPool.school.length}개 · 학원 ${state.subjectPool.academy.length}개`,
-            `${state.subjectPool.school.length} school · ${state.subjectPool.academy.length} academy`,
-            `学校 ${state.subjectPool.school.length} 个 · 补习班 ${state.subjectPool.academy.length} 个`
-          )}
-        >
-          <div className="p-4 space-y-4">
-            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
-              {tr(
+            <SectionResetButton
+              lang={lang}
+              label={sectionResetLabel}
+              onConfirm={handleResetAcademySection}
+              onClear={handleClearAcademySection}
+              clearText={tr(
                 lang,
-                '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요.',
-                'School subjects and academies offered as quick-select buttons when editing timetables.',
-                '修改课表时作为快捷按钮显示的学校科目与补习班列表。'
+                '모든 학원 수업과 보강·휴강 기록을 지워요. 되돌릴 수 없어요.',
+                'Removes every academy class, makeup and cancellation. This cannot be undone.',
+                '将删除所有补习班课程及补课、停课记录。无法撤销。'
               )}
-            </p>
-            {/* School Subject Pool */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-sage-800">
-                  {tr(
-                    lang,
-                    `학교 과목 후보군 (${state.subjectPool.school.length}종)`,
-                    `School Subjects (${state.subjectPool.school.length})`,
-                    `学校候选科目 (${state.subjectPool.school.length}种)`
-                  )}
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {state.subjectPool.school.map((subj) => (
-                  <span
-                    key={subj}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-semibold"
-                  >
-                    {translateSubject(subj, lang)}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSchoolSubject(subj)}
-                      className="text-sage-600 hover:text-accent-800"
-                      aria-label={tr(
-                        lang,
-                        `${subj} 삭제`,
-                        `Delete ${translateSubject(subj, lang)}`,
-                        `删除${translateSubject(subj, lang)}`
-                      )}
-                    >
-                      <X className="w-3 h-3" strokeWidth={2.75} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <form onSubmit={handleAddSchoolSubject} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder={tr(
-                    lang,
-                    '새 학교 과목 입력 (예: 제2외국어, 진로)',
-                    'Add new school subject (e.g. Physics, Spanish)',
-                    '输入新学校科目（如：物理、第二外语）'
-                  )}
-                  value={newSchoolSubject}
-                  onChange={(e) => setNewSchoolSubject(e.target.value)}
-                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
-                />
-                <button
-                  type="submit"
-                  className="h-9 px-3 rounded-full bg-sage-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-sage-800 shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
-                </button>
-              </form>
-            </div>
-
-            {/* Academy Subject Pool */}
-            <div className="space-y-2.5 pt-3 border-t border-divider">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-accent-800">
-                  {tr(
-                    lang,
-                    `학원 후보군 (${state.subjectPool.academy.length}종)`,
-                    `Academies (${state.subjectPool.academy.length})`,
-                    `补习班候选库 (${state.subjectPool.academy.length}家)`
-                  )}
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {state.subjectPool.academy.map((acName) => (
-                  <span
-                    key={acName}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-semibold"
-                  >
-                    {translateSubject(acName, lang)}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAcademySubject(acName)}
-                      className="text-accent-600 hover:text-accent-900"
-                      aria-label={tr(
-                        lang,
-                        `${acName} 삭제`,
-                        `Delete ${translateSubject(acName, lang)}`,
-                        `删除${translateSubject(acName, lang)}`
-                      )}
-                    >
-                      <X className="w-3 h-3" strokeWidth={2.75} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <form onSubmit={handleAddAcademySubject} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder={tr(
-                    lang,
-                    '새 학원명 입력 (예: 피아노학원, 국어학원)',
-                    'Add new academy (e.g. Piano Academy)',
-                    '输入新补习班名称（如：钢琴班、语文班）'
-                  )}
-                  value={newAcademySubject}
-                  onChange={(e) => setNewAcademySubject(e.target.value)}
-                  className="flex-1 min-w-0 h-9 px-3 rounded-full border border-divider bg-paper text-xs font-medium text-ink placeholder:text-slate-600 focus:outline-none focus:border-accent"
-                />
-                <button
-                  type="submit"
-                  className="h-9 px-3 rounded-full bg-accent-700 text-paper text-xs font-bold inline-flex items-center gap-1 hover:bg-accent-800 shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" /> {tr(lang, '추가', 'Add', '添加')}
-                </button>
-              </form>
-            </div>
-
-            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetSubjectPool} />
+            />
           </div>
         </SettingsCard>
+
       </div>
 
       {/* School table editor bottom sheet */}
@@ -3422,16 +3772,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
               {tr(
                 lang,
-                '휴대폰 교체나 브라우저 초기화에 대비해 플래너 전체를 JSON 파일로 보관하고 언제든 복원하세요.',
-                'Keep your whole planner as a JSON file and restore it anytime — handy when switching phones or clearing the browser.',
-                '将整个规划器保存为 JSON 文件，更换手机或重置浏览器后可随时恢复。'
+                '플래너 전체를 JSON 파일로 보관해요. 불러올 때는 원하는 항목만 골라 적용할 수 있고, 친구·가족이 보낸 파일도 쓸 수 있어요.',
+                'Keep the whole planner as a JSON file. When importing, pick just the parts you want — files from friends or family work too.',
+                '将整个规划器保存为 JSON 文件。导入时可只选择需要的内容，也可以使用朋友或家人发来的文件。'
               )}
             </p>
-            <div className="px-3.5 py-2.5 rounded-xl bg-paper flex items-center justify-between gap-2">
-              <span className="text-[0.75rem] font-semibold text-slate-600">
-                {tr(lang, '마지막 백업 일시', 'Last Backup Date', '上次备份时间')}
+            <div className="px-3.5 py-2.5 rounded-xl bg-paper flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+              <span className="text-[0.75rem] font-semibold text-slate-600 whitespace-nowrap">
+                {tr(lang, '마지막 백업', 'Last backup', '上次备份')}
               </span>
-              <span className="text-[0.8125rem] font-mono text-ink tabular-nums">
+              <span className="text-[0.8125rem] font-mono text-ink tabular-nums whitespace-nowrap">
                 {state.backupMeta.lastBackupDate ||
                   tr(lang, '백업 기록 없음', 'Never backed up', '暂无备份记录')}
               </span>
@@ -3462,89 +3812,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               className="hidden"
             />
 
-            <div className="grid grid-cols-2 gap-2.5">
+            {/* Stacked full-width buttons so the labels stay on one line at large text sizes */}
+            <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
                 onClick={handleExportBackupJson}
-                className="min-h-[40px] px-3 py-2 rounded-full bg-accent-700 text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-800"
+                className="min-h-[44px] px-4 py-2 rounded-full bg-accent-700 text-paper text-[0.8125rem] font-bold flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-accent-800"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-4 h-4 shrink-0" />
                 {tr(lang, '데이터 내보내기 (저장)', 'Export Backup (.json)', '导出备份文件')}
               </button>
 
               <button
                 type="button"
                 onClick={() => restoreFileInputRef.current?.click()}
-                className="min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100"
+                className="min-h-[44px] px-4 py-2 rounded-full bg-transparent text-ink border border-divider text-[0.8125rem] font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-slate-100"
               >
-                <FileUp className="w-4 h-4" />
+                <FileUp className="w-4 h-4 shrink-0" />
                 {tr(lang, '데이터 불러오기 (복원)', 'Import Backup (.json)', '导入恢复数据')}
               </button>
             </div>
 
-            <div className="pt-4 border-t border-divider space-y-2">
-              <div className="flex items-center gap-1.5">
-                <ShieldAlert strokeWidth={2.5} className="w-3.5 h-3.5 text-accent-800" />
-                <span className="text-[0.75rem] font-bold text-accent-800">
-                  {tr(lang, '초기화', 'Danger zone', '重置')}
-                </span>
-              </div>
-              {!resetConfirmOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setResetConfirmOpen(true)}
-                  className="w-full h-10 rounded-full border-[1.5px] border-accent-800 bg-transparent text-accent-800 inline-flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-accent-100"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  {tr(
-                    lang,
-                    '초기 샘플 데이터로 전체 리셋',
-                    'Reset All to Initial Sample Data',
-                    '全部重置为初始示例数据'
-                  )}
-                </button>
-              ) : (
-                <div role="alert" className="rounded-xl bg-accent-100 border border-accent-300 p-3 space-y-2.5">
-                  <p className="text-[0.75rem] font-semibold text-accent-900 leading-snug">
-                    {tr(
-                      lang,
-                      '모든 시간표·일정·출석·메모가 샘플 데이터로 바뀌어요. 되돌릴 수 없으니 먼저 백업을 권장합니다.',
-                      'All timetables, schedules, attendance and memos will be replaced with sample data. This cannot be undone — back up first.',
-                      '所有课表、日程、出勤和备忘都将被示例数据替换，且无法撤销，建议先备份。'
-                    )}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setResetConfirmOpen(false)}
-                      className="flex-1 h-9 rounded-full border border-divider bg-paper text-ink text-xs font-semibold hover:bg-slate-100"
-                    >
-                      {tr(lang, '취소', 'Cancel', '取消')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onResetSampleData();
-                        setResetConfirmOpen(false);
-                        setBackupFeedback({
-                          type: 'success',
-                          message: tr(
-                            lang,
-                            '초기 샘플 데이터 상태로 초기화되었습니다.',
-                            'Reset to initial sample data.',
-                            '已重置为初始示例数据状态。'
-                          ),
-                        });
-                      }}
-                      className="flex-1 h-9 rounded-full bg-accent-800 text-paper text-xs font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-900"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      {tr(lang, '리셋하기', 'Reset', '确认重置')}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </SettingsCard>
       </div>
@@ -3554,6 +3842,115 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <GroupHeader label={tr(lang, '앱', 'App', '应用')} />
 
         <SettingsCard
+          id="reminders"
+          open={!!openCards.reminders}
+          onToggle={toggleCard}
+          tone="accent"
+          icon={BellRing}
+          title={tr(lang, '보강 알림', 'Makeup reminders', '补课提醒')}
+          summary={
+            reminders.enabled
+              ? tr(lang, `켜짐 · ${reminderLeadLabel(reminders.leadMinutes, lang)}`, `On · ${reminderLeadLabel(reminders.leadMinutes, lang)}`, `已开启 · ${reminderLeadLabel(reminders.leadMinutes, lang)}`)
+              : tr(lang, '꺼짐 · 보강·특강 전에 휴대폰 알림', 'Off · a phone alert before each makeup', '已关闭 · 补课前手机提醒')
+          }
+        >
+          <div className="p-3.5 space-y-3">
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-paper px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-[0.875rem] font-bold text-ink">{tr(lang, '보강·특강 알림 받기', 'Remind me of makeups', '接收补课提醒')}</div>
+                <div className="text-[0.6875rem] text-slate-600 leading-snug">
+                  {tr(
+                    lang,
+                    '시간표에 등록한 보강·특강 시작 전에 휴대폰으로 알려줘요',
+                    'A phone notification before each makeup/special class you add',
+                    '在已登记的补课/特讲开始前发送手机通知'
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={reminders.enabled}
+                aria-label={tr(lang, '보강 알림', 'Makeup reminders', '补课提醒')}
+                onClick={() => void toggleReminders()}
+                className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${reminders.enabled ? 'bg-accent-700' : 'bg-slate-300'}`}
+              >
+                <span className={`block w-6 h-6 rounded-full bg-paper shadow-xs transition-transform ${reminders.enabled ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+
+            {reminderDenied && (
+              <p role="alert" className="rounded-xl bg-accent-100 border border-accent-300 px-3 py-2 text-[0.75rem] font-semibold text-accent-900 leading-snug">
+                {tr(
+                  lang,
+                  '알림 권한이 꺼져 있어요. 휴대폰 설정 → 애플리케이션 → 틈틈 → 알림에서 허용한 뒤 다시 켜 주세요.',
+                  'Notifications are blocked. Allow them in phone Settings → Apps → TeumTeum → Notifications, then try again.',
+                  '通知权限已关闭。请在手机设置 → 应用 → TeumTeum → 通知中允许后再开启。'
+                )}
+              </p>
+            )}
+
+            <div className={`space-y-1.5 ${reminders.enabled ? '' : 'opacity-50 pointer-events-none'}`}>
+              <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '언제 알려줄까요?', 'When?', '何时提醒？')}</span>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={tr(lang, '알림 시간', 'Reminder time', '提醒时间')}>
+                {REMINDER_LEADS.map((lead) => (
+                  <button
+                    key={lead}
+                    type="button"
+                    role="radio"
+                    aria-checked={reminders.leadMinutes === lead}
+                    onClick={() => setReminders({ leadMinutes: lead })}
+                    className={`h-9 px-3.5 rounded-full text-[0.8125rem] font-bold ${
+                      reminders.leadMinutes === lead ? 'bg-accent-700 text-paper' : 'bg-paper text-ink hover:bg-slate-100'
+                    }`}
+                  >
+                    {reminderLeadLabel(lead, lang)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {reminders.enabled && (() => {
+              const next = planMakeupReminders(state).slice(0, 3);
+              return (
+                <div className="rounded-2xl bg-paper p-3 space-y-1.5">
+                  <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '다가오는 알림', 'Coming up', '即将提醒')}</span>
+                  {next.length === 0 ? (
+                    <p className="text-[0.75rem] text-slate-600">
+                      {tr(lang, '예정된 보강·특강이 없어요. 시간표에서 「보강/특강 추가」로 등록해 보세요.', 'No upcoming makeups. Add one with “Add makeup” on the timetable.', '暂无补课安排。可在课表中用「添加补课/特讲」登记。')}
+                    </p>
+                  ) : (
+                    next.map((r) => (
+                      <div key={r.id} className="flex items-start gap-2">
+                        <Bell className="w-3.5 h-3.5 text-accent-700 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <div className="text-[0.75rem] font-bold text-ink truncate">{r.title}</div>
+                          <div className="text-[0.6875rem] text-slate-600 truncate">
+                            {tr(lang, '알림', 'Alert', '提醒')} {formatDateKey(r.at).slice(5).replace('-', '/')}{' '}
+                            {String(r.at.getHours()).padStart(2, '0')}:{String(r.at.getMinutes()).padStart(2, '0')} · {r.body}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })()}
+
+            <p className="text-[0.6875rem] text-slate-600 leading-snug">
+              {isNativeApp
+                ? tr(
+                    lang,
+                    '보강을 추가·수정·취소하면 알림도 바로 바뀌어요. 자녀가 여럿이면 모든 자녀의 보강을 알려줘요. 배터리 절약 상태에서는 몇 분 늦게 올 수 있어요.',
+                    'Reminders update as soon as you add, change or cancel a makeup, for every child. Battery saving may delay them by a few minutes.',
+                    '新增、修改或取消补课后提醒会立即更新，所有孩子的补课都会提醒。省电模式下可能延迟几分钟。'
+                  )
+                : tr(lang, '알림은 안드로이드 앱에서 와요. 웹 미리보기에서는 설정만 저장돼요.', 'Reminders arrive in the Android app; the web preview only saves the setting.', '提醒仅在安卓应用中发送，网页预览只保存设置。')}
+            </p>
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
           id="widgets"
           open={!!openCards.widgets}
           onToggle={toggleCard}
@@ -3561,203 +3958,326 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           icon={Smartphone}
           title={tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
           summary={
-            !HOME_WIDGETS_AVAILABLE
+            !isNativeApp
               ? tr(
                   lang,
-                  `곧 지원 예정 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
-                  `Coming soon · ${HOME_WIDGET_IDS.length} previews`,
-                  `即将推出 · ${HOME_WIDGET_IDS.length} 种预览`
+                  `안드로이드 앱에서 사용 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
+                  `In the Android app · ${HOME_WIDGET_IDS.length} previews`,
+                  `安卓应用中可用 · ${HOME_WIDGET_IDS.length} 种预览`
                 )
-              : widgetConfig.enabled.length > 0
+              : placedTotal > 0
               ? tr(
                   lang,
-                  `위젯 ${widgetConfig.enabled.length}개 추가됨 · 총 ${HOME_WIDGET_IDS.length}종`,
-                  `${widgetConfig.enabled.length} of ${HOME_WIDGET_IDS.length} widgets added`,
-                  `已添加 ${widgetConfig.enabled.length} 个 · 共 ${HOME_WIDGET_IDS.length} 种`
+                  `홈 화면에 ${placedTotal}개 · 총 ${HOME_WIDGET_IDS.length}종`,
+                  `${placedTotal} on home screen · ${HOME_WIDGET_IDS.length} kinds`,
+                  `主屏幕上 ${placedTotal} 个 · 共 ${HOME_WIDGET_IDS.length} 种`
                 )
               : tr(
                   lang,
-                  `추가된 위젯 없음 · 총 ${HOME_WIDGET_IDS.length}종`,
-                  `No widgets yet · ${HOME_WIDGET_IDS.length} available`,
-                  `尚未添加 · 共 ${HOME_WIDGET_IDS.length} 种`
+                  `위젯 ${HOME_WIDGET_IDS.length}종 · 홈 화면에 추가해 보세요`,
+                  `${HOME_WIDGET_IDS.length} widgets · add one to your home screen`,
+                  `${HOME_WIDGET_IDS.length} 种小组件 · 添加到主屏幕吧`
                 )
           }
         >
           <div className="p-4 space-y-3">
-        {!HOME_WIDGETS_AVAILABLE && (
-          <p className="rounded-2xl bg-other-100 text-other-800 px-3.5 py-3 text-[0.75rem] font-semibold leading-snug">
-            {tr(
-              lang,
-              '홈 화면 위젯은 준비 중이에요. 다음 업데이트에서 휴대폰 홈 화면에 추가할 수 있어요. 지금은 어떤 모양인지 미리 볼 수 있어요.',
-              'Home-screen widgets are coming soon. You will be able to add them in a future update — for now you can preview them.',
-              '主屏幕小组件正在准备中，将在后续更新中支持添加。现在可以先预览样式。'
-            )}
-          </p>
-        )}
-        {HOME_WIDGETS_AVAILABLE && widgetConfig.enabled.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {widgetConfig.enabled.map((id) => (
-              <span
-                key={id}
-                className="inline-flex items-center gap-1 pl-3 pr-1 h-8 rounded-full bg-paper border border-divider text-xs font-semibold text-ink"
-              >
-                {HOME_WIDGET_META[id].name(lang)}
-                <button
-                  type="button"
-                  onClick={() => toggleWidget(id)}
-                  aria-label={tr(lang, `${HOME_WIDGET_META[id].name(lang)} 위젯 빼기`, `Remove ${HOME_WIDGET_META[id].name(lang)}`, `移除 ${HOME_WIDGET_META[id].name(lang)}`)}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-200"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setIsWidgetSheetOpen(true)}
-          className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
-        >
-          <Smartphone className="w-4 h-4" strokeWidth={2.75} />
-          {HOME_WIDGETS_AVAILABLE
-            ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
-            : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
-        </button>
-
-            {HOME_WIDGETS_AVAILABLE && (
-              <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
-            )}
-          </div>
-        </SettingsCard>
-
-        <SettingsCard
-          id="guide"
-          open={!!openCards.guide}
-          onToggle={toggleCard}
-          tone="neutral"
-          icon={BookOpen}
-          title={tr(lang, '사용 가이드', 'User Guide', '使用指南')}
-          summary={tr(
-            lang,
-            `핵심 기능 ${USER_GUIDE_TOPICS.length}가지 · 단계별 안내`,
-            `${USER_GUIDE_TOPICS.length} key features · step by step`,
-            `${USER_GUIDE_TOPICS.length} 项核心功能 · 分步说明`
-          )}
-        >
-          <div className="p-4 space-y-3">
-            {/* 6 Major Feature Selector Grid */}
-            <div className="grid grid-cols-3 gap-1.5">
-              {USER_GUIDE_TOPICS.map((topic, idx) => {
-                const isSelected = topic.id === selectedGuideId;
-                return (
-                  <button
-                    key={topic.id}
-                    type="button"
-                    onClick={() => setSelectedGuideId(topic.id)}
-                    className={`h-[34px] px-2 rounded-full text-center transition-colors flex items-center justify-center gap-1 min-w-0 ${
-                      isSelected
-                        ? 'bg-accent-700 text-paper'
-                        : 'bg-paper text-ink hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="min-w-0 flex items-baseline gap-1">
-                      <div
-                        className={`hidden sm:block text-[0.6875rem] font-mono ${
-                          isSelected ? 'text-accent-100' : 'text-accent-700'
-                        }`}
-                      >
-                        0{idx + 1}
-                      </div>
-                      <div className="text-xs font-semibold truncate">
-                        {tr(lang, topic.badge.ko, topic.badge.en, topic.badge.zh)}
-                      </div>
-                    </div>
-                    <ChevronDown
-                      className={`hidden ${
-                        isSelected ? 'text-paper -rotate-90' : 'text-slate-400'
-                      }`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Selected Feature Step-by-Step Walkthrough Card */}
-            <div className="p-3 rounded-xl bg-paper space-y-2.5">
-              <div className="space-y-1 border-b border-divider pb-2.5">
-                <span className="inline-block px-2 py-0.5 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-bold">
-                  {tr(
+            <p className="rounded-2xl bg-other-100 text-other-800 px-3.5 py-3 text-[0.75rem] font-semibold leading-snug">
+              {isNativeApp
+                ? tr(
                     lang,
-                    activeGuideTopic.badge.ko,
-                    activeGuideTopic.badge.en,
-                    activeGuideTopic.badge.zh
-                  )}
-                </span>
-                <h3 className="text-xs font-bold text-ink">
-                  {tr(
+                    '원하는 위젯을 홈 화면에 추가하세요. 위젯 테마(밝게/어둡게)와 글자 크기도 여기서 바꿀 수 있어요.',
+                    'Add the widgets you like to your home screen. You can also change their theme and text size here.',
+                    '把喜欢的小组件添加到主屏幕。也可以在这里更改主题和字体大小。'
+                  )
+                : tr(
                     lang,
-                    activeGuideTopic.title.ko,
-                    activeGuideTopic.title.en,
-                    activeGuideTopic.title.zh
+                    '홈 화면 위젯은 안드로이드 앱에서 쓸 수 있어요. 여기서는 모양을 미리 볼 수 있어요.',
+                    'Home-screen widgets work in the Android app. Here you can preview them.',
+                    '主屏幕小组件需在安卓应用中使用，这里可以先预览样式。'
                   )}
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {tr(
-                    lang,
-                    activeGuideTopic.summary.ko,
-                    activeGuideTopic.summary.en,
-                    activeGuideTopic.summary.zh
-                  )}
-                </p>
-              </div>
+            </p>
 
-              {/* Concrete Steps */}
-              <div className="space-y-1.5">
-                {activeGuideTopic.steps.map((st, sIdx) => (
-                  <div key={sIdx} className="flex items-start gap-2">
-                    <span className="flex-none w-[18px] h-[18px] mt-px rounded-full bg-accent-700 text-paper font-mono text-[0.6875rem] grid place-items-center">
-                      {sIdx + 1}
-                    </span>
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="text-xs font-bold text-ink">
-                        {tr(lang, st.stepTitle.ko, st.stepTitle.en, st.stepTitle.zh)}
-                      </div>
-                      <p className="text-xs text-slate-700 leading-[1.45] break-keep">
-                        {tr(lang, st.stepDesc.ko, st.stepDesc.en, st.stepDesc.zh)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <button
+              type="button"
+              onClick={() => {
+                setPinMessage(null);
+                refreshPlacedWidgets();
+                setIsWidgetSheetOpen(true);
+              }}
+              className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
+            >
+              <Smartphone className="w-4 h-4" strokeWidth={2.75} />
+              {isNativeApp
+                ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
+                : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
+            </button>
 
-              {/* Pro Tip Box */}
-              <div className="px-2.5 py-2 rounded bg-sage-100 flex items-start gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-sage-700 shrink-0 mt-0.5" />
-                <p className="text-[0.6875rem] font-medium text-sage-900 leading-relaxed">
-                  <strong className="font-bold mr-1">{tr(lang, '팁:', 'TIP:', '提示：')}</strong>
-                  {tr(
-                    lang,
-                    activeGuideTopic.tip.ko,
-                    activeGuideTopic.tip.en,
-                    activeGuideTopic.tip.zh
-                  )}
-                </p>
-              </div>
-            </div>
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
           </div>
         </SettingsCard>
       </div>
 
-      {/* 위젯 선택 시트 (전체 화면) */}
+      {importDraft && (
+        <ImportSheet
+          lang={lang}
+          fileName={importDraft.fileName}
+          parsed={importDraft.parsed}
+          state={state}
+          onUpdateState={onUpdateState}
+          onClose={() => setImportDraft(null)}
+          onDone={(message) => {
+            setImportDraft(null);
+            setBackupFeedback({ type: 'success', message });
+          }}
+        />
+      )}
+
+      {isGuideOpen && (
+        <GuideSheet
+          lang={lang}
+          onClose={() => setIsGuideOpen(false)}
+          onGo={(target) => {
+            setIsGuideOpen(false);
+            if (target === 'top') {
+              document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              openCardAndScroll(target);
+            }
+          }}
+        />
+      )}
+
+      {/* 앱 초기화 시트 */}
+      {isResetSheetOpen && (() => {
+        const filledSchool = DAYS_OF_WEEK.reduce(
+          (n, d) => n + (state.masterTimetable[d]?.school || []).filter((p) => p.subject.trim()).length,
+          0
+        );
+        const academyCount = DAYS_OF_WEEK.reduce((n, d) => n + (state.masterTimetable[d]?.academy || []).length, 0);
+        const memoCount = Object.values(state.memos).filter((m) => m.content.trim()).length;
+        const parts: Record<ResetPart, { icon: LucideIcon; tone: string; label: string; detail: string }> = {
+          school: {
+            icon: GraduationCap,
+            tone: 'bg-sage-700',
+            label: tr(lang, '학교 시간표', 'School timetable', '学校课表'),
+            detail: tr(lang, `과목 ${filledSchool}칸 · 날짜별 변경 포함`, `${filledSchool} periods · incl. daily changes`, `${filledSchool} 节 · 含每日变更`),
+          },
+          academy: {
+            icon: Building2,
+            tone: 'bg-accent-700',
+            label: tr(lang, '학원 시간표', 'Academy timetable', '补习班课表'),
+            detail: tr(lang, `수업 ${academyCount}개 · 보강·휴강 포함`, `${academyCount} classes · incl. makeups`, `${academyCount} 节课 · 含补课停课`),
+          },
+          schedules: {
+            icon: CalendarDays,
+            tone: 'bg-other-600',
+            label: tr(lang, '일정', 'Schedule', '日程'),
+            detail: tr(lang, `일정 ${state.schedules.length}개`, `${state.schedules.length} events`, `${state.schedules.length} 个日程`),
+          },
+          attendance: {
+            icon: CheckCircle2,
+            tone: 'bg-sage-600',
+            label: tr(lang, '출석 기록', 'Attendance', '出勤记录'),
+            detail: tr(
+              lang,
+              `${Object.keys(state.attendance).length}일 기록 · 보강 목록 포함`,
+              `${Object.keys(state.attendance).length} days · incl. makeups`,
+              `${Object.keys(state.attendance).length} 天记录 · 含补课`
+            ),
+          },
+          memos: {
+            icon: StickyNote,
+            tone: 'bg-accent-600',
+            label: tr(lang, '메모', 'Memos', '备忘录'),
+            detail: tr(lang, `메모 ${memoCount}개`, `${memoCount} memos`, `${memoCount} 条备忘`),
+          },
+          profile: {
+            icon: IdCard,
+            tone: 'bg-sage-800',
+            label: tr(lang, '내 정보', 'My profile', '我的信息'),
+            detail: profile.name.trim() || tr(lang, '이름·학교·학년', 'Name, school, grade', '姓名、学校、年级'),
+          },
+          settings: {
+            icon: Settings2,
+            tone: 'bg-slate-600',
+            label: tr(lang, '앱 설정', 'App settings', '应用设置'),
+            detail: tr(
+              lang,
+              '과목 후보·수업 시간·표시 범위·글자 크기·위젯 (언어는 유지)',
+              'Subjects, class times, range, text size, widgets (language kept)',
+              '候选科目、上课时间、显示范围、字体、小组件（保留语言）'
+            ),
+          },
+        };
+        const allOn = resetParts.length === RESET_PARTS.length;
+        const togglePart = (part: ResetPart) => {
+          setResetConfirming(false);
+          setResetParts((prev) => (prev.includes(part) ? prev.filter((x) => x !== part) : [...prev, part]));
+        };
+        const applyReset = () => {
+          onUpdateState((prev) => resetPlannerParts(prev, resetParts, resetMode));
+          if (resetParts.includes('profile')) setLastGradeChip(null);
+          setIsResetSheetOpen(false);
+          showMasterToast(
+            resetMode === 'sample'
+              ? tr(lang, `${resetParts.length}개 항목을 예시 데이터로 되돌렸어요`, `${resetParts.length} item(s) restored to sample data`, `已将 ${resetParts.length} 项恢复为示例数据`)
+              : tr(lang, `${resetParts.length}개 항목을 초기화했어요`, `${resetParts.length} item(s) cleared`, `已清除 ${resetParts.length} 项`)
+          );
+        };
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
+            onClick={() => setIsResetSheetOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={tr(lang, '앱 초기화', 'Reset app', '重置应用')}
+          >
+            <div
+              className="w-full max-w-md max-h-[92vh] bg-paper rounded-t-[28px] shadow-2xl flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 pt-2.5 pb-3 border-b border-divider space-y-2.5 shrink-0">
+                <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-[1rem] font-bold text-ink">{tr(lang, '앱 초기화', 'Reset app', '重置应用')}</h3>
+                    <p className="text-[0.6875rem] text-slate-600">
+                      {tr(lang, '지울 항목을 고르세요. 되돌릴 수 없어요.', 'Pick what to clear. This cannot be undone.', '请选择要清除的内容，无法撤销。')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsResetSheetOpen(false)}
+                    aria-label={tr(lang, '닫기', 'Close', '关闭')}
+                    className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink hover:bg-slate-200 shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetConfirming(false);
+                    setResetParts(allOn ? [] : [...RESET_PARTS]);
+                  }}
+                  className="h-8 px-3 rounded-full border border-divider bg-paper text-[0.75rem] font-bold text-ink inline-flex items-center gap-1.5 hover:bg-slate-100"
+                >
+                  <Check strokeWidth={3} className="w-3.5 h-3.5" />
+                  {allOn ? tr(lang, '모두 해제', 'Clear selection', '全部取消') : tr(lang, '모두 선택', 'Select all', '全选')}
+                </button>
+
+                {RESET_PARTS.map((part) => {
+                  const meta = parts[part];
+                  const Icon = meta.icon;
+                  const on = resetParts.includes(part);
+                  return (
+                    <button
+                      key={part}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      onClick={() => togglePart(part)}
+                      className={`w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
+                        on ? 'bg-accent-100 ring-2 ring-accent-600' : 'bg-surface hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 text-paper ${meta.tone}`}>
+                        <Icon strokeWidth={2.5} className="w-4 h-4" />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[0.875rem] font-bold text-ink">{meta.label}</span>
+                        <span className="block text-[0.6875rem] text-slate-600 truncate">{meta.detail}</span>
+                      </span>
+                      <span
+                        className={`w-6 h-6 rounded-lg grid place-items-center shrink-0 border-2 ${
+                          on ? 'bg-accent-700 border-accent-700 text-paper' : 'border-slate-400 bg-paper'
+                        }`}
+                      >
+                        {on && <Check strokeWidth={3.5} className="w-3.5 h-3.5" />}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                <div className="pt-2 space-y-1.5">
+                  <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '초기화 방식', 'How to reset', '重置方式')}</span>
+                  <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-surface" role="radiogroup">
+                    {(
+                      [
+                        ['empty', tr(lang, '빈 상태로', 'Empty', '清空'), tr(lang, '내용을 모두 지워요', 'Remove everything', '全部删除')],
+                        ['sample', tr(lang, '예시 데이터로', 'Sample data', '示例数据'), tr(lang, '처음 예시로 되돌려요', 'Back to the examples', '恢复为示例')],
+                      ] as Array<[ResetMode, string, string]>
+                    ).map(([mode, label, hint]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="radio"
+                        aria-checked={resetMode === mode}
+                        onClick={() => {
+                          setResetConfirming(false);
+                          setResetMode(mode);
+                        }}
+                        className={`rounded-xl px-2 py-2 text-center transition-colors ${
+                          resetMode === mode ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className="block text-[0.8125rem] font-bold">{label}</span>
+                        <span className={`block text-[0.625rem] ${resetMode === mode ? 'text-paper/80' : 'text-slate-600'}`}>{hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[0.6875rem] text-slate-600 leading-snug">
+                    {tr(
+                      lang,
+                      '지우기 전에 「데이터 → 백업 · 복원」에서 내보내 두면 나중에 되살릴 수 있어요.',
+                      'Export a backup first (Data → Backup & Restore) if you may want it back.',
+                      '清除前可在「数据 → 备份与恢复」中导出，以便日后恢复。'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-4 pt-3 pb-5 border-t border-divider shrink-0 space-y-2">
+                {resetConfirming && (
+                  <p role="alert" className="rounded-xl bg-accent-100 border border-accent-300 px-3 py-2 text-[0.75rem] font-semibold text-accent-900 leading-snug">
+                    {tr(
+                      lang,
+                      `선택한 ${resetParts.length}개 항목을 정말 ${resetMode === 'sample' ? '예시 데이터로 되돌릴까요' : '지울까요'}? 되돌릴 수 없어요.`,
+                      `Really ${resetMode === 'sample' ? 'restore sample data for' : 'clear'} ${resetParts.length} item(s)? This cannot be undone.`,
+                      `确定要${resetMode === 'sample' ? '将所选 ' + resetParts.length + ' 项恢复为示例数据' : '清除所选 ' + resetParts.length + ' 项'}吗？无法撤销。`
+                    )}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={resetParts.length === 0}
+                  onClick={() => (resetConfirming ? applyReset() : setResetConfirming(true))}
+                  className="w-full h-12 rounded-full bg-accent-800 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-900 disabled:opacity-40"
+                >
+                  <RotateCcw strokeWidth={2.5} className="w-4 h-4" />
+                  {resetParts.length === 0
+                    ? tr(lang, '초기화할 항목을 고르세요', 'Pick something to reset', '请选择要重置的内容')
+                    : resetConfirming
+                    ? tr(lang, '네, 초기화할게요', 'Yes, reset', '确认重置')
+                    : tr(lang, `선택한 ${resetParts.length}개 초기화`, `Reset ${resetParts.length} item(s)`, `重置所选 ${resetParts.length} 项`)}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 위젯 시트: 테마·글자 크기 + 위젯별 미리보기와 "홈 화면에 추가" */}
       {isWidgetSheetOpen && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
           onClick={() => setIsWidgetSheetOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label={tr(lang, '홈 화면 위젯 고르기', 'Choose home screen widgets', '选择主屏幕小组件')}
+          aria-label={tr(lang, '홈 화면 위젯', 'Home screen widgets', '主屏幕小组件')}
         >
           <div
             className="w-full max-w-md max-h-[92vh] bg-paper rounded-t-[28px] shadow-2xl flex flex-col"
@@ -3768,19 +4288,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="text-[1rem] font-bold text-ink">
-                    {HOME_WIDGETS_AVAILABLE
-                      ? tr(lang, '홈 화면 위젯 고르기', 'Choose widgets', '选择小组件')
-                      : tr(lang, '홈 화면 위젯 미리보기', 'Widget preview', '小组件预览')}
+                    {tr(lang, '홈 화면 위젯', 'Home screen widgets', '主屏幕小组件')}
                   </h3>
                   <p className="text-[0.6875rem] text-slate-600">
-                    {!HOME_WIDGETS_AVAILABLE
-                      ? tr(lang, '곧 지원 예정이에요 · 모양을 미리 볼 수 있어요', 'Coming soon · preview how they look', '即将推出 · 可先预览样式')
-                      : tr(
-                      lang,
-                      `원하는 위젯의 "홈 화면에 추가"를 누르세요 · ${widgetConfig.enabled.length}개 추가됨`,
-                      `Tap "Add to Home" on the widgets you want · ${widgetConfig.enabled.length} added`,
-                      `点击想要的小组件的"添加到主屏幕" · 已添加 ${widgetConfig.enabled.length} 个`
-                    )}
+                    {isNativeApp
+                      ? tr(
+                          lang,
+                          '테마와 글자 크기는 모든 위젯에 함께 적용돼요',
+                          'Theme and text size apply to every widget',
+                          '主题和字体大小会应用到所有小组件'
+                        )
+                      : tr(lang, '안드로이드 앱에서 추가할 수 있어요', 'Add them in the Android app', '可在安卓应用中添加')}
                   </p>
                 </div>
                 <button
@@ -3792,135 +4310,127 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* 위젯 테마 */}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
                 </span>
-              {/* 위젯 테마 전환 버튼 (밝은 테마 / 어두운 테마) — widgetConfig.theme */}
-              <div
-                className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
-                role="group"
-                aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
-              >
-                {(['light', 'dark'] as const).map((th) => (
-                  <button
-                    key={th}
-                    type="button"
-                    aria-pressed={widgetTheme === th}
-                    onClick={() => updateWidgetConfig({ theme: th })}
-                    className={`h-[30px] px-2.5 text-[0.6875rem] font-semibold flex items-center gap-1 transition-colors ${
-                      widgetTheme === th ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
-                    }`}
-                  >
-                    {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
-                    {th === 'light'
-                      ? tr(lang, '밝은 테마', 'Light', '浅色')
-                      : tr(lang, '어두운 테마', 'Dark', '深色')}
-                  </button>
-                ))}
+                <div
+                  className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+                  role="group"
+                  aria-label={tr(lang, '위젯 테마', 'Widget theme', '小组件主题')}
+                >
+                  {(['light', 'dark'] as const).map((th) => (
+                    <button
+                      key={th}
+                      type="button"
+                      aria-pressed={widgetTheme === th}
+                      onClick={() => updateWidgetConfig({ theme: th })}
+                      className={`h-[30px] px-2.5 text-[0.6875rem] font-semibold flex items-center gap-1 transition-colors ${
+                        widgetTheme === th ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                      }`}
+                    >
+                      {th === 'light' ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+                      {th === 'light' ? tr(lang, '밝은 테마', 'Light', '浅色') : tr(lang, '어두운 테마', 'Dark', '深色')}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* 위젯 글자 크기 */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
+                  {tr(lang, '위젯 글자 크기', 'Widget text size', '小组件字体大小')}
+                </span>
+                <div
+                  className="inline-flex rounded-full border border-divider overflow-hidden shrink-0"
+                  role="radiogroup"
+                  aria-label={tr(lang, '위젯 글자 크기', 'Widget text size', '小组件字体大小')}
+                >
+                  {(
+                    [
+                      ['sm', tr(lang, '작게', 'S', '小')],
+                      ['md', tr(lang, '보통', 'M', '中')],
+                      ['lg', tr(lang, '크게', 'L', '大')],
+                      ['xl', tr(lang, '아주 크게', 'XL', '特大')],
+                    ] as Array<[WidgetFontScale, string]>
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={widgetFontScale === key}
+                      onClick={() => updateWidgetConfig({ fontScale: key })}
+                      className={`h-[30px] px-2.5 text-[0.6875rem] font-semibold whitespace-nowrap transition-colors ${
+                        widgetFontScale === key ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-              {/* 위젯 갤러리 */}
-              <div className="space-y-3">
-                {HOME_WIDGET_IDS.map((id) => {
-                  const meta = HOME_WIDGET_META[id];
-                  const isOn = HOME_WIDGETS_AVAILABLE && widgetConfig.enabled.includes(id);
-                  return (
-                    <div
-                      key={id}
-                      className={`rounded-2xl p-3 space-y-3 transition-colors ${
-                        isOn ? 'bg-paper ring-2 ring-accent' : 'bg-paper/60'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[0.8125rem] font-bold text-ink">{meta.name(lang)}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-mono text-slate-700">
-                              {meta.sizeLabel(lang)}
-                            </span>
-                            <span className="text-[0.6875rem] text-slate-600">
-                              {tr(lang, `${meta.source(lang)} 메뉴`, `from ${meta.source(lang)}`, `来自${meta.source(lang)}`)}
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
-                        </div>
-                        {!HOME_WIDGETS_AVAILABLE ? (
-                          <span className="h-8 px-3 rounded-full bg-other-100 text-other-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center whitespace-nowrap">
-                            {tr(lang, '준비 중', 'Coming soon', '准备中')}
+              {HOME_WIDGET_IDS.map((id) => {
+                const meta = HOME_WIDGET_META[id];
+                const placed = placedWidgets[id] ?? 0;
+                return (
+                  <div key={id} className={`rounded-2xl p-3 space-y-3 bg-paper/60 ${placed > 0 ? 'ring-2 ring-sage-400' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[0.8125rem] font-bold text-ink">{meta.name(lang)}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-mono text-slate-700">
+                            {meta.sizeLabel(lang)}
                           </span>
-                        ) : (
+                          {placed > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-bold inline-flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              {tr(lang, `홈 화면에 ${placed}개`, `${placed} on home`, `主屏幕 ${placed} 个`)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
+                      </div>
+                      {isNativeApp ? (
                         <button
                           type="button"
-                          aria-pressed={isOn}
-                          onClick={() => toggleWidget(id)}
-                          className={`h-8 px-3 rounded-full text-[0.6875rem] font-bold shrink-0 inline-flex items-center gap-1 transition-colors ${
-                            isOn
-                              ? 'bg-sage-100 text-sage-800 hover:bg-sage-200'
-                              : 'bg-accent-700 text-paper hover:bg-accent-800'
-                          }`}
+                          onClick={() => void handlePinWidget(id)}
+                          className="h-8 px-3 rounded-full bg-accent-700 text-paper hover:bg-accent-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center gap-1 whitespace-nowrap"
                         >
-                          {isOn ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                          {isOn
-                            ? tr(lang, '추가됨', 'Added', '已添加')
-                            : tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
+                          <Plus className="w-3 h-3" />
+                          {tr(lang, '홈 화면에 추가', 'Add to Home', '添加到主屏幕')}
                         </button>
-                        )}
-                      </div>
-
-                      {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
-                      <div
-                        className={`p-3 rounded-2xl transition-colors ${
-                          widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'
-                        } ${isOn || !HOME_WIDGETS_AVAILABLE ? '' : 'opacity-80'}`}
-                      >
-                        <HomeWidgetPreview id={id} data={widgetPreviewData} theme={widgetTheme} lang={lang} />
-                      </div>
+                      ) : (
+                        <span className="h-8 px-3 rounded-full bg-other-100 text-other-800 text-[0.6875rem] font-bold shrink-0 inline-flex items-center whitespace-nowrap">
+                          {tr(lang, '앱에서 가능', 'In the app', '应用内可用')}
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
 
-              {HOME_WIDGETS_AVAILABLE && (
-              <p className="text-[0.6875rem] text-slate-600 leading-relaxed px-1">
-                {tr(
-                  lang,
-                  '안드로이드/iOS 앱에서는 선택한 위젯이 실제 홈 화면 위젯으로 표시됩니다. 웹 앱에서는 미리보기와 위젯 데이터 동기화만 제공돼요.',
-                  'In the Android/iOS app, the selected widgets appear as real home-screen widgets. The web app shows a preview and syncs the widget data.',
-                  '在安卓/iOS 应用中，所选小组件会显示为真正的主屏幕小组件；网页版仅提供预览和数据同步。'
-                )}
-              </p>
-              )}
-
-              {HOME_WIDGETS_AVAILABLE && (
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-[0.6875rem] text-slate-600">
-                  {widgetSyncToast ||
-                    tr(
-                      lang,
-                      '시간표·일정·출석이 바뀌면 위젯 데이터도 자동으로 동기화돼요.',
-                      'Widget data syncs automatically whenever your plans change.',
-                      '课表、日程或考勤变化时，小组件数据会自动同步。'
+                    {/* 스마트폰 홈 화면 배경 프레임 + 위젯 미리보기 */}
+                    <div
+                      data-widget-preview={id}
+                      className={`p-3 rounded-2xl transition-colors ${widgetTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200/60'}`}
+                    >
+                      <HomeWidgetPreview
+                        id={id}
+                        data={widgetPreviewData}
+                        theme={widgetTheme}
+                        lang={lang}
+                      />
+                    </div>
+                    {pinMessage?.id === id && (
+                      <p aria-live="polite" className="rounded-xl bg-sage-100 text-sage-800 px-3 py-2 text-[0.75rem] font-semibold leading-snug">
+                        {pinMessage.text}
+                      </p>
                     )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    syncWidgetData(state);
-                    setWidgetSyncToast(
-                      tr(lang, '✓ 방금 위젯 데이터가 동기화되었습니다.', '✓ Widget data synced just now.', '✓ 小组件数据刚刚已同步。')
-                    );
-                    setTimeout(() => setWidgetSyncToast(null), 2500);
-                  }}
-                  className="h-9 px-3 rounded-full border border-divider bg-transparent hover:bg-slate-100 text-ink text-xs font-semibold shrink-0 transition-colors"
-                >
-                  {tr(lang, '위젯 수동 동기화', 'Sync Now', '立即同步')}
-                </button>
-              </div>
-              )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="px-4 pt-3 pb-5 border-t border-divider shrink-0">
@@ -3929,14 +4439,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 onClick={() => setIsWidgetSheetOpen(false)}
                 className="w-full h-12 rounded-full bg-ink text-paper text-[0.875rem] font-bold hover:bg-slate-800"
               >
-                {!HOME_WIDGETS_AVAILABLE
-                  ? tr(lang, '닫기', 'Close', '关闭')
-                  : tr(
-                  lang,
-                  `완료 · ${widgetConfig.enabled.length}개 추가됨`,
-                  `Done · ${widgetConfig.enabled.length} added`,
-                  `完成 · 已添加 ${widgetConfig.enabled.length} 个`
-                )}
+                {tr(lang, '닫기', 'Close', '关闭')}
               </button>
             </div>
           </div>

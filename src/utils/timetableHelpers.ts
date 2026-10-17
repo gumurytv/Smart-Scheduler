@@ -5,6 +5,8 @@ import {
   SchoolPeriod,
   AcademyOverrideItem,
   SlotStatus,
+  ScheduleItem,
+  SchoolTimeConfig,
 } from '../types';
 import { getDayOfWeekKor } from '../data/initialData';
 
@@ -63,7 +65,11 @@ export function resolveDailyTimetable(
   const dayOverride = dailyOverrides[dateStr];
 
   // 1. Resolve raw School Periods
-  const rawSchool: Omit<ResolvedSchoolPeriod, 'isOverlapping'>[] = dayMaster.school.map((item) => {
+  // Periods with no subject (an empty timetable, e.g. a newly added child) aren't classes.
+  const rawSchool: Omit<ResolvedSchoolPeriod, 'isOverlapping'>[] = dayMaster.school.flatMap((item) => {
+    const ov = dayOverride?.school?.[item.period];
+    return (ov?.subject ?? item.subject).trim() ? [item] : [];
+  }).map((item) => {
     const ov = dayOverride?.school?.[item.period];
     if (!ov) {
       return {
@@ -227,4 +233,83 @@ export function resolveDailyTimetable(
   });
 
   return { dayOfWeek, school, academy };
+}
+
+// ===================== Time overlap check (보강·일정 등록 시 겹침 알림) =====================
+
+export interface TimeConflict {
+  kind: 'school' | 'academy' | 'schedule';
+  /** Untranslated subject / title; the caller localizes it. */
+  name: string;
+  period?: number;
+  startTime: string;
+  endTime?: string;
+}
+
+function scheduleOnDate(dateStr: string, item: ScheduleItem): boolean {
+  if (!item.endDate || item.endDate <= item.date) return item.date === dateStr;
+  return dateStr >= item.date && dateStr <= item.endDate;
+}
+
+/**
+ * What already takes place on `dateStr` during start–end (or at `start` when there's no end):
+ * school periods and academy classes that aren't cancelled, and events with a time.
+ */
+export function findTimeConflicts(opts: {
+  dateStr: string;
+  start: string;
+  end?: string;
+  masterTimetable: MasterTimetable;
+  dailyOverrides: DailyOverrides;
+  schedules?: ScheduleItem[];
+  ignoreAcademyId?: string;
+  ignoreScheduleId?: string;
+}): TimeConflict[] {
+  const s = timeToMinutes(opts.start);
+  const rawEnd = opts.end ? timeToMinutes(opts.end) : s;
+  const e = rawEnd > s ? rawEnd : s + 1;
+  const overlaps = (a: number, b: number) => s < b && a < e;
+  const day = resolveDailyTimetable(opts.dateStr, opts.masterTimetable, opts.dailyOverrides);
+  const out: TimeConflict[] = [];
+
+  day.school.forEach((p) => {
+    if (p.isCancelled || !p.subject.trim()) return;
+    if (overlaps(timeToMinutes(p.startTime), timeToMinutes(p.endTime))) {
+      out.push({ kind: 'school', name: p.subject, period: p.period, startTime: p.startTime, endTime: p.endTime });
+    }
+  });
+  day.academy.forEach((a) => {
+    if (a.isCancelled || a.id === opts.ignoreAcademyId) return;
+    if (overlaps(timeToMinutes(a.startTime), timeToMinutes(a.endTime))) {
+      out.push({ kind: 'academy', name: a.subject, startTime: a.startTime, endTime: a.endTime });
+    }
+  });
+  (opts.schedules || []).forEach((it) => {
+    if (!it.time || it.id === opts.ignoreScheduleId || !scheduleOnDate(opts.dateStr, it)) return;
+    const t = timeToMinutes(it.time);
+    if (overlaps(t, t + 1)) out.push({ kind: 'schedule', name: it.title, startTime: it.time });
+  });
+  return out.sort((a, b) => a.startTime.localeCompare(b.startTime));
+}
+
+/**
+ * Lunch break on a school day: preset mode puts it after `lunchAfterPeriod` for `lunchMinutes`;
+ * custom mode uses the start/end the user set. Null on days without school periods.
+ */
+export function getLunchRange(
+  config: SchoolTimeConfig | undefined,
+  school: Array<{ period: number; endTime: string; subject: string }>
+): { start: string; end: string } | null {
+  if (!config || !school.some((p) => p.subject.trim())) return null;
+  if (config.mode === 'custom') {
+    const l = config.customLunch;
+    if (!l?.enabled || timeToMinutes(l.end) <= timeToMinutes(l.start)) return null;
+    return { start: l.start, end: l.end };
+  }
+  const before = school.find((p) => p.period === config.lunchAfterPeriod);
+  if (!before || config.lunchMinutes <= 0 || config.lunchAfterPeriod >= config.periodCount) return null;
+  const start = timeToMinutes(before.endTime);
+  const end = Math.min(1440, start + config.lunchMinutes);
+  const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return { start: before.endTime, end: fmt(end) };
 }

@@ -417,6 +417,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   );
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
   const [selectedAcademyDetail, setSelectedAcademyDetail] = useState<string | null>(null);
+  // Monthly KPI tile tapped → history sheet (지각 / 결석 / 출석 / 보강 대기)
+  const [kpiDetail, setKpiDetail] = useState<'present' | 'late' | 'absent' | 'makeup' | null>(null);
   const checkCardRef = useRef<HTMLElement>(null);
 
   /** Select a date and keep the shared month cursor (calendar + charts) in sync. */
@@ -879,6 +881,69 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       valueColor: 'text-accent-700',
     },
   ];
+
+  /* ---- KPI history (sheet opened from the monthly tiles) ---- */
+  type KpiRow = {
+    key: string;
+    dateStr: string;
+    who: string;
+    isSchool: boolean;
+    status: AttendanceStatus;
+    reason?: string;
+    makeup?: 'pending' | 'done';
+  };
+  const kpiRows: KpiRow[] = (() => {
+    if (!kpiDetail) return [];
+    if (kpiDetail === 'makeup') {
+      return monthlyStats.pendingMakeups.map((mk) => ({
+        key: `${mk.dateStr}-${mk.academyName}`,
+        dateStr: mk.dateStr,
+        who: translateSubject(mk.academyName, lang),
+        isSchool: false,
+        status: mk.status,
+        reason: mk.reason,
+        makeup: 'pending' as const,
+      }));
+    }
+    const rows: KpiRow[] = [];
+    Object.entries(attendance || {}).forEach(([dateStr, dayAtt]) => {
+      if (!dayAtt || !dateStr.startsWith(monthPrefix)) return;
+      if (dayAtt.school?.status === kpiDetail) {
+        rows.push({
+          key: `${dateStr}-school`,
+          dateStr,
+          who: tr(lang, '학교', 'School', '学校'),
+          isSchool: true,
+          status: dayAtt.school.status,
+          reason: dayAtt.school.reason,
+        });
+      }
+      Object.entries(dayAtt.academies || {}).forEach(([acName, rec]) => {
+        if (rec.status !== kpiDetail) return;
+        rows.push({
+          key: `${dateStr}-${acName}`,
+          dateStr,
+          who: translateSubject(acName, lang),
+          isSchool: false,
+          status: rec.status,
+          reason: rec.reason,
+          makeup: rec.needsMakeup ? (rec.makeupCompleted ? 'done' : 'pending') : undefined,
+        });
+      });
+    });
+    return rows.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  })();
+  const kpiTitle =
+    kpiDetail === 'makeup'
+      ? tr(lang, '보강 대기 목록', 'Makeups due', '待补课列表')
+      : kpiDetail
+      ? tr(
+          lang,
+          `${monthLabel} ${statusShortLabel(kpiDetail, lang)} 이력`,
+          `${monthLabel} · ${statusShortLabel(kpiDetail, lang)}`,
+          `${monthLabel} ${statusShortLabel(kpiDetail, lang)}记录`
+        )
+      : '';
 
   /* ---- Shared UI pieces ---- */
   const navBtn =
@@ -1476,7 +1541,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         {/* KPI tiles */}
         <div className="grid grid-cols-4 gap-1.5">
           {kpis.map((k) => (
-            <div key={k.key} className="px-2 py-2.5 rounded-2xl bg-paper min-w-0 flex flex-col items-center text-center">
+            <button
+              key={k.key}
+              type="button"
+              onClick={() => setKpiDetail(k.key as 'present' | 'late' | 'absent' | 'makeup')}
+              aria-label={tr(lang, `${k.label} 이력 보기`, `Show ${k.label} history`, `查看${k.label}记录`)}
+              className="px-2 py-2.5 rounded-2xl bg-paper min-w-0 flex flex-col items-center text-center hover:bg-slate-100 active:scale-[0.97] transition-transform"
+            >
               <span className={`w-6 h-6 rounded-full flex items-center justify-center ${k.iconWrap}`} aria-hidden="true">
                 {k.icon}
               </span>
@@ -1484,9 +1555,13 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 {k.value}
               </div>
               <div className="text-[0.6875rem] font-semibold text-slate-600 max-w-full truncate">{k.label}</div>
-            </div>
+            </button>
           ))}
         </div>
+
+        <p className="-mt-1 text-[0.625rem] text-slate-500 text-center">
+          {tr(lang, '숫자를 누르면 날짜별 이력을 볼 수 있어요', 'Tap a number to see the dates', '点击数字可查看每日记录')}
+        </p>
 
         {/* Status distribution donuts */}
         <div className="grid grid-cols-2 gap-2">
@@ -2005,6 +2080,107 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           </div>
         </div>
       </section>
+
+      {/* KPI history sheet */}
+      {kpiDetail && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"
+          onClick={() => setKpiDetail(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={kpiTitle}
+        >
+          <div
+            className="w-full max-w-md max-h-[80vh] bg-paper rounded-t-[28px] shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 pt-2.5 pb-3 border-b border-divider shrink-0 space-y-2">
+              <div className="w-10 h-1.5 rounded-full bg-slate-300 mx-auto" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-[1rem] font-bold text-ink truncate">{kpiTitle}</h3>
+                  <p className="text-[0.6875rem] text-slate-600">
+                    {kpiDetail === 'makeup'
+                      ? tr(lang, '아직 보강하지 않은 수업 (모든 달)', 'Missed classes not made up yet (all months)', '尚未补课的课程（所有月份）')
+                      : tr(lang, `학교·학원 합계 ${kpiRows.length}건`, `${kpiRows.length} in total (school + academies)`, `学校+补习班共 ${kpiRows.length} 条`)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKpiDetail(null)}
+                  aria-label={tr(lang, '닫기', 'Close', '关闭')}
+                  className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink hover:bg-slate-200 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+              {kpiRows.length === 0 ? (
+                <div className="py-10 text-center text-[0.8125rem] text-slate-600">
+                  {tr(lang, '해당하는 기록이 없어요', 'Nothing to show', '没有相关记录')}
+                </div>
+              ) : (
+                kpiRows.map((row) => {
+                  const meta = STATUS_META[row.status];
+                  const StatusIcon = meta.Icon;
+                  return (
+                    <button
+                      key={row.key}
+                      type="button"
+                      onClick={() => {
+                        // Jump the day picker to that date so it can be fixed right away.
+                        const [y, m] = row.dateStr.split('-').map(Number);
+                        setCursorMonth(new Date(y, m - 1, 1));
+                        setSelectedDateStr(row.dateStr);
+                        setKpiDetail(null);
+                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="w-full flex items-center gap-3 rounded-2xl bg-surface px-3 py-2.5 text-left hover:bg-slate-100"
+                    >
+                      <span
+                        className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 text-paper ${
+                          row.isSchool ? 'bg-sage-700' : 'bg-accent-700'
+                        }`}
+                      >
+                        {row.isSchool ? (
+                          <GraduationCap strokeWidth={2.5} className="w-4 h-4" />
+                        ) : (
+                          <Building2 strokeWidth={2.5} className="w-4 h-4" />
+                        )}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[0.875rem] font-bold text-ink truncate">{row.who}</span>
+                          <span className="inline-flex items-center gap-0.5 text-[0.6875rem] font-bold text-slate-700 shrink-0">
+                            <StatusIcon strokeWidth={2.75} className="w-3 h-3" />
+                            {statusShortLabel(row.status, lang)}
+                          </span>
+                        </span>
+                        <span className="block text-[0.75rem] text-slate-600 truncate">
+                          {formatDateWithDay(row.dateStr, lang).shortDateLabel}
+                          {row.reason ? ` · ${row.reason}` : ''}
+                        </span>
+                      </span>
+                      {row.makeup && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[0.6875rem] font-bold shrink-0 ${
+                            row.makeup === 'done' ? 'bg-sage-100 text-sage-800' : 'bg-accent-100 text-accent-800'
+                          }`}
+                        >
+                          {row.makeup === 'done'
+                            ? tr(lang, '보강 완료', 'Made up', '已补课')
+                            : tr(lang, '보강 대기', 'Makeup due', '待补课')}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

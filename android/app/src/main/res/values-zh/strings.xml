@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">틈틈</string>
+    <string name="title_activity_main">틈틈</string>
+    <!-- Home-screen widgets -->
+    <string name="widget_now_name">TeumTeum · 现在</string>
+    <string name="widget_now_description">显示当前课程、剩余时间和下一节课</string>
+    <string name="widget_weekly_school_name">TeumTeum · 每周学校课表</string>
+    <string name="widget_weekly_school_description">本周一至周五各节课程，今天高亮</string>
+    <string name="widget_weekly_academy_name">TeumTeum · 每周补习班课表</string>
+    <string name="widget_weekly_academy_description">周一至周日补习班时间与补课、停课</string>
+    <string name="widget_timeline_name">TeumTeum · 今日时间线</string>
+    <string name="widget_timeline_description">按时间顺序显示今日课程、日程与空闲时间</string>
+    <string name="widget_month_calendar_name">TeumTeum · 月历</string>
+    <string name="widget_month_calendar_description">以彩色圆点显示本月日程</string>
+    <string name="widget_empty_title">TeumTeum</string>
+    <string name="widget_empty_subtitle">打开一次应用即可显示课表</string>
+</resources>

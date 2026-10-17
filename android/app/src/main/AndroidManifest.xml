@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -20,6 +21,73 @@
             </intent-filter>
         </activity>
 
+        <!-- Home-screen widgets (android/.../widget/) -->
+        <receiver
+            android:name=".widget.NowWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_now_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_now_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.WeeklySchoolWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_weekly_school_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_weekly_school_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.WeeklyAcademyWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_weekly_academy_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_weekly_academy_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.TimelineWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_timeline_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_timeline_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.MonthCalendarWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_month_calendar_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_month_calendar_info" />
+        </receiver>
+        <!-- Scheduled widget redraws and clock changes -->
+        <receiver
+            android:name=".widget.WidgetRefreshReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -32,4 +100,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 보강 알림 are scheduled as inexact alarms (a few minutes' slack is fine), so the
+         exact-alarm permission the notifications plugin declares isn't needed. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
 </manifest>
