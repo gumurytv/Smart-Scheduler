@@ -64,6 +64,7 @@ import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { API_BASE_URL, isNativeApp } from '../native/androidShell';
 import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
 import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/appReset';
+import { SUBJECT_COLORS, SUBJECT_COLOR_KEYS, SubjectColorKey, subjectColor } from '../utils/subjectColors';
 import { createInitialPlannerState, formatDateKey, generatePeriodSchedule } from '../data/initialData';
 import {
   tr,
@@ -594,6 +595,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [copySourceDay, setCopySourceDay] = useState<DayOfWeek>('월');
   const [copyTargetDay, setCopyTargetDay] = useState<DayOfWeek>('화');
   const [masterFeedback, setMasterFeedback] = useState<string | null>(null);
+  // 과목 후보군: which subject's colour palette is open
+  const [colorPickFor, setColorPickFor] = useState<string | null>(null);
+  const setSubjectColor = (subject: string, key: SubjectColorKey | null) => {
+    onUpdateState((prev) => {
+      const next = { ...(prev.subjectColors || {}) };
+      if (key) next[subject] = key;
+      else delete next[subject];
+      return { ...prev, subjectColors: next };
+    });
+    setColorPickFor(null);
+  };
 
   // --- 앱 초기화 (top card): pick what to clear ---
   const [isResetSheetOpen, setIsResetSheetOpen] = useState(false);
@@ -2484,9 +2496,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                       cell
                                         ? cell.subject === '자습'
                                           ? 'bg-slate-200 text-ink hover:bg-slate-300'
+                                          : subjectColor(state.subjectColors, cell.subject)
+                                          ? 'font-semibold hover:brightness-95'
                                           : 'bg-sage-100 text-sage-900 font-semibold hover:bg-sage-200'
                                         : 'text-slate-400 hover:bg-sage-100 hover:text-sage-700'
                                     }`}
+                                    style={(() => {
+                                      const c = cell && cell.subject !== '자습' ? subjectColor(state.subjectColors, cell.subject) : undefined;
+                                      return c ? { backgroundColor: c.bg, color: c.fg } : undefined;
+                                    })()}
                                     aria-label={tr(
                                       lang,
                                       `${d}요일 ${periodNum}교시`,
@@ -2769,9 +2787,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
               {tr(
                 lang,
-                '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요.',
-                'School subjects and academies offered as quick-select buttons when editing timetables.',
-                '修改课表时作为快捷按钮显示的学校科目与补习班列表。'
+                '시간표를 수정할 때 빠른 선택 버튼으로 나타나는 학교 과목과 학원 목록이에요. 이름 앞 동그라미를 누르면 과목마다 색을 정할 수 있고, 시간표에 그 색으로 표시돼요.',
+                'Subjects and academies offered when editing timetables. Tap the circle before a name to give it a colour; timetables show it in that colour.',
+                '修改课表时作为快捷按钮显示的学校科目与补习班列表。点击名称前的圆点可为科目设置颜色，课表会以该颜色显示。'
               )}
             </p>
             {/* School Subject Pool */}
@@ -2790,8 +2808,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.school.map((subj) => (
                   <span
                     key={subj}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-semibold"
+                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-sage-100 text-sage-800 text-[0.6875rem] font-semibold"
+                    style={
+                      subjectColor(state.subjectColors, subj)
+                        ? { backgroundColor: subjectColor(state.subjectColors, subj)!.bg, color: subjectColor(state.subjectColors, subj)!.fg }
+                        : undefined
+                    }
                   >
+                    <button
+                      type="button"
+                      onClick={() => setColorPickFor(colorPickFor === subj ? null : subj)}
+                      aria-label={tr(lang, `${subj} 색상 고르기`, `Colour for ${translateSubject(subj, lang)}`, `为${translateSubject(subj, lang)}选择颜色`)}
+                      aria-expanded={colorPickFor === subj}
+                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === subj ? 'ring-2 ring-ink' : ''}`}
+                      style={{ backgroundColor: subjectColor(state.subjectColors, subj)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, subj) ? 'solid' : 'dashed' }}
+                    />
                     {translateSubject(subj, lang)}
                     <button
                       type="button"
@@ -2809,6 +2840,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </span>
                 ))}
               </div>
+              {colorPickFor && state.subjectPool.school.includes(colorPickFor) && (
+                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
+                  <div className="text-[0.6875rem] font-bold text-ink">
+                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUBJECT_COLOR_KEYS.map((key) => {
+                      const c = SUBJECT_COLORS[key];
+                      const active = state.subjectColors?.[colorPickFor] === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSubjectColor(colorPickFor, key)}
+                          aria-label={key}
+                          aria-pressed={active}
+                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
+                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
+                        >
+                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSubjectColor(colorPickFor, null)}
+                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
+                    >
+                      {tr(lang, '기본색', 'Default', '默认')}
+                    </button>
+                  </div>
+                </div>
+              )}
               <form onSubmit={handleAddSchoolSubject} className="flex gap-2">
                 <input
                   type="text"
@@ -2847,8 +2911,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {state.subjectPool.academy.map((acName) => (
                   <span
                     key={acName}
-                    className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-semibold"
+                    className="inline-flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-semibold"
+                    style={
+                      subjectColor(state.subjectColors, acName)
+                        ? { backgroundColor: subjectColor(state.subjectColors, acName)!.bg, color: subjectColor(state.subjectColors, acName)!.fg }
+                        : undefined
+                    }
                   >
+                    <button
+                      type="button"
+                      onClick={() => setColorPickFor(colorPickFor === acName ? null : acName)}
+                      aria-label={tr(lang, `${acName} 색상 고르기`, `Colour for ${translateSubject(acName, lang)}`, `为${translateSubject(acName, lang)}选择颜色`)}
+                      aria-expanded={colorPickFor === acName}
+                      className={`w-4 h-4 rounded-full border-2 border-paper shrink-0 ${colorPickFor === acName ? 'ring-2 ring-ink' : ''}`}
+                      style={{ backgroundColor: subjectColor(state.subjectColors, acName)?.dot ?? 'transparent', borderStyle: subjectColor(state.subjectColors, acName) ? 'solid' : 'dashed' }}
+                    />
                     {translateSubject(acName, lang)}
                     <button
                       type="button"
@@ -2866,6 +2943,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   </span>
                 ))}
               </div>
+              {colorPickFor && state.subjectPool.academy.includes(colorPickFor) && (
+                <div className="rounded-2xl bg-paper p-2.5 space-y-2">
+                  <div className="text-[0.6875rem] font-bold text-ink">
+                    {tr(lang, `「${translateSubject(colorPickFor, lang)}」 색상`, `Colour for ${translateSubject(colorPickFor, lang)}`, `「${translateSubject(colorPickFor, lang)}」的颜色`)}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUBJECT_COLOR_KEYS.map((key) => {
+                      const c = SUBJECT_COLORS[key];
+                      const active = state.subjectColors?.[colorPickFor] === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSubjectColor(colorPickFor, key)}
+                          aria-label={key}
+                          aria-pressed={active}
+                          className={`w-8 h-8 rounded-full grid place-items-center ${active ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
+                          style={{ backgroundColor: c.bg, border: `3px solid ${c.dot}` }}
+                        >
+                          {active && <Check strokeWidth={3.5} className="w-3.5 h-3.5" style={{ color: c.fg }} />}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setSubjectColor(colorPickFor, null)}
+                      className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.6875rem] font-bold text-slate-700"
+                    >
+                      {tr(lang, '기본색', 'Default', '默认')}
+                    </button>
+                  </div>
+                </div>
+              )}
               <form onSubmit={handleAddAcademySubject} className="flex gap-2">
                 <input
                   type="text"

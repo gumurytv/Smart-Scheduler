@@ -178,6 +178,8 @@ export interface PlannerState {
   schoolTimeConfig?: SchoolTimeConfig;
   widgetConfig?: WidgetConfig;
   profile?: UserProfile;
+  /** Settings → 과목 후보군 colours (subject name → colour key in utils/subjectColors). */
+  subjectColors?: Record<string, string>;
 }
 
 export interface AIExtractedEntry {

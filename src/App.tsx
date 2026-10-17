@@ -252,6 +252,7 @@ export default function App() {
             onUpdateAttendance={handleUpdateAttendance}
             profile={state.profile}
             schoolTimeConfig={state.schoolTimeConfig}
+            subjectColors={state.subjectColors}
             onEditProfile={() => {
               setSettingsFocus('profile');
               setActiveTab('settings');

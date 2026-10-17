@@ -59,6 +59,7 @@ import {
 import { ConflictDialog } from './ConflictDialog';
 import { tr, translateDay, translateSubject, translateSampleText } from '../i18n/translations';
 import { usePersistentState } from '../utils/usePersistentState';
+import { subjectColor } from '../utils/subjectColors';
 
 interface TimetableTabProps {
   language?: AppLanguage;
@@ -74,6 +75,7 @@ interface TimetableTabProps {
   profile?: UserProfile;
   onEditProfile?: () => void;
   schoolTimeConfig?: SchoolTimeConfig;
+  subjectColors?: Record<string, string>;
 }
 
 const HOUR_HEIGHT_PX = 84;
@@ -318,6 +320,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   profile,
   onEditProfile,
   schoolTimeConfig,
+  subjectColors,
 }) => {
   const lang = language;
   const startHour = timelineConfig?.startHour ?? 8;
@@ -1448,6 +1451,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     isOverlapping: boolean;
     modifiedFrom?: string;
     isMakeup?: boolean;
+    subject?: string;
     onClick: () => void;
   }) => {
     const h = Math.max(36, opts.heightPx - 3);
@@ -1494,6 +1498,17 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       metaCls = 'text-accent-800';
       badgeCls = opts.isMakeup ? 'bg-accent-700 text-paper' : 'bg-accent-200 text-accent-900';
     }
+    // 과목 색: replaces the default sage / terracotta look on normal (not live/cancelled/self-study) blocks
+    const color =
+      !opts.isCurrent && !opts.isCancelled && opts.status !== 'selfStudy' && opts.subject
+        ? subjectColor(subjectColors, opts.subject)
+        : undefined;
+    if (color) {
+      shell = 'hover:brightness-95';
+      titleCls = '';
+      metaCls = '';
+      if (!opts.isMakeup) badgeCls = 'bg-paper/70';
+    }
     const conflictRing =
       opts.isOverlapping && !opts.isCancelled ? 'ring-2 ring-accent-800 ring-offset-1 ring-offset-surface' : '';
 
@@ -1524,10 +1539,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           height: `${h}px`,
           left: `calc(${leftPercent}% + 3px)`,
           width: `calc(${widthPercent}% - 6px)`,
+          ...(color ? { backgroundColor: color.bg, color: color.fg } : {}),
         }}
         className={`absolute z-10 rounded-xl text-left transition-colors overflow-hidden flex ${shell} ${conflictRing}`}
       >
-        <span className={`w-1.5 shrink-0 ${strip}`} aria-hidden="true" />
+        <span
+          className={`w-1.5 shrink-0 ${color ? '' : strip}`}
+          style={color && opts.status !== 'absent' ? { backgroundColor: color.dot } : undefined}
+          aria-hidden="true"
+        />
         {compact ? (
           <span className="min-w-0 flex-1 flex items-center gap-1.5 px-2.5">
             {conflictIcon}
@@ -1605,6 +1625,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     isOverlapping: boolean;
     modifiedFrom?: string;
     isMakeup?: boolean;
+    subject?: string;
     onClick: () => void;
   }) => {
     const isSchool = opts.kind === 'school';
@@ -1617,6 +1638,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       : isSchool
       ? 'bg-sage-600'
       : 'bg-accent';
+    const rowColor =
+      !opts.isCancelled && opts.status !== 'selfStudy' && opts.status !== 'absent' && opts.subject
+        ? subjectColor(subjectColors, opts.subject)
+        : undefined;
     return (
       <button
         key={opts.key}
@@ -1642,7 +1667,11 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             {opts.endTime}
           </span>
         </span>
-        <span className={`w-1 rounded-full shrink-0 ${strip}`} aria-hidden="true" />
+        <span
+          className={`w-1 rounded-full shrink-0 ${strip}`}
+          style={rowColor ? { backgroundColor: rowColor.dot } : undefined}
+          aria-hidden="true"
+        />
         <span className="min-w-0 flex-1 flex flex-col justify-center gap-1">
           <span className="flex items-center gap-1.5 min-w-0">
             {opts.isOverlapping && !opts.isCancelled && (
@@ -2260,17 +2289,21 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         {tr(lang, `학교 ${cell.schoolActive}`, `Sch ${cell.schoolActive}`, `学校${cell.schoolActive}`)}
                       </span>
                     )}
-                    {shown.map((a) => (
+                    {shown.map((a) => {
+                      const c = a.isAdded ? undefined : subjectColor(subjectColors, a.subject);
+                      return (
                       <span
                         key={a.id}
                         className={`rounded-md text-[0.5625rem] font-bold leading-tight px-1 py-px truncate ${
-                          a.isAdded ? 'bg-accent-700 text-paper' : 'bg-accent-100 text-accent-800'
+                          a.isAdded ? 'bg-accent-700 text-paper' : c ? '' : 'bg-accent-100 text-accent-800'
                         }`}
+                        style={c ? { backgroundColor: c.bg, color: c.fg } : undefined}
                       >
                         {translateSubject(a.subject, lang).replace(/\s*(학원|Academy|补习班)$/i, '') ||
                           translateSubject(a.subject, lang)}
                       </span>
-                    ))}
+                      );
+                    })}
                     {more > 0 && (
                       <span className="text-[0.5625rem] font-bold text-slate-600 leading-tight px-1">+{more}</span>
                     )}
@@ -2749,6 +2782,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           item.isModified && item.originalSubject !== item.subject
                             ? translateSubject(item.originalSubject, lang)
                             : undefined,
+                        subject: item.subject,
                         onClick: () => openSchoolEdit(item),
                       })
                     )}
@@ -2783,6 +2817,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                             ? translateSubject(item.originalSubject, lang)
                             : undefined,
                         isMakeup: item.isAdded,
+                        subject: item.subject,
                         onClick: () => openEditAcademyModal(item),
                       })
                     )}
@@ -2877,6 +2912,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           item.isModified && item.originalSubject !== item.subject
                             ? translateSubject(item.originalSubject, lang)
                             : undefined,
+                        subject: item.subject,
                         onClick: () => openSchoolEdit(item),
                       })
                     )}
@@ -2938,6 +2974,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                             ? translateSubject(item.originalSubject, lang)
                             : undefined,
                         isMakeup: item.isAdded,
+                        subject: item.subject,
                         onClick: () => openEditAcademyModal(item),
                       })
                     )}
@@ -3070,13 +3107,16 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                             : wd.isToday
                             ? 'bg-sage-200 text-sage-900'
                             : 'bg-sage-100 text-sage-900';
+                          const cellColor =
+                            !cell.isCancelled && !cell.status ? subjectColor(subjectColors, cell.subject) : undefined;
                           return (
                             <td key={wd.dateStr} className={`p-0.5 ${wd.isToday ? 'bg-accent-100/60' : ''}`}>
                               <button
                                 type="button"
                                 onClick={() => openItemOnDate({ kind: 'school', item: cell }, wd.dateObj)}
                                 aria-label={`${formatDateLabel(wd.dateStr, lang)} ${periodLabel(period, lang)} ${translateSubject(cell.subject, lang)}`}
-                                className={`relative w-full min-h-[40px] px-0.5 py-1 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:brightness-95 active:scale-95 transition ${cellTone}`}
+                                className={`relative w-full min-h-[40px] px-0.5 py-1 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:brightness-95 active:scale-95 transition ${cellColor ? (wd.isToday ? 'ring-1 ring-inset ring-sage-600' : '') : cellTone}`}
+                                style={cellColor ? { backgroundColor: cellColor.bg, color: cellColor.fg } : undefined}
                               >
                                 <span className="w-full truncate text-[0.6875rem] font-bold leading-tight">
                                   {cell.status === 'selfStudy'
@@ -3157,6 +3197,13 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           key={ac.id}
                           type="button"
                           onClick={() => openItemOnDate({ kind: 'academy', item: ac }, wd.dateObj)}
+                          style={(() => {
+                            const c =
+                              !ac.isCancelled && ac.status !== 'selfStudy' && !ac.isAdded
+                                ? subjectColor(subjectColors, ac.subject)
+                                : undefined;
+                            return c ? { backgroundColor: c.bg, color: c.fg } : undefined;
+                          })()}
                           className={`max-w-full px-2.5 py-1 rounded-full text-[0.75rem] inline-flex items-center gap-1.5 active:scale-95 transition ${
                             ac.isCancelled
                               ? 'bg-paper border border-dashed border-slate-400 text-slate-600'
@@ -3164,6 +3211,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                               ? 'bg-slate-200 text-ink'
                               : ac.isAdded
                               ? 'bg-accent-700 text-paper hover:bg-accent-800'
+                              : subjectColor(subjectColors, ac.subject)
+                              ? 'hover:brightness-95 border border-transparent'
                               : 'bg-accent-100 text-accent-900 hover:bg-accent-200 border border-accent-200'
                           } ${ac.isOverlapping && !ac.isCancelled ? 'ring-2 ring-accent-800' : ''}`}
                         >

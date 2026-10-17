@@ -68,6 +68,7 @@ export function resetPlannerParts(prev: PlannerState, parts: ResetPart[], mode: 
       schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
       widgetConfig: { ...DEFAULT_WIDGET_CONFIG, enabled: [...DEFAULT_WIDGET_CONFIG.enabled] },
       textScale: undefined,
+      subjectColors: undefined,
     };
   }
   return next;
