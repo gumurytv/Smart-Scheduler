@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   Users,
+  ChevronRight,
   Bell,
   BellRing,
   X,
@@ -21,7 +22,6 @@ import {
   Globe,
   Type,
   BookOpen,
-  Sparkles,
   Check,
   Smartphone,
   Sun,
@@ -72,6 +72,7 @@ import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
 import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/appReset';
 import { ParsedBackup, parseBackup } from '../utils/backupImport';
 import { ImportSheet } from './ImportSheet';
+import { GuideSheet } from './GuideSheet';
 import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
 import { childFallbackName } from './ChildrenSheet';
 import { childName, listChildren } from '../utils/children';
@@ -82,7 +83,6 @@ import {
   translateDay,
   translateSubject,
   translateSampleText,
-  USER_GUIDE_TOPICS,
 } from '../i18n/translations';
 import { buildHomeWidgetsData, getWidgetConfig, syncWidgetData } from '../utils/widgetSync';
 import { HOME_WIDGET_META, HomeWidgetPreview } from './HomeWidgets';
@@ -208,8 +208,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'guide';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'guide'];
+type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -504,8 +504,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
   const lang: AppLanguage = state.language || 'ko';
 
-  // Selected interactive guide topic (default to first topic so user immediately sees step-by-step instructions)
-  const [selectedGuideId, setSelectedGuideId] = useState<string>(USER_GUIDE_TOPICS[0].id);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Accordion open state (all collapsed by default; remembered per device)
   const [openCards, setOpenCards] = useState<Partial<Record<SettingsCardId, boolean>>>(loadOpenCards);
@@ -749,8 +748,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const timelineStartHour = state.timelineConfig?.startHour ?? 8;
   const timelineEndHour = state.timelineConfig?.endHour ?? 24;
 
-  const activeGuideTopic =
-    USER_GUIDE_TOPICS.find((g) => g.id === selectedGuideId) || USER_GUIDE_TOPICS[0];
 
   const textScale: TextScale = TEXT_SCALES.includes(state.textScale ?? 100) ? state.textScale ?? 100 : 100;
   const handleSetTextScale = (next: TextScale) => {
@@ -1738,6 +1735,24 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </button>
           );
         })()}
+
+        {/* 사용 가이드: by bottom menu, or the setup order */}
+        <button
+          type="button"
+          onClick={() => setIsGuideOpen(true)}
+          className="w-full rounded-2xl bg-paper px-3 py-2.5 flex items-center gap-3 text-left hover:bg-slate-100"
+        >
+          <span className="w-9 h-9 rounded-xl bg-sage-700 text-paper grid place-items-center shrink-0">
+            <BookOpen strokeWidth={2.5} className="w-4 h-4" />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[0.8125rem] font-bold text-ink">{tr(lang, '사용 가이드', 'User guide', '使用指南')}</span>
+            <span className="block text-[0.6875rem] text-slate-600 truncate">
+              {tr(lang, '메뉴별 기능 · 처음 설정 순서', 'Features by menu · setup steps', '按菜单功能 · 初次设置步骤')}
+            </span>
+          </span>
+          <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
+        </button>
 
         {/* 앱 초기화: choose which parts to clear */}
         <button
@@ -3911,123 +3926,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
           </div>
         </SettingsCard>
-
-        <SettingsCard
-          id="guide"
-          open={!!openCards.guide}
-          onToggle={toggleCard}
-          tone="neutral"
-          icon={BookOpen}
-          title={tr(lang, '사용 가이드', 'User Guide', '使用指南')}
-          summary={tr(
-            lang,
-            `핵심 기능 ${USER_GUIDE_TOPICS.length}가지 · 단계별 안내`,
-            `${USER_GUIDE_TOPICS.length} key features · step by step`,
-            `${USER_GUIDE_TOPICS.length} 项核心功能 · 分步说明`
-          )}
-        >
-          <div className="p-4 space-y-3">
-            {/* 6 Major Feature Selector Grid */}
-            <div className="grid grid-cols-3 gap-1.5">
-              {USER_GUIDE_TOPICS.map((topic, idx) => {
-                const isSelected = topic.id === selectedGuideId;
-                return (
-                  <button
-                    key={topic.id}
-                    type="button"
-                    onClick={() => setSelectedGuideId(topic.id)}
-                    className={`h-[34px] px-2 rounded-full text-center transition-colors flex items-center justify-center gap-1 min-w-0 ${
-                      isSelected
-                        ? 'bg-accent-700 text-paper'
-                        : 'bg-paper text-ink hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="min-w-0 flex items-baseline gap-1">
-                      <div
-                        className={`hidden sm:block text-[0.6875rem] font-mono ${
-                          isSelected ? 'text-accent-100' : 'text-accent-700'
-                        }`}
-                      >
-                        0{idx + 1}
-                      </div>
-                      <div className="text-xs font-semibold truncate">
-                        {tr(lang, topic.badge.ko, topic.badge.en, topic.badge.zh)}
-                      </div>
-                    </div>
-                    <ChevronDown
-                      className={`hidden ${
-                        isSelected ? 'text-paper -rotate-90' : 'text-slate-400'
-                      }`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Selected Feature Step-by-Step Walkthrough Card */}
-            <div className="p-3 rounded-xl bg-paper space-y-2.5">
-              <div className="space-y-1 border-b border-divider pb-2.5">
-                <span className="inline-block px-2 py-0.5 rounded-full bg-accent-100 text-accent-800 text-[0.6875rem] font-bold">
-                  {tr(
-                    lang,
-                    activeGuideTopic.badge.ko,
-                    activeGuideTopic.badge.en,
-                    activeGuideTopic.badge.zh
-                  )}
-                </span>
-                <h3 className="text-xs font-bold text-ink">
-                  {tr(
-                    lang,
-                    activeGuideTopic.title.ko,
-                    activeGuideTopic.title.en,
-                    activeGuideTopic.title.zh
-                  )}
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {tr(
-                    lang,
-                    activeGuideTopic.summary.ko,
-                    activeGuideTopic.summary.en,
-                    activeGuideTopic.summary.zh
-                  )}
-                </p>
-              </div>
-
-              {/* Concrete Steps */}
-              <div className="space-y-1.5">
-                {activeGuideTopic.steps.map((st, sIdx) => (
-                  <div key={sIdx} className="flex items-start gap-2">
-                    <span className="flex-none w-[18px] h-[18px] mt-px rounded-full bg-accent-700 text-paper font-mono text-[0.6875rem] grid place-items-center">
-                      {sIdx + 1}
-                    </span>
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="text-xs font-bold text-ink">
-                        {tr(lang, st.stepTitle.ko, st.stepTitle.en, st.stepTitle.zh)}
-                      </div>
-                      <p className="text-xs text-slate-700 leading-[1.45] break-keep">
-                        {tr(lang, st.stepDesc.ko, st.stepDesc.en, st.stepDesc.zh)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pro Tip Box */}
-              <div className="px-2.5 py-2 rounded bg-sage-100 flex items-start gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-sage-700 shrink-0 mt-0.5" />
-                <p className="text-[0.6875rem] font-medium text-sage-900 leading-relaxed">
-                  <strong className="font-bold mr-1">{tr(lang, '팁:', 'TIP:', '提示：')}</strong>
-                  {tr(
-                    lang,
-                    activeGuideTopic.tip.ko,
-                    activeGuideTopic.tip.en,
-                    activeGuideTopic.tip.zh
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        </SettingsCard>
       </div>
 
       {importDraft && (
@@ -4041,6 +3939,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           onDone={(message) => {
             setImportDraft(null);
             setBackupFeedback({ type: 'success', message });
+          }}
+        />
+      )}
+
+      {isGuideOpen && (
+        <GuideSheet
+          lang={lang}
+          onClose={() => setIsGuideOpen(false)}
+          onGo={(target) => {
+            setIsGuideOpen(false);
+            if (target === 'top') {
+              document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              openCardAndScroll(target);
+            }
           }}
         />
       )}
