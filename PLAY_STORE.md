@@ -125,3 +125,31 @@ main에 머지될 때마다 `.github/workflows/pages.yml`이 자동으로 배포
 처음 한 번만: 저장소 **Settings → Pages → Build and deployment → Source: GitHub Actions** 로 바꿔 주세요.
 
 웹 미리보기의 데이터는 브라우저에 따로 저장돼요. 휴대폰 앱의 데이터와 섞이지 않아요.
+
+---
+
+## 4. 자동 출시 (GitHub Actions)
+
+`.github/workflows/android-release.yml`이 서명된 AAB를 만들고 Play Console 비공개 테스트(Alpha)에 올려요.
+GitHub 저장소 → **Actions → Android release → Run workflow**에서 버전 이름과 출시 노트를 넣고 실행하면 돼요.
+
+- versionCode는 `10 + 실행 번호`로 자동으로 올라가요(첫 실행은 11). 자동 출시를 쓰기 시작한 뒤에는 Android Studio에서 직접 만든 AAB를 올리지 마세요(번호가 더 낮아서 거절돼요).
+- 만든 AAB는 실행 화면의 Artifacts에도 남아요.
+
+### 처음 한 번만 할 일
+1. **서비스 계정 만들기** (Google Cloud Console)
+   - 프로젝트 선택(없으면 새로 만들기) → API 및 서비스 → 라이브러리 → **Google Play Android Developer API** 사용 설정
+   - IAM 및 관리자 → 서비스 계정 → 서비스 계정 만들기(역할은 주지 않아도 됨)
+   - 만든 계정 → 키 → 키 추가 → 새 키 만들기 → **JSON** → 파일이 내려받아져요
+2. **Play Console에 권한 주기**
+   - 사용자 및 권한 → 새 사용자 초대 → 서비스 계정 이메일(`…@….iam.gserviceaccount.com`) 입력
+   - 앱 권한에 「틈틈」 추가 → **테스트 트랙에 앱 출시**, **테스트 트랙 관리**(정식 출시까지 하려면 **프로덕션에 앱 출시**도) 체크 → 사용자 초대
+3. **GitHub Secrets 등록** (저장소 Settings → Secrets and variables → Actions → New repository secret)
+
+   | 이름 | 값 |
+   |---|---|
+   | `ANDROID_KEYSTORE_BASE64` | 맥 터미널에서 `base64 -i 업로드키.jks \| pbcopy` 실행 후 붙여넣기 |
+   | `ANDROID_KEYSTORE_PASSWORD` | 키 스토어 비밀번호 |
+   | `ANDROID_KEY_ALIAS` | 키 별칭(alias) |
+   | `ANDROID_KEY_PASSWORD` | 키 비밀번호 |
+   | `PLAY_SERVICE_ACCOUNT_JSON` | 1번에서 받은 JSON 파일 내용 전체 |
