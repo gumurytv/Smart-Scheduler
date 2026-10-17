@@ -284,6 +284,7 @@ export default function App() {
             profile={state.profile}
             schoolTimeConfig={state.schoolTimeConfig}
             subjectColors={state.subjectColors}
+            layout={state.timetableLayout}
             onEditProfile={() => {
               setSettingsFocus('profile');
               setActiveTab('settings');

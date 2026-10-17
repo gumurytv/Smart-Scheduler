@@ -70,6 +70,7 @@ export function resetPlannerParts(prev: PlannerState, parts: ResetPart[], mode: 
       textScale: undefined,
       subjectColors: undefined,
       reminders: undefined,
+      timetableLayout: undefined,
     };
   }
   return next;

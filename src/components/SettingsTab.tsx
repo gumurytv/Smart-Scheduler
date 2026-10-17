@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   Users,
+  LayoutList,
+  ArrowUp,
+  ArrowDown,
   ChevronRight,
   Bell,
   BellRing,
@@ -65,6 +68,12 @@ import {
   REMINDER_LEADS,
   ReminderConfig,
   ReminderLead,
+  DEFAULT_TIMETABLE_LAYOUT,
+  TIMETABLE_BLOCK_GROUPS,
+  TIMETABLE_FIXED_BLOCKS,
+  TimetableBlockGroup,
+  TimetableBlockId,
+  timetableBlockRank,
 } from '../types';
 import { isAiTimetableEnabled } from '../utils/featureFlags';
 import { API_BASE_URL, isNativeApp } from '../native/androidShell';
@@ -208,8 +217,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets'];
+type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -933,6 +942,36 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     setNewAcademySubject('');
     setColorPickFor(null);
     showMasterToast(tr(lang, '과목/수업 목록을 모두 지웠어요', 'All subjects cleared', '已清除全部科目'));
+  };
+
+  // 시간표 화면 구성: reorder within a group, show/hide
+  const timetableLayout = state.timetableLayout ?? DEFAULT_TIMETABLE_LAYOUT;
+  const sortedGroup = (group: TimetableBlockGroup) =>
+    [...TIMETABLE_BLOCK_GROUPS[group]].sort(
+      (a, b) => timetableBlockRank(timetableLayout, a) - timetableBlockRank(timetableLayout, b)
+    );
+  const moveTimetableBlock = (group: TimetableBlockGroup, id: TimetableBlockId, dir: -1 | 1) =>
+    onUpdateState((prev) => {
+      const cur = prev.timetableLayout ?? DEFAULT_TIMETABLE_LAYOUT;
+      const order = [...cur.order, ...DEFAULT_TIMETABLE_LAYOUT.order.filter((b) => !cur.order.includes(b))];
+      const items = [...TIMETABLE_BLOCK_GROUPS[group]].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      const i = items.indexOf(id);
+      const j = i + dir;
+      if (j < 0 || j >= items.length) return prev;
+      const ia = order.indexOf(items[i]);
+      const ib = order.indexOf(items[j]);
+      [order[ia], order[ib]] = [order[ib], order[ia]];
+      return { ...prev, timetableLayout: { ...cur, order } };
+    });
+  const toggleTimetableBlock = (id: TimetableBlockId) =>
+    onUpdateState((prev) => {
+      const cur = prev.timetableLayout ?? DEFAULT_TIMETABLE_LAYOUT;
+      const hidden = cur.hidden.includes(id) ? cur.hidden.filter((b) => b !== id) : [...cur.hidden, id];
+      return { ...prev, timetableLayout: { ...cur, hidden } };
+    });
+  const handleResetTimetableLayout = () => {
+    onUpdateState((prev) => ({ ...prev, timetableLayout: undefined }));
+    showMasterToast(tr(lang, '시간표 화면 구성을 기본값으로 되돌렸어요', 'Timetable layout restored to defaults', '课表画面布局已恢复默认'));
   };
 
   const handleResetWidgets = () => {
@@ -1999,6 +2038,107 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       {/* ===== GROUP: 시간표 ===== */}
       <div className="space-y-2">
         <GroupHeader label={tr(lang, '시간표', 'Timetable', '课表')} />
+
+        <SettingsCard
+          id="layout"
+          open={!!openCards.layout}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={LayoutList}
+          title={tr(lang, '시간표 화면 구성', 'Timetable layout', '课表画面布局')}
+          summary={
+            timetableLayout.hidden.length > 0
+              ? tr(lang, `순서 설정 · ${timetableLayout.hidden.length}개 숨김`, `Custom order · ${timetableLayout.hidden.length} hidden`, `自定义顺序 · 隐藏 ${timetableLayout.hidden.length} 个`)
+              : tr(lang, '시간표 메뉴의 칸 순서와 표시', 'Order and visibility of timetable sections', '课表菜单板块的顺序与显示')
+          }
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
+              {tr(
+                lang,
+                '↑↓로 순서를 바꾸고, 스위치로 칸을 숨기거나 보여줘요. 일별·주간·월별 선택과 날짜 칸은 항상 시간표 위에 있어요.',
+                'Use ↑↓ to reorder and the switch to hide or show. The day/week/month and date controls always stay above the timetable.',
+                '用 ↑↓ 调整顺序，用开关隐藏或显示。日/周/月和日期选择始终位于课表上方。'
+              )}
+            </p>
+            {(
+              [
+                ['screen', tr(lang, '시간표 화면', 'Timetable screen', '课表画面')],
+                ['daily', tr(lang, '일별 보기', 'Day view', '日视图')],
+                ['weekly', tr(lang, '주간 보기', 'Week view', '周视图')],
+              ] as Array<[TimetableBlockGroup, string]>
+            ).map(([group, groupLabel]) => {
+              const meta: Record<TimetableBlockId, [string, string]> = {
+                now: [tr(lang, '「지금」 카드', '“Now” card', '「现在」卡片'), tr(lang, '시계 · 지금 수업 · 오늘 보강', 'Clock, current class, today’s makeups', '时钟 · 当前课程 · 今日补课')],
+                main: [tr(lang, '시간표', 'Timetable', '课表'), tr(lang, '일별·주간·월별 보기', 'Day, week and month views', '日/周/月视图')],
+                daySummary: [tr(lang, '하루 한눈에', 'Day at a glance', '一天概览'), tr(lang, '시간 막대 · 합계 · 겹침 경고', 'Time bar, totals, overlaps', '时间条 · 合计 · 冲突提醒')],
+                dayDetail: [tr(lang, '타임라인 · 목록', 'Timeline · list', '时间轴 · 列表'), tr(lang, '그날 수업과 일정', 'The day’s classes and events', '当天课程与日程')],
+                weekSchool: [tr(lang, '학교 시간표', 'School timetable', '学校课表'), tr(lang, '월~금 교시 표', 'Mon–Fri periods', '周一至周五课节表')],
+                weekAcademy: [tr(lang, '학원', 'Academies', '补习班'), tr(lang, '월~일 학원 수업', 'Mon–Sun classes', '周一至周日补习班')],
+              };
+              const items = sortedGroup(group);
+              return (
+                <div key={group} className="space-y-1.5">
+                  <span className="text-[0.75rem] font-bold text-ink">{groupLabel}</span>
+                  {items.map((id, idx) => {
+                    const fixed = TIMETABLE_FIXED_BLOCKS.includes(id);
+                    const visible = fixed || !timetableLayout.hidden.includes(id);
+                    const [label, hint] = meta[id];
+                    return (
+                      <div
+                        key={id}
+                        className={`rounded-2xl bg-paper px-3 py-2 flex items-center gap-2 ${visible ? '' : 'opacity-60'}`}
+                      >
+                        <span className="w-6 h-6 rounded-full bg-surface text-[0.6875rem] font-mono text-slate-700 grid place-items-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[0.8125rem] font-bold text-ink truncate">{label}</span>
+                          <span className="block text-[0.6875rem] text-slate-600 truncate">{hint}</span>
+                        </span>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => moveTimetableBlock(group, id, -1)}
+                          aria-label={tr(lang, `${label} 위로`, `Move ${label} up`, `${label} 上移`)}
+                          className="w-8 h-8 rounded-full grid place-items-center text-ink hover:bg-surface disabled:opacity-25 shrink-0"
+                        >
+                          <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === items.length - 1}
+                          onClick={() => moveTimetableBlock(group, id, 1)}
+                          aria-label={tr(lang, `${label} 아래로`, `Move ${label} down`, `${label} 下移`)}
+                          className="w-8 h-8 rounded-full grid place-items-center text-ink hover:bg-surface disabled:opacity-25 shrink-0"
+                        >
+                          <ArrowDown className="w-4 h-4" strokeWidth={2.5} />
+                        </button>
+                        {fixed ? (
+                          <span className="w-12 text-center text-[0.625rem] font-bold text-slate-500 shrink-0">
+                            {tr(lang, '항상', 'Always', '始终')}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={visible}
+                            aria-label={tr(lang, `${label} 보이기`, `Show ${label}`, `显示${label}`)}
+                            onClick={() => toggleTimetableBlock(id)}
+                            className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${visible ? 'bg-accent-700' : 'bg-slate-300'}`}
+                          >
+                            <span className={`block w-6 h-6 rounded-full bg-paper shadow-xs transition-transform ${visible ? 'translate-x-5' : ''}`} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetTimetableLayout} />
+          </div>
+        </SettingsCard>
 
         <SettingsCard
           id="range"
