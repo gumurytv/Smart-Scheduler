@@ -1440,43 +1440,6 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         <CalendarClock strokeWidth={2.5} className="w-3.5 h-3.5" />
                         {tr(lang, '보강 필요', 'Needs makeup', '需要补课')}
                       </button>
-                      {rec.needsMakeup && !rec.makeupCompleted && !isPlanLive(rec.makeupPlan) && onUpdateDailyOverrides && (
-                        <button
-                          type="button"
-                          onClick={() => setPlanTarget({ missedDate: selectedDateStr, academyName: ac.name })}
-                          className="h-8 px-3 rounded-full border border-accent-700 text-accent-800 text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap hover:bg-accent-100"
-                        >
-                          <CalendarDays strokeWidth={2.5} className="w-3.5 h-3.5" />
-                          {tr(lang, '보강 일정 등록', 'Schedule makeup', '登记补课')}
-                        </button>
-                      )}
-                      {rec.needsMakeup && rec.makeupPlan && isPlanLive(rec.makeupPlan) && (
-                        <button
-                          type="button"
-                          onClick={() => setPlanTarget({ missedDate: selectedDateStr, academyName: ac.name })}
-                          className="h-8 px-3 rounded-full bg-sage-100 text-sage-900 text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap"
-                        >
-                          <CalendarClock strokeWidth={2.5} className="w-3.5 h-3.5" />
-                          {planLabel(rec.makeupPlan)}
-                        </button>
-                      )}
-                      {rec.needsMakeup && (rec.makeupCompleted || isPlanLive(rec.makeupPlan) || !onUpdateDailyOverrides) && (
-                        <button
-                          type="button"
-                          aria-pressed={Boolean(rec.makeupCompleted)}
-                          onClick={() => setMakeupDone(selectedDateStr, ac.name, !rec.makeupCompleted)}
-                          className={`h-8 px-3 rounded-full text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
-                            rec.makeupCompleted
-                              ? 'bg-sage-700 text-paper hover:bg-sage-800'
-                              : 'border border-divider text-slate-700 hover:bg-surface'
-                          }`}
-                        >
-                          <Check strokeWidth={3} className="w-3.5 h-3.5" />
-                          {rec.makeupCompleted
-                            ? tr(lang, '보강 완료됨', 'Makeup done', '已完成补课')
-                            : tr(lang, '보강 완료 표시', 'Mark makeup done', '标记补课完成')}
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>
@@ -1543,37 +1506,25 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                   }
                   className="min-w-0 flex-1 text-left"
                 >
-                  <div className="text-[0.875rem] font-bold text-ink truncate">
-                    {translateSubject(mk.academyName, lang)}
-                  </div>
-                  <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface text-[0.6875rem] font-semibold text-slate-700 tabular-nums whitespace-nowrap">
-                      <Calendar strokeWidth={2.5} className="w-3 h-3" />
-                      {mk.shortDateLabel}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[0.875rem] font-bold text-ink truncate">
+                      {translateSubject(mk.academyName, lang)}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[0.6875rem] font-bold whitespace-nowrap ${STATUS_META[mk.status].badgeClass}`}
+                      className={`px-1.5 py-px rounded-full text-[0.625rem] font-bold whitespace-nowrap shrink-0 ${STATUS_META[mk.status].badgeClass}`}
                     >
                       {statusShortLabel(mk.status, lang)}
                     </span>
                   </div>
-                  {mk.plan ? (
-                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sage-100 text-sage-900 text-[0.6875rem] font-bold tabular-nums">
-                      <CalendarClock strokeWidth={2.5} className="w-3 h-3 shrink-0" />
-                      {tr(lang, '일정 등록됨', 'Scheduled', '已登记')} · {planLabel(mk.plan)}
-                    </div>
-                  ) : (
-                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-accent-700 text-accent-800 text-[0.6875rem] font-bold">
-                      <CalendarDays strokeWidth={2.5} className="w-3 h-3 shrink-0" />
-                      {tr(lang, '일정 미등록 · 눌러서 등록', 'Not scheduled · tap to add', '未登记 · 点击登记')}
-                    </div>
-                  )}
-                  {mk.reason && (
-                    <p className="mt-1 text-[0.75rem] text-slate-600 truncate">
-                      {tr(lang, '사유: ', 'Reason: ', '原因：')}
-                      {translateSampleText(mk.reason, lang)}
-                    </p>
-                  )}
+                  <div className="mt-0.5 text-[0.6875rem] text-slate-600 tabular-nums truncate">
+                    {shortMd(mk.dateStr)}
+                    {mk.plan ? (
+                      <span className="text-sage-800 font-bold">
+                        {' → '}
+                        {tr(lang, '보강', 'makeup', '补课')} {planLabel(mk.plan).split('–')[0]}
+                      </span>
+                    ) : null}
+                  </div>
                 </button>
                 {mk.plan || !onUpdateDailyOverrides ? (
                   <button
