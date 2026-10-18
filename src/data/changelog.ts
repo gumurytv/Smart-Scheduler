@@ -10,6 +10,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.0',
+    date: '2026-10-19',
+    items: [
+      {
+        ko: '처음 사용 안내: 앱을 처음 열면 화면 설명과 처음 설정(글자 크기, 예시 지우기, 내 정보, 시간표 넣는 법, 보강 알림)을 한 단계씩 알려줘요. 잘 아는 사람은 바로 건너뛸 수 있어요',
+        en: 'First-run guide: on first launch, the screens and setup are explained step by step (text size, clearing the example, profile, timetables, reminders). Skip it anytime',
+        zh: '初次使用指南：首次打开时逐步介绍画面和初次设置（字体大小、清除示例、个人信息、课表、补课提醒），也可直接跳过',
+      },
+      {
+        ko: '설정 맨 위 카드의 「처음 사용 안내」에서 언제든 다시 볼 수 있어요',
+        en: 'Replay it from “First-run guide” in the Settings top card',
+        zh: '可随时在设置顶部卡片的「初次使用指南」中重看',
+      },
+    ],
+  },
+  {
     version: '1.3.1',
     date: '2026-10-19',
     items: [

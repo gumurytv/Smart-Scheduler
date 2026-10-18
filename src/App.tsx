@@ -30,9 +30,12 @@ import { syncWidgetData } from './utils/widgetSync';
 import { syncMakeupReminders } from './native/reminders';
 import { registerBackButton, keepRepainted } from './native/androidShell';
 import { ChildrenSheet, childFallbackName } from './components/ChildrenSheet';
+import { Onboarding, OnboardingExit } from './components/Onboarding';
 import { childName, listChildren } from './utils/children';
 
 const STORAGE_KEY = 'smart_school_academy_planner_v1';
+// Set once the first-run guide was finished or skipped.
+const ONBOARDED_KEY = 'teumteum.onboarded';
 
 type TabKey = 'timetable' | 'schedule' | 'attendance' | 'memo' | 'settings';
 
@@ -70,9 +73,31 @@ function loadInitialState(): PlannerState {
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('timetable');
   // Settings section to open when arriving from another tab (e.g. "내 정보" from the 지금 card)
-  const [settingsFocus, setSettingsFocus] = useState<'profile' | null>(null);
+  const [settingsFocus, setSettingsFocus] = useState<string | null>(null);
   const [state, setState] = useState<PlannerState>(() => loadInitialState());
   const [isChildSheetOpen, setIsChildSheetOpen] = useState(false);
+  // 처음 사용 안내: only on a fresh install (no saved planner yet), or when replayed from Settings.
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem(ONBOARDED_KEY) && !localStorage.getItem(STORAGE_KEY);
+    } catch {
+      return false;
+    }
+  });
+  const finishOnboarding = (exit: OnboardingExit) => {
+    try {
+      localStorage.setItem(ONBOARDED_KEY, '1');
+    } catch {
+      /* storage unavailable */
+    }
+    setShowOnboarding(false);
+    if (exit === 'timetable') {
+      setActiveTab('timetable');
+    } else {
+      setSettingsFocus(exit);
+      setActiveTab('settings');
+    }
+  };
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
@@ -333,9 +358,14 @@ export default function App() {
             focusSection={settingsFocus}
             onFocusHandled={() => setSettingsFocus(null)}
             onOpenChildren={() => setIsChildSheetOpen(true)}
+            onReplayOnboarding={() => setShowOnboarding(true)}
           />
         )}
       </main>
+
+      {showOnboarding && (
+        <Onboarding lang={lang} state={state} onUpdateState={setState} onFinish={finishOnboarding} />
+      )}
 
       {isChildSheetOpen && (
         <ChildrenSheet lang={lang} state={state} onUpdateState={setState} onClose={() => setIsChildSheetOpen(false)} />

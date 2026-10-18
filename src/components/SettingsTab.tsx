@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   Users,
+  Hand,
   History,
   LayoutList,
   ArrowUp,
@@ -103,10 +104,13 @@ import { HOME_WIDGET_META, HomeWidgetPreview } from './HomeWidgets';
 interface SettingsTabProps {
   state: PlannerState;
   onUpdateState: (updater: (prev: PlannerState) => PlannerState) => void;
-  focusSection?: 'profile' | null;
+  /** A settings card to open and scroll to (e.g. from the 지금 card or the first-run guide), or 'top'. */
+  focusSection?: string | null;
   onFocusHandled?: () => void;
   /** Opens the 자녀 선택 sheet (owned by App so the header can open it too). */
   onOpenChildren?: () => void;
+  /** Shows the first-run guide again. */
+  onReplayOnboarding?: () => void;
 }
 
 function minutesToTimeStr(total: number): string {
@@ -547,6 +551,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   focusSection,
   onFocusHandled,
   onOpenChildren,
+  onReplayOnboarding,
 }) => {
   const lang: AppLanguage = state.language || 'ko';
 
@@ -634,11 +639,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     onFocusHandledRef.current = onFocusHandled;
   }, [onFocusHandled]);
   useEffect(() => {
-    if (focusSection !== 'profile') return;
-    setOpenCards((prev) => ({ ...prev, profile: true }));
+    if (!focusSection) return;
+    const card = SETTINGS_CARD_IDS.find((id) => id === focusSection);
+    if (card) setOpenCards((prev) => ({ ...prev, [card]: true }));
     const timer = window.setTimeout(() => {
-      document.getElementById('settings-card-profile')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      profileNameRef.current?.focus({ preventScroll: true });
+      if (card) {
+        document.getElementById(`settings-card-${card}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        document.querySelector('main')?.scrollTo({ top: 0 });
+      }
+      if (card === 'profile') profileNameRef.current?.focus({ preventScroll: true });
       onFocusHandledRef.current?.();
     }, 60);
     return () => window.clearTimeout(timer);
@@ -1862,6 +1872,25 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </span>
           <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
         </button>
+
+        {onReplayOnboarding && (
+          <button
+            type="button"
+            onClick={onReplayOnboarding}
+            className="w-full rounded-2xl bg-paper px-3 py-2.5 flex items-center gap-3 text-left hover:bg-slate-100"
+          >
+            <span className="w-9 h-9 rounded-xl bg-accent-700 text-paper grid place-items-center shrink-0">
+              <Hand strokeWidth={2.5} className="w-4 h-4" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[0.8125rem] font-bold text-ink">{tr(lang, '처음 사용 안내', 'First-run guide', '初次使用指南')}</span>
+              <span className="block text-[0.6875rem] text-slate-600 truncate">
+                {tr(lang, '화면 설명과 처음 설정을 한 단계씩 다시 보기', 'Screens and setup, one step at a time', '逐步重看画面说明和初次设置')}
+              </span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
+          </button>
+        )}
 
         {/* 앱 초기화: choose which parts to clear */}
         <button
