@@ -84,6 +84,7 @@ import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/a
 import { ParsedBackup, parseBackup } from '../utils/backupImport';
 import { ImportSheet } from './ImportSheet';
 import { GuideSheet } from './GuideSheet';
+import { exportBackupFile } from '../native/backupFile';
 import { APP_VERSION, CHANGELOG } from '../data/changelog';
 import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
 import { childFallbackName } from './ChildrenSheet';
@@ -1483,7 +1484,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   // ================= SECTION 4: BACKUP & RESTORE HANDLERS =================
-  const handleExportBackupJson = () => {
+  const handleExportBackupJson = async () => {
     const now = new Date();
     const ymd = formatDateKey(now).replace(/-/g, '');
     const timestamp = `${formatDateKey(now)} ${String(now.getHours()).padStart(2, '0')}:${String(
@@ -1496,30 +1497,40 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         lastBackupDate: timestamp,
       },
     };
+    const fileName = `teumteum_backup_${ymd}.json`;
 
-    onUpdateState(() => exportState);
-
-    const blob = new Blob([JSON.stringify(exportState, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `teumteum_backup_${ymd}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setBackupFeedback({
-      type: 'success',
-      message: tr(
-        lang,
-        `teumteum_backup_${ymd}.json 파일이 저장되었습니다.`,
-        `Saved backup file: teumteum_backup_${ymd}.json`,
-        `备份文件 teumteum_backup_${ymd}.json 已保存。`
-      ),
-    });
+    try {
+      const result = await exportBackupFile(
+        fileName,
+        JSON.stringify(exportState, null, 2),
+        tr(lang, '백업 파일 보내기 · 저장하기', 'Send or save the backup', '发送或保存备份文件')
+      );
+      if (result === 'cancelled') return;
+      onUpdateState((prev) => ({ ...prev, backupMeta: { lastBackupDate: timestamp } }));
+      setBackupFeedback({
+        type: 'success',
+        message:
+          result === 'shared'
+            ? tr(
+                lang,
+                `${fileName} 파일을 보냈어요. 다시 보내거나 저장하려면 한 번 더 눌러 주세요.`,
+                `Sent ${fileName}. Tap again to send or save it somewhere else.`,
+                `已发送 ${fileName}。如需再次发送或保存，请再点一次。`
+              )
+            : tr(
+                lang,
+                `${fileName} 파일이 저장되었습니다.`,
+                `Saved backup file: ${fileName}`,
+                `备份文件 ${fileName} 已保存。`
+              ),
+      });
+    } catch (err) {
+      console.warn('Backup export failed:', err);
+      setBackupFeedback({
+        type: 'error',
+        message: tr(lang, '백업 파일을 만들지 못했어요. 다시 시도해 주세요.', 'Could not create the backup file. Please try again.', '无法创建备份文件，请重试。'),
+      });
+    }
   };
 
   const handleImportBackupJson = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3952,7 +3963,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <input
               ref={restoreFileInputRef}
               type="file"
-              accept=".json,application/json"
+              // In the app, files received by messenger often have no JSON type, so don't filter there
+              accept={isNativeApp ? undefined : '.json,application/json'}
               onChange={handleImportBackupJson}
               className="hidden"
             />
@@ -3961,11 +3973,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
-                onClick={handleExportBackupJson}
+                onClick={() => void handleExportBackupJson()}
                 className="min-h-[44px] px-4 py-2 rounded-full bg-accent-700 text-paper text-[0.8125rem] font-bold flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-accent-800"
               >
                 <Download className="w-4 h-4 shrink-0" />
-                {tr(lang, '데이터 내보내기 (저장)', 'Export Backup (.json)', '导出备份文件')}
+                {isNativeApp
+                  ? tr(lang, '데이터 내보내기 (보내기·저장)', 'Export (send or save)', '导出（发送·保存）')
+                  : tr(lang, '데이터 내보내기 (저장)', 'Export Backup (.json)', '导出备份文件')}
               </button>
 
               <button
@@ -3977,6 +3991,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 {tr(lang, '데이터 불러오기 (복원)', 'Import Backup (.json)', '导入恢复数据')}
               </button>
             </div>
+            {isNativeApp && (
+              <p className="text-[0.6875rem] text-slate-600 leading-snug">
+                {tr(
+                  lang,
+                  '「보내기·저장」을 누르면 공유 창이 떠요. 카카오톡·메일로 바로 보내거나, 「내 파일」·드라이브를 골라 저장하세요. 받은 사람은 「데이터 불러오기」로 그 파일을 열면 돼요.',
+                  'Export opens the share sheet: send it via a messenger or email, or pick Files / Drive to save it. The other person opens it with “Import”.',
+                  '点「导出」会打开分享窗口：可直接通过聊天软件或邮件发送，或选择「我的文件」/云端硬盘保存。对方用「导入」打开即可。'
+                )}
+              </p>
+            )}
 
           </div>
         </SettingsCard>
