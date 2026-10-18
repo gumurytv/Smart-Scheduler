@@ -324,7 +324,7 @@ function buildWeeklyAcademy(state: PlannerState, now: Date, lang: AppLanguage): 
           subjectLabel: slotTitle(a.subject, a.status, lang),
           isCancelled: a.isCancelled,
           isModified: a.isModified,
-          isAdded: a.isAdded,
+          isAdded: a.isMakeup,
           isOverlapping: a.isOverlapping,
           status: a.status,
           statusLabel: widgetStatusLabel(a.status, lang),
@@ -358,7 +358,7 @@ function buildNow(state: PlannerState, now: Date, lang: AppLanguage): NowWidgetD
         startTime: a.startTime,
         endTime: a.endTime,
         title: slotTitle(a.subject, a.status, lang),
-        badge: a.isAdded
+        badge: a.isMakeup
           ? tr(lang, '학원 보강/특강', 'Academy · Makeup', '补习班 补课/特讲')
           : tr(lang, '학원', 'Academy', '补习班'),
         status: a.status,
@@ -397,7 +397,7 @@ function buildNow(state: PlannerState, now: Date, lang: AppLanguage): NowWidgetD
     current,
     next: nextRaw ? strip(nextRaw) : null,
     makeups: resolved.academy
-      .filter((a) => a.isAdded)
+      .filter((a) => a.isMakeup)
       .map((a) => ({
         id: a.id,
         startTime: a.startTime,
@@ -446,14 +446,14 @@ function buildTimeline(state: PlannerState, now: Date, lang: AppLanguage): Timel
     ...resolved.academy.map((a) => ({
       key: `academy-${a.id}`,
       kind: 'academy' as const,
-      kindLabel: a.isAdded
+      kindLabel: a.isMakeup
         ? tr(lang, '보강/특강', 'Makeup', '补课/特讲')
         : tr(lang, '학원', 'Academy', '补习班'),
       startTime: a.startTime,
       endTime: a.endTime,
       title: slotTitle(a.subject, a.status, lang),
       isCancelled: a.isCancelled,
-      isAdded: a.isAdded,
+      isAdded: a.isMakeup,
       status: a.status,
       statusLabel: widgetStatusLabel(a.status, lang),
       note: a.note,
@@ -652,7 +652,7 @@ export function buildWidgetSyncPayload(
       subject: a.subject,
       subjectLabel: translateSubject(a.subject, lang),
       isCancelled: a.isCancelled,
-      isAdded: a.isAdded,
+      isAdded: a.isMakeup,
       isOverlapping: a.isOverlapping,
     })),
     todaySchedules,

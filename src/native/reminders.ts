@@ -51,7 +51,7 @@ export function planMakeupReminders(state: PlannerState, now = new Date()): Plan
     const who = kids.length > 1 ? childName(kid.data, idx, fallback) : '';
     Object.entries(kid.data.dailyOverrides || {}).forEach(([date, ov]) => {
       (ov.academy || []).forEach((a) => {
-        if (!a.isAdded || a.isCancelled || !/^\d{2}:\d{2}$/.test(a.startTime)) return;
+        if (!a.isAdded || a.notMakeup || a.isCancelled || !/^\d{2}:\d{2}$/.test(a.startTime)) return;
         const [y, m, d] = date.split('-').map(Number);
         const [hh, mm] = a.startTime.split(':').map(Number);
         const classStart = new Date(y, m - 1, d, hh, mm);
