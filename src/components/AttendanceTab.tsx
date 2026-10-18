@@ -32,7 +32,10 @@ import {
   SubjectPool,
   DAYS_OF_WEEK,
   AppLanguage,
+  MakeupPlan,
+  ScheduleItem,
 } from '../types';
+import { MakeupScheduleSheet } from './MakeupScheduleSheet';
 import { formatDateKey, getDayOfWeekKor, addDays } from '../data/initialData';
 import { resolveDailyTimetable } from '../utils/timetableHelpers';
 import {
@@ -49,6 +52,9 @@ interface AttendanceTabProps {
   dailyOverrides: DailyOverrides;
   subjectPool?: SubjectPool;
   onUpdateAttendance: (updater: (prev: AttendanceMap) => AttendanceMap) => void;
+  /** Needed to put a scheduled makeup on the timetable. */
+  onUpdateDailyOverrides?: (updater: (prev: DailyOverrides) => DailyOverrides) => void;
+  schedules?: ScheduleItem[];
 }
 
 const STATUS_ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'cancelled'];
@@ -407,6 +413,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   dailyOverrides,
   subjectPool,
   onUpdateAttendance,
+  onUpdateDailyOverrides,
+  schedules,
 }) => {
   const lang = language;
   const today = useMemo(() => new Date(), []);
@@ -420,6 +428,9 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   // Monthly KPI tile tapped → history sheet (지각 / 결석 / 출석 / 보강 대기)
   const [kpiDetail, setKpiDetail] = useState<'present' | 'late' | 'absent' | 'makeup' | null>(null);
   const checkCardRef = useRef<HTMLElement>(null);
+  // 보강 일정 등록 sheet: which missed class it is for
+  const [planTarget, setPlanTarget] = useState<{ missedDate: string; academyName: string } | null>(null);
+  const [showDoneMakeups, setShowDoneMakeups] = useState(false);
 
   /** Select a date and keep the shared month cursor (calendar + charts) in sync. */
   const selectDate = (dateStr: string) => {
@@ -477,6 +488,15 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       academyName: string;
       status: AttendanceStatus;
       reason?: string;
+      plan?: MakeupPlan;
+    }> = [];
+    const doneMakeups: Array<{
+      dateStr: string;
+      shortDateLabel: string;
+      academyName: string;
+      status: AttendanceStatus;
+      plan?: MakeupPlan;
+      completedAt?: string;
     }> = [];
 
     Object.entries(attendance || {}).forEach(([dateStr, dayAtt]) => {
@@ -492,6 +512,21 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               academyName: acName,
               status: rec.status,
               reason: rec.reason,
+              // A plan whose class was later removed from the timetable counts as not scheduled
+              plan:
+                rec.makeupPlan &&
+                dailyOverrides[rec.makeupPlan.date]?.academy?.some((x) => x.id === rec.makeupPlan!.overrideId)
+                  ? rec.makeupPlan
+                  : undefined,
+            });
+          } else if (rec.needsMakeup && rec.makeupCompleted) {
+            doneMakeups.push({
+              dateStr,
+              shortDateLabel: formatDateWithDay(dateStr, lang).shortDateLabel,
+              academyName: acName,
+              status: rec.status,
+              plan: rec.makeupPlan,
+              completedAt: rec.makeupCompletedAt,
             });
           }
         });
@@ -513,6 +548,9 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
     });
 
     pendingMakeups.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+    doneMakeups.sort((a, b) =>
+      (b.completedAt || b.plan?.date || b.dateStr).localeCompare(a.completedAt || a.plan?.date || a.dateStr)
+    );
 
     const perAcademyStats = Array.from(allAcademyNames)
       .map((acName) => {
@@ -567,9 +605,10 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       combined: computeStatsWithDates([...schoolDated, ...academyDatedAll], lang),
       perAcademyStats,
       pendingMakeups,
+      doneMakeups,
       weekly,
     };
-  }, [attendance, monthPrefix, cursorMonth, subjectPool, masterTimetable, lang]);
+  }, [attendance, monthPrefix, cursorMonth, subjectPool, masterTimetable, dailyOverrides, lang]);
 
   const activeAcademyDetailObj = useMemo(() => {
     if (!selectedAcademyDetail) return null;
@@ -740,6 +779,51 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       return next;
     });
   };
+
+  // ---- 보강 일정: register / change the makeup class, then mark it done ----
+  const shortMd = (dateStr: string) => `${Number(dateStr.slice(5, 7))}/${Number(dateStr.slice(8, 10))}`;
+
+  const saveMakeupPlan = (missedDate: string, academyName: string, when: { date: string; start: string; end: string }) => {
+    if (!onUpdateDailyOverrides) return;
+    const old = attendance[missedDate]?.academies?.[academyName]?.makeupPlan;
+    const overrideId = old?.overrideId ?? `makeup-${Date.now()}`;
+    onUpdateDailyOverrides((prev) => {
+      const next = { ...prev };
+      if (old && next[old.date]?.academy) {
+        next[old.date] = { ...next[old.date], academy: next[old.date].academy!.filter((x) => x.id !== old.overrideId) };
+      }
+      const day = { ...(next[when.date] || {}) };
+      day.academy = [
+        ...(day.academy || []).filter((x) => x.id !== overrideId),
+        {
+          id: overrideId,
+          startTime: when.start,
+          endTime: when.end,
+          subject: academyName,
+          isCancelled: false,
+          isAdded: true,
+          note: tr(lang, `${shortMd(missedDate)} 결석 보강`, `Makeup for ${shortMd(missedDate)}`, `${shortMd(missedDate)} 缺课补课`),
+        },
+      ];
+      next[when.date] = day;
+      return next;
+    });
+    handleUpdateAcademyDetail(missedDate, academyName, { makeupPlan: { ...when, overrideId } });
+    setPlanTarget(null);
+  };
+
+  const setMakeupDone = (missedDate: string, academyName: string, done: boolean) =>
+    handleUpdateAcademyDetail(missedDate, academyName, {
+      makeupCompleted: done,
+      makeupCompletedAt: done ? todayStr : undefined,
+    });
+
+  /** "10/20(화) 18:00–20:00" */
+  const planLabel = (plan: MakeupPlan) =>
+    `${shortMd(plan.date)}(${translateDay(getDayOfWeekKor(new Date(plan.date + 'T00:00:00')), lang)}) ${plan.start}–${plan.end}`;
+
+  const isPlanLive = (plan?: MakeupPlan) =>
+    Boolean(plan && dailyOverrides[plan.date]?.academy?.some((x) => x.id === plan.overrideId));
 
   /** One tap: fill every not-yet-recorded class of the selected day (timetable-cancelled academies → 휴강). */
   const handleMarkAllPresent = () => {
@@ -1356,15 +1440,31 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                         <CalendarClock strokeWidth={2.5} className="w-3.5 h-3.5" />
                         {tr(lang, '보강 필요', 'Needs makeup', '需要补课')}
                       </button>
-                      {rec.needsMakeup && (
+                      {rec.needsMakeup && !rec.makeupCompleted && !isPlanLive(rec.makeupPlan) && onUpdateDailyOverrides && (
+                        <button
+                          type="button"
+                          onClick={() => setPlanTarget({ missedDate: selectedDateStr, academyName: ac.name })}
+                          className="h-8 px-3 rounded-full border border-accent-700 text-accent-800 text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap hover:bg-accent-100"
+                        >
+                          <CalendarDays strokeWidth={2.5} className="w-3.5 h-3.5" />
+                          {tr(lang, '보강 일정 등록', 'Schedule makeup', '登记补课')}
+                        </button>
+                      )}
+                      {rec.needsMakeup && rec.makeupPlan && isPlanLive(rec.makeupPlan) && (
+                        <button
+                          type="button"
+                          onClick={() => setPlanTarget({ missedDate: selectedDateStr, academyName: ac.name })}
+                          className="h-8 px-3 rounded-full bg-sage-100 text-sage-900 text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap"
+                        >
+                          <CalendarClock strokeWidth={2.5} className="w-3.5 h-3.5" />
+                          {planLabel(rec.makeupPlan)}
+                        </button>
+                      )}
+                      {rec.needsMakeup && (rec.makeupCompleted || isPlanLive(rec.makeupPlan) || !onUpdateDailyOverrides) && (
                         <button
                           type="button"
                           aria-pressed={Boolean(rec.makeupCompleted)}
-                          onClick={() =>
-                            handleUpdateAcademyDetail(selectedDateStr, ac.name, {
-                              makeupCompleted: !rec.makeupCompleted,
-                            })
-                          }
+                          onClick={() => setMakeupDone(selectedDateStr, ac.name, !rec.makeupCompleted)}
                           className={`h-8 px-3 rounded-full text-[0.75rem] font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${
                             rec.makeupCompleted
                               ? 'bg-sage-700 text-paper hover:bg-sage-800'
@@ -1419,7 +1519,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               </span>
             </div>
             <span className="text-[0.6875rem] text-slate-600 text-right">
-              {tr(lang, '보강하면 완료를 눌러요', 'Tap done after makeup', '补课后点击完成')}
+              {tr(lang, '일정 등록 → 보강 후 완료', 'Schedule → done after it', '登记 → 补课后完成')}
             </span>
           </div>
 
@@ -1429,13 +1529,18 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                 key={`${mk.dateStr}-${mk.academyName}`}
                 className="relative rounded-2xl bg-paper p-3 pl-4 flex items-center gap-3 overflow-hidden"
               >
-                <span className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-accent" aria-hidden="true" />
+                <span
+                  className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${mk.plan ? 'bg-sage-600' : 'bg-accent'}`}
+                  aria-hidden="true"
+                />
+                {/* Tap: register the makeup (or change it once registered) */}
                 <button
                   type="button"
-                  onClick={() => {
-                    selectDate(mk.dateStr);
-                    setSelectedAcademyDetail(mk.academyName);
-                  }}
+                  onClick={() =>
+                    onUpdateDailyOverrides
+                      ? setPlanTarget({ missedDate: mk.dateStr, academyName: mk.academyName })
+                      : (selectDate(mk.dateStr), setSelectedAcademyDetail(mk.academyName))
+                  }
                   className="min-w-0 flex-1 text-left"
                 >
                   <div className="text-[0.875rem] font-bold text-ink truncate">
@@ -1452,6 +1557,17 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                       {statusShortLabel(mk.status, lang)}
                     </span>
                   </div>
+                  {mk.plan ? (
+                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sage-100 text-sage-900 text-[0.6875rem] font-bold tabular-nums">
+                      <CalendarClock strokeWidth={2.5} className="w-3 h-3 shrink-0" />
+                      {tr(lang, '일정 등록됨', 'Scheduled', '已登记')} · {planLabel(mk.plan)}
+                    </div>
+                  ) : (
+                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-accent-700 text-accent-800 text-[0.6875rem] font-bold">
+                      <CalendarDays strokeWidth={2.5} className="w-3 h-3 shrink-0" />
+                      {tr(lang, '일정 미등록 · 눌러서 등록', 'Not scheduled · tap to add', '未登记 · 点击登记')}
+                    </div>
+                  )}
                   {mk.reason && (
                     <p className="mt-1 text-[0.75rem] text-slate-600 truncate">
                       {tr(lang, '사유: ', 'Reason: ', '原因：')}
@@ -1459,21 +1575,90 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                     </p>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleUpdateAcademyDetail(mk.dateStr, mk.academyName, {
-                      makeupCompleted: true,
-                    })
-                  }
-                  className="h-10 px-3.5 rounded-full bg-sage-700 text-paper text-[0.75rem] font-bold inline-flex items-center gap-1.5 hover:bg-sage-800 active:scale-95 transition-transform shrink-0 whitespace-nowrap"
-                >
-                  <Check strokeWidth={3} className="w-4 h-4" />
-                  {tr(lang, '보강 완료', 'Done', '补课完成')}
-                </button>
+                {mk.plan || !onUpdateDailyOverrides ? (
+                  <button
+                    type="button"
+                    onClick={() => setMakeupDone(mk.dateStr, mk.academyName, true)}
+                    className="h-10 px-3.5 rounded-full bg-sage-700 text-paper text-[0.75rem] font-bold inline-flex items-center gap-1.5 hover:bg-sage-800 active:scale-95 transition-transform shrink-0 whitespace-nowrap"
+                  >
+                    <Check strokeWidth={3} className="w-4 h-4" />
+                    {tr(lang, '보강 완료', 'Done', '补课完成')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPlanTarget({ missedDate: mk.dateStr, academyName: mk.academyName })}
+                    className="h-10 px-3.5 rounded-full bg-accent-700 text-paper text-[0.75rem] font-bold inline-flex items-center gap-1.5 hover:bg-accent-800 active:scale-95 transition-transform shrink-0 whitespace-nowrap"
+                  >
+                    <CalendarDays strokeWidth={2.5} className="w-4 h-4" />
+                    {tr(lang, '일정 등록', 'Schedule', '登记')}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {/* 2-1. COMPLETED MAKEUPS (history, folded) */}
+      {monthlyStats.doneMakeups.length > 0 && (
+        <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-2.5">
+          <button
+            type="button"
+            onClick={() => setShowDoneMakeups((v) => !v)}
+            aria-expanded={showDoneMakeups}
+            className="w-full flex items-center justify-between gap-2 text-left"
+          >
+            <span className="flex items-center gap-1.5 min-w-0">
+              <CheckCircle2 strokeWidth={2.75} className="w-4 h-4 text-sage-700 shrink-0" />
+              <span className="text-[0.8125rem] font-bold text-ink truncate">
+                {tr(lang, '완료된 보강 이력', 'Completed makeups', '已完成补课记录')}
+              </span>
+              <span className="px-2 py-px rounded-full bg-sage-700 text-paper text-[0.6875rem] font-bold tabular-nums">
+                {tr(lang, `${monthlyStats.doneMakeups.length}건`, `${monthlyStats.doneMakeups.length}`, `${monthlyStats.doneMakeups.length}项`)}
+              </span>
+            </span>
+            {showDoneMakeups ? (
+              <ChevronUp className="w-4 h-4 text-slate-600 shrink-0" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
+            )}
+          </button>
+          {showDoneMakeups && (
+            <ul className="space-y-1.5">
+              {monthlyStats.doneMakeups.map((mk) => (
+                <li
+                  key={`${mk.dateStr}-${mk.academyName}`}
+                  className="rounded-2xl bg-paper px-3 py-2.5 flex items-center gap-3"
+                >
+                  <span className="w-8 h-8 rounded-full bg-sage-100 text-sage-800 grid place-items-center shrink-0">
+                    <Check strokeWidth={3} className="w-4 h-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[0.8125rem] font-bold text-ink truncate">
+                      {translateSubject(mk.academyName, lang)}
+                    </span>
+                    <span className="block text-[0.6875rem] text-slate-600 tabular-nums leading-snug">
+                      {statusShortLabel(mk.status, lang)} {mk.shortDateLabel}
+                      {' → '}
+                      {mk.plan
+                        ? tr(lang, `보강 ${planLabel(mk.plan)}`, `made up ${planLabel(mk.plan)}`, `补课 ${planLabel(mk.plan)}`)
+                        : mk.completedAt
+                        ? tr(lang, `${shortMd(mk.completedAt)} 완료`, `done ${shortMd(mk.completedAt)}`, `${shortMd(mk.completedAt)} 完成`)
+                        : tr(lang, '보강 완료', 'done', '已完成')}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMakeupDone(mk.dateStr, mk.academyName, false)}
+                    className="h-8 px-2.5 rounded-full border border-divider text-[0.6875rem] font-bold text-slate-700 hover:bg-surface shrink-0 whitespace-nowrap"
+                  >
+                    {tr(lang, '완료 취소', 'Undo', '撤销')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 
@@ -2082,6 +2267,39 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       </section>
 
       {/* KPI history sheet */}
+      {planTarget && onUpdateDailyOverrides && (() => {
+        const { missedDate, academyName } = planTarget;
+        const rec = attendance[missedDate]?.academies?.[academyName];
+        const live = isPlanLive(rec?.makeupPlan) ? rec?.makeupPlan : undefined;
+        // Default: the same time as the missed class, from tomorrow (or the day after the missed one)
+        const missedClass = resolveDailyTimetable(missedDate, masterTimetable, dailyOverrides).academy.find(
+          (a) => a.subject === academyName
+        );
+        const tomorrow = formatDateKey(addDays(today, 1));
+        const dayAfter = formatDateKey(addDays(new Date(missedDate + 'T00:00:00'), 1));
+        const initial = live
+          ? { date: live.date, start: live.start, end: live.end }
+          : {
+              date: dayAfter > tomorrow ? dayAfter : tomorrow,
+              start: missedClass?.startTime || '18:00',
+              end: missedClass?.endTime || '20:00',
+            };
+        return (
+          <MakeupScheduleSheet
+            lang={lang}
+            academyName={academyName}
+            missedLabel={`${formatDateWithDay(missedDate, lang).shortDateLabel} ${rec ? statusShortLabel(rec.status, lang) : ''}`}
+            initial={initial}
+            editingOverrideId={live?.overrideId}
+            masterTimetable={masterTimetable}
+            dailyOverrides={dailyOverrides}
+            schedules={schedules}
+            onSave={(when) => saveMakeupPlan(missedDate, academyName, when)}
+            onClose={() => setPlanTarget(null)}
+          />
+        );
+      })()}
+
       {kpiDetail && (
         <div
           className="fixed inset-0 z-50 bg-slate-900/50 flex items-end justify-center"

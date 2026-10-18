@@ -312,6 +312,8 @@ export default function App() {
             dailyOverrides={state.dailyOverrides}
             subjectPool={state.subjectPool}
             onUpdateAttendance={handleUpdateAttendance}
+            onUpdateDailyOverrides={handleUpdateDailyOverrides}
+            schedules={state.schedules}
           />
         )}
 

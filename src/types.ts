@@ -45,7 +45,9 @@ export interface AcademyOverrideItem {
   endTime: string;
   subject: string;
   isCancelled?: boolean;
-  isAdded?: boolean; // True if added as a one-day makeup/special class
+  isAdded?: boolean; // True if added for one day only (not in the weekly master timetable)
+  /** A one-day class that isn't a makeup (시간표 → 주간 → 학원 빈 칸에서 「이날만 수업」). */
+  notMakeup?: boolean;
   status?: SlotStatus;
   note?: string;
   originalSubject?: string;
@@ -79,6 +81,18 @@ export interface AttendanceRecord {
   reason?: string;
   needsMakeup?: boolean;
   makeupCompleted?: boolean;
+  /** 출석표 → 미완료 보강 → 일정 등록: the makeup class put on the timetable for this missed class. */
+  makeupPlan?: MakeupPlan;
+  /** YYYY-MM-DD the makeup was marked done. */
+  makeupCompletedAt?: string;
+}
+
+export interface MakeupPlan {
+  date: string; // YYYY-MM-DD
+  start: string; // HH:MM
+  end: string; // HH:MM
+  /** id of the one-day academy class in dailyOverrides[date].academy */
+  overrideId: string;
 }
 
 export interface DailyAttendance {

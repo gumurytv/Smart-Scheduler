@@ -358,7 +358,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   // Edit / add sheet targets (keyed by date so they work from the weekly view and the "Now" card too)
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   // source 'button' = top 보강/특강 추가 button (academy only, any date); 'canvas' = empty time slot
-  const [addTarget, setAddTarget] = useState<{ date: string; source: 'button' | 'canvas' } | null>(null);
+  // source: 'button' = 보강/특강 추가 button, 'canvas' = a free slot (academy or event), 'weekly' = 주간 학원 빈 칸
+  const [addTarget, setAddTarget] = useState<{ date: string; source: 'button' | 'canvas' | 'weekly' } | null>(null);
+  // Academy add: a makeup/special class, or a one-day class that isn't a makeup
+  const [addAsMakeup, setAddAsMakeup] = useState(true);
   // Save that overlaps something: ask before going ahead
   const [pendingConflict, setPendingConflict] = useState<{ conflicts: TimeConflict[]; proceed: () => void } | null>(null);
   const [addKind, setAddKind] = useState<'academy' | 'schedule'>('academy');
@@ -756,7 +759,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     Object.entries(dailyOverrides).forEach(([date, ov]) => {
       if (date < twoWeeksAgo) return;
       (ov.academy || []).forEach((item) => {
-        if (item.isAdded) rows.push({ date, item });
+        if (item.isAdded && !item.notMakeup) rows.push({ date, item });
       });
     });
     rows.sort((a, b) => (a.date + a.item.startTime).localeCompare(b.date + b.item.startTime));
@@ -813,7 +816,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
   const openAddAcademyModal = (
     defaultStart = '18:00',
     defaultEnd = '20:00',
-    source: 'button' | 'canvas' = 'canvas',
+    source: 'button' | 'canvas' | 'weekly' = 'canvas',
     dateStr: string = selectedDateStr
   ) => {
     const startMin = timeToMinutes(defaultStart);
@@ -824,6 +827,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     setEditTarget(null);
     setAddTarget({ date: dateStr, source });
     setAddKind('academy');
+    setAddAsMakeup(true);
     setTempStartTime(defaultStart);
     setTempEndTime(minutesToTimeStr(reasonableEndMin));
     setTempAcademySubject(subjectPool.academy[0] || '');
@@ -1024,6 +1028,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           subject: existing?.subject ?? item.subject,
           isCancelled: existing?.isCancelled ?? item.isCancelled,
           isAdded: item.isAdded,
+          notMakeup: existing?.notMakeup,
           status: existing?.status ?? item.status,
           note: existing?.note ?? item.note,
           originalSubject: item.originalSubject,
@@ -1035,6 +1040,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         if (!entry.status) delete entry.status;
         if (!entry.note) delete entry.note;
         if (!entry.masterId) delete entry.masterId;
+        if (!entry.notMakeup) delete entry.notMakeup;
         if (foundIdx >= 0) {
           const copy = [...list];
           copy[foundIdx] = entry;
@@ -1054,6 +1060,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         subject: chosenSubject,
         isCancelled: false,
         isAdded: true,
+        ...(addTarget.source !== 'button' && !addAsMakeup ? { notMakeup: true } : {}),
       };
       const dateStr = addTarget.date;
       guardOverlap(dateStr, tempStartTime, tempEndTime, () => {
@@ -1199,7 +1206,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           endTime: a.endTime,
           title: slotTitle(a.subject, a.status, lang),
           subject: slotTitle(a.subject, a.status, lang),
-          badge: a.isAdded
+          badge: a.isMakeup
             ? tr(lang, '학원 보강/특강', 'Academy · Makeup', '补习班 补课/特讲')
             : tr(lang, '학원', 'Academy', '补习班'),
           status: a.status,
@@ -1209,7 +1216,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
     const current = entries.filter((e) => e.start <= nowMinutes && nowMinutes < e.end);
     const next = entries.find((e) => e.start > nowMinutes) ?? null;
-    const makeups = todayData.academy.filter((a) => a.isAdded);
+    const makeups = todayData.academy.filter((a) => a.isMakeup);
     const makeupSchedules = getSchedulesForDate(schedules, todayStr).filter(
       (s) => s.category === 'academy' && s.title.includes('보강')
     );
@@ -1344,9 +1351,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     weekDays.forEach((wd) => {
       const ov = dailyOverrides[wd.dateStr];
       const academyOv = ov?.academy || [];
-      const makeup = academyOv.some((a) => a.isAdded);
+      const makeup = academyOv.some((a) => a.isAdded && !a.notMakeup);
       const changed =
-        Object.keys(ov?.school || {}).length > 0 || academyOv.some((a) => !a.isAdded);
+        Object.keys(ov?.school || {}).length > 0 || academyOv.some((a) => !a.isAdded || a.notMakeup);
       const schedule = getSchedulesForDate(schedules, wd.dateStr).length > 0;
       map[wd.dateStr] = { makeup, changed, schedule };
     });
@@ -2285,6 +2292,18 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           </button>
         </div>
         )}
+
+        {/* 주간: the same 보강 추가 as the day view (any date, edit registered ones) */}
+        {viewMode === 'weekly' && (
+          <button
+            type="button"
+            onClick={() => openAddAcademyModal('18:00', '20:00', 'button', selectedDateStr)}
+            className="w-full h-10 px-3.5 rounded-full border border-divider bg-paper text-accent-800 text-[0.75rem] font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-100 whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" strokeWidth={2.75} />
+            {tr(lang, '보강 추가', 'Makeup', '加补课')}
+          </button>
+        )}
       </section>
 
       {/* VIEW MODE 3: MONTHLY — school + academies for every day, tap a day to edit/add */}
@@ -2305,7 +2324,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                 const academies = cell.academy.filter((a) => !a.isCancelled);
                 const shown = academies.slice(0, 2);
                 const more = academies.length - shown.length;
-                const hasMakeup = cell.academy.some((a) => a.isAdded);
+                const hasMakeup = cell.academy.some((a) => a.isMakeup);
                 return (
                   <button
                     key={cell.dateStr}
@@ -2348,12 +2367,12 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                       </span>
                     )}
                     {shown.map((a) => {
-                      const c = a.isAdded ? undefined : subjectColor(subjectColors, a.subject);
+                      const c = a.isMakeup ? undefined : subjectColor(subjectColors, a.subject);
                       return (
                       <span
                         key={a.id}
                         className={`rounded-md text-[0.5625rem] font-bold leading-tight px-1 py-px truncate ${
-                          a.isAdded ? 'bg-accent-700 text-paper' : c ? '' : 'bg-accent-100 text-accent-800'
+                          a.isMakeup ? 'bg-accent-700 text-paper' : c ? '' : 'bg-accent-100 text-accent-800'
                         }`}
                         style={c ? { backgroundColor: c.bg, color: c.fg } : undefined}
                       >
@@ -2464,7 +2483,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                               ? `${tr(lang, `${row.p.period}교시`, `P${row.p.period}`, `第${row.p.period}节`)} · ${translateSubject(row.p.subject, lang)}`
                               : translateSubject(row.a.subject, lang)}
                           </span>
-                          {!isSchool && row.a.isAdded && (
+                          {!isSchool && row.a.isMakeup && (
                             <span className="px-1.5 py-px rounded-full bg-accent-700 text-paper text-[0.625rem] font-bold shrink-0">
                               {tr(lang, '보강', 'Makeup', '补课')}
                             </span>
@@ -2822,7 +2841,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           : slotTitle(item.subject, item.status, lang),
                         startTime: item.startTime,
                         endTime: item.endTime,
-                        badge: item.isAdded
+                        badge: item.isMakeup
                           ? tr(lang, '보강', 'Makeup', '补课')
                           : tr(lang, '학원', 'Academy', '补习班'),
                         status: item.status,
@@ -2837,7 +2856,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           item.isModified && !item.isAdded && item.originalSubject && item.originalSubject !== item.subject
                             ? translateSubject(item.originalSubject, lang)
                             : undefined,
-                        isMakeup: item.isAdded,
+                        isMakeup: item.isMakeup,
                         subject: item.subject,
                         onClick: () => openEditAcademyModal(item),
                       })
@@ -2979,7 +2998,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                         title: item.isCancelled
                           ? translateSubject(item.subject, lang)
                           : slotTitle(item.subject, item.status, lang),
-                        badge: item.isAdded
+                        badge: item.isMakeup
                           ? tr(lang, '보강', 'Makeup', '补课')
                           : tr(lang, '학원', 'Academy', '补习班'),
                         status: item.status,
@@ -2994,7 +3013,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           item.isModified && !item.isAdded && item.originalSubject && item.originalSubject !== item.subject
                             ? translateSubject(item.originalSubject, lang)
                             : undefined,
-                        isMakeup: item.isAdded,
+                        isMakeup: item.isMakeup,
                         subject: item.subject,
                         onClick: () => openEditAcademyModal(item),
                       })
@@ -3057,7 +3076,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             <div className="flex items-center justify-between gap-2">
               <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink min-w-0">
                 <GraduationCap className="w-4 h-4 text-sage-700 shrink-0" strokeWidth={2.5} />
-                <span className="truncate">{tr(lang, '학교 시간표 · 월~금', 'School · Mon–Fri', '学校课表 · 周一至周五')}</span>
+                <span className="truncate">{tr(lang, '학교 시간표', 'School timetable', '学校课表')}</span>
               </h2>
               <span className="text-[0.6875rem] font-semibold text-slate-600 whitespace-nowrap">
                 {tr(lang, '칸을 눌러 수정', 'Tap a cell to edit', '点击单元格修改')}
@@ -3189,7 +3208,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3" style={blockOrder('weekAcademy')}>
             <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
               <Building2 className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
-              {tr(lang, '학원 · 월~일', 'Academies · Mon–Sun', '补习班 · 周一至周日')}
+              {tr(lang, '학원 시간표', 'Academy timetable', '补习班课表')}
             </h2>
             <div className="space-y-1.5">
               {weeklyData.map((wd) => (
@@ -3210,11 +3229,22 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   >
                     {renderDateBlock(wd.dateStr, wd.isToday ? 'accent' : 'plain', 'sm')}
                   </button>
-                  <div className="flex-1 min-w-0 flex flex-wrap gap-1.5">
+                  {/* Tapping the row's free space adds an academy class on that day */}
+                  <div
+                    className="flex-1 min-w-0 min-h-[36px] flex flex-wrap items-center gap-1.5 cursor-pointer"
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) openAddAcademyModal('18:00', '20:00', 'weekly', wd.dateStr);
+                    }}
+                  >
                     {wd.resolved.academy.length === 0 ? (
-                      <span className="text-[0.75rem] font-medium text-slate-500">
-                        {tr(lang, '학원 없음', 'No academy', '无补习班')}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openAddAcademyModal('18:00', '20:00', 'weekly', wd.dateStr)}
+                        className="h-8 px-3 rounded-full border border-dashed border-slate-400 text-[0.75rem] font-semibold text-slate-600 inline-flex items-center gap-1 hover:bg-surface"
+                      >
+                        <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                        {tr(lang, '학원 수업 추가', 'Add a class', '添加课程')}
+                      </button>
                     ) : (
                       wd.resolved.academy.map((ac) => (
                         <button
@@ -3223,7 +3253,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           onClick={() => openItemOnDate({ kind: 'academy', item: ac }, wd.dateObj)}
                           style={(() => {
                             const c =
-                              !ac.isCancelled && ac.status !== 'selfStudy' && !ac.isAdded
+                              !ac.isCancelled && ac.status !== 'selfStudy' && !ac.isMakeup
                                 ? subjectColor(subjectColors, ac.subject)
                                 : undefined;
                             return c ? { backgroundColor: c.bg, color: c.fg } : undefined;
@@ -3233,7 +3263,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                               ? 'bg-paper border border-dashed border-slate-400 text-slate-600'
                               : ac.status === 'selfStudy'
                               ? 'bg-slate-200 text-ink'
-                              : ac.isAdded
+                              : ac.isMakeup
                               ? 'bg-accent-700 text-paper hover:bg-accent-800'
                               : subjectColor(subjectColors, ac.subject)
                               ? 'hover:brightness-95 border border-transparent'
@@ -3254,6 +3284,16 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                           {ac.note && <StickyNote className="w-3 h-3 shrink-0" />}
                         </button>
                       ))
+                    )}
+                    {wd.resolved.academy.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => openAddAcademyModal('18:00', '20:00', 'weekly', wd.dateStr)}
+                        aria-label={tr(lang, `${formatDateLabel(wd.dateStr, lang)} 학원 수업 추가`, `Add a class on ${formatDateLabel(wd.dateStr, lang)}`, `在${formatDateLabel(wd.dateStr, lang)}添加课程`)}
+                        className="w-8 h-8 rounded-full border border-dashed border-slate-400 text-slate-600 grid place-items-center hover:bg-surface shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -3415,10 +3455,10 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <span
                       className={`px-2 py-px rounded-full text-[0.6875rem] font-bold ${
-                        editingAcademyItem.isAdded ? 'bg-accent-700 text-paper' : 'bg-accent-200 text-accent-900'
+                        editingAcademyItem.isMakeup ? 'bg-accent-700 text-paper' : 'bg-accent-200 text-accent-900'
                       }`}
                     >
-                      {editingAcademyItem.isAdded
+                      {editingAcademyItem.isMakeup
                         ? tr(lang, '당일 보강', 'Makeup', '临时补课')
                         : tr(lang, '학원', 'Academy', '补习班')}
                     </span>
@@ -3570,6 +3610,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   <h3 className="text-[1rem] font-bold text-ink truncate">
                     {addTarget.source === 'button'
                       ? tr(lang, '보강/특강 추가', 'Add makeup / special class', '添加补课/特讲')
+                      : addTarget.source === 'weekly'
+                      ? tr(lang, '학원 수업 추가', 'Add an academy class', '添加补习班课程')
                       : tr(lang, '이 시간에 추가하기', 'Add at this time', '在此时间添加')}
                   </h3>
                   <div className="text-[0.75rem] font-semibold text-slate-600 truncate">
@@ -3587,7 +3629,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </button>
             </div>
 
-            {addTarget.source === 'button' && (
+            {addTarget.source !== 'canvas' && (
               <label className="block space-y-1.5">
                 <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                   <CalendarClock className="w-4 h-4 text-accent-700" />
@@ -3603,7 +3645,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </label>
             )}
 
-            {onUpdateSchedules && addTarget.source !== 'button' && (
+            {onUpdateSchedules && addTarget.source === 'canvas' && (
               <div className="grid grid-cols-2 p-1 rounded-full bg-surface" role="tablist">
                 {(
                   [
@@ -3631,8 +3673,40 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               </div>
             )}
 
-            {addKind === 'academy' || !onUpdateSchedules || addTarget.source === 'button' ? (
+            {addKind === 'academy' || !onUpdateSchedules || addTarget.source !== 'canvas' ? (
               <>
+                {addTarget.source !== 'button' && (
+                  <div className="space-y-2">
+                    <span className="text-[0.8125rem] font-bold text-ink">
+                      {tr(lang, '수업 종류', 'Class type', '课程类型')}
+                    </span>
+                    <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-surface" role="radiogroup">
+                      {(
+                        [
+                          [true, tr(lang, '보강 · 특강', 'Makeup · special', '补课 · 特讲'), tr(lang, '보강 알림 대상', 'Gets a reminder', '会收到提醒')],
+                          [false, tr(lang, '일반 수업', 'Regular class', '普通课程'), tr(lang, '이 날만 추가', 'This day only', '仅当天')],
+                        ] as Array<[boolean, string, string]>
+                      ).map(([value, label, hint]) => (
+                        <button
+                          key={String(value)}
+                          type="button"
+                          role="radio"
+                          aria-checked={addAsMakeup === value}
+                          onClick={() => setAddAsMakeup(value)}
+                          className={`rounded-xl px-2 py-2 text-center transition-colors ${
+                            addAsMakeup === value ? 'bg-accent-700 text-paper' : 'text-ink hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="block text-[0.8125rem] font-bold">{label}</span>
+                          <span className={`block text-[0.625rem] ${addAsMakeup === value ? 'text-paper/80' : 'text-slate-600'}`}>
+                            {hint}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <span className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                     <Clock className="w-4 h-4 text-accent-700" />

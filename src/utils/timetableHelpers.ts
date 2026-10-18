@@ -31,6 +31,8 @@ export interface ResolvedAcademyItem {
   isModified: boolean;
   isCancelled: boolean;
   isAdded: boolean;
+  /** Added for one day as a makeup/special class (isAdded without notMakeup). */
+  isMakeup: boolean;
   isOverlapping: boolean;
   status?: SlotStatus;
   note?: string;
@@ -122,6 +124,7 @@ export function resolveDailyTimetable(
           isModified: false,
           isCancelled: false,
           isAdded: false,
+          isMakeup: false,
         });
       } else {
         const isCancelled = Boolean(ov.isCancelled);
@@ -143,6 +146,7 @@ export function resolveDailyTimetable(
           isModified,
           isCancelled,
           isAdded: false,
+          isMakeup: false,
           status: ov.status ?? (isCancelled ? 'cancelled' : undefined),
           note: ov.note,
         });
@@ -158,6 +162,7 @@ export function resolveDailyTimetable(
         isModified: true,
         isCancelled: Boolean(added.isCancelled),
         isAdded: true,
+        isMakeup: !added.notMakeup,
         status: added.status ?? (added.isCancelled ? 'cancelled' : undefined),
         note: added.note,
       });
@@ -175,6 +180,7 @@ export function resolveDailyTimetable(
       isModified: false,
       isCancelled: false,
       isAdded: false,
+      isMakeup: false,
     }));
   }
 

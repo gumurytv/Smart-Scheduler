@@ -143,9 +143,9 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
       {
         title: { ko: '보강 챙기기', en: 'Track makeups', zh: '跟进补课' },
         desc: {
-          ko: '빠진 학원 수업은 「보강 필요」로 표시하고, 보강을 마치면 완료로 바꿔요. 미완료 보강은 위쪽 배지로도 보여요.',
-          en: 'Mark missed academy classes “needs makeup” and tick them off when done. Pending ones show as a badge in the header.',
-          zh: '缺上的补习班课程可标记为「需补课」，完成后标记完成。未完成的会在顶部徽章显示。',
+          ko: '빠진 학원 수업은 「보강 필요」로 표시하고, 미완료 보강에서 보강 일정을 등록하면 시간표에 들어가요. 보강을 마치면 「보강 완료」를 누르고, 완료된 보강 이력에서 다시 볼 수 있어요.',
+          en: 'Mark missed academy classes “needs makeup”, schedule the makeup (it goes on the timetable), then mark it done; completed ones stay in the history.',
+          zh: '缺上的补习班课程可标记为「需补课」，登记补课时间后会加入课表，补课后标记完成，可在完成记录中查看。',
         },
       },
       {

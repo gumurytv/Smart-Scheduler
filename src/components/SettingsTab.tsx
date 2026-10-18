@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   Users,
+  History,
   LayoutList,
   ArrowUp,
   ArrowDown,
@@ -18,6 +19,7 @@ import {
   AlertCircle,
   Trash2,
   ChevronDown,
+  ChevronUp,
   ChevronsDownUp,
   Loader2,
   RotateCcw,
@@ -82,6 +84,7 @@ import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/a
 import { ParsedBackup, parseBackup } from '../utils/backupImport';
 import { ImportSheet } from './ImportSheet';
 import { GuideSheet } from './GuideSheet';
+import { APP_VERSION, CHANGELOG } from '../data/changelog';
 import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
 import { childFallbackName } from './ChildrenSheet';
 import { childName, listChildren } from '../utils/children';
@@ -217,8 +220,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets'];
+type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'updates';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'updates'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -547,6 +550,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const lang: AppLanguage = state.language || 'ko';
 
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  // 업데이트 이력: which version is unfolded (null = the latest)
+  const [openVersion, setOpenVersion] = useState<string | null>(null);
 
   // Accordion open state (all collapsed by default; remembered per device)
   const [openCards, setOpenCards] = useState<Partial<Record<SettingsCardId, boolean>>>(loadOpenCards);
@@ -4153,6 +4158,56 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </button>
 
             <SectionResetButton lang={lang} label={sectionResetLabel} onConfirm={handleResetWidgets} />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="updates"
+          open={!!openCards.updates}
+          onToggle={toggleCard}
+          tone="neutral"
+          icon={History}
+          title={tr(lang, '업데이트 이력', 'Update history', '更新记录')}
+          summary={tr(lang, `지금 버전 ${APP_VERSION}`, `Current version ${APP_VERSION}`, `当前版本 ${APP_VERSION}`)}
+        >
+          <div className="p-4 space-y-2">
+            {CHANGELOG.map((entry, i) => {
+              const open = openVersion === null ? i === 0 : openVersion === entry.version;
+              return (
+                <div key={entry.version} className="rounded-2xl bg-paper overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setOpenVersion(open ? '' : entry.version)}
+                    aria-expanded={open}
+                    className="w-full px-3.5 py-2.5 flex items-center gap-2 text-left hover:bg-slate-100"
+                  >
+                    <span className="font-mono text-[0.875rem] font-bold text-ink tabular-nums">v{entry.version}</span>
+                    {i === 0 && (
+                      <span className="px-1.5 py-px rounded-full bg-accent-700 text-paper text-[0.625rem] font-bold">
+                        {tr(lang, '최신', 'Latest', '最新')}
+                      </span>
+                    )}
+                    <span className="flex-1" />
+                    <span className="text-[0.6875rem] text-slate-600 tabular-nums">{entry.date.replace(/-/g, '.')}</span>
+                    {open ? (
+                      <ChevronUp className="w-4 h-4 text-slate-600 shrink-0" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
+                    )}
+                  </button>
+                  {open && (
+                    <ul className="px-3.5 pb-3 space-y-1.5">
+                      {entry.items.map((item, j) => (
+                        <li key={j} className="flex items-start gap-2 text-[0.75rem] text-slate-700 leading-[1.5] break-keep">
+                          <span className="w-1.5 h-1.5 mt-[0.45rem] rounded-full bg-accent shrink-0" aria-hidden="true" />
+                          <span>{tr(lang, item.ko, item.en, item.zh)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </SettingsCard>
       </div>
