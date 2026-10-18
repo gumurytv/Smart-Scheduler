@@ -10,6 +10,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.1',
+    date: '2026-10-19',
+    items: [
+      {
+        ko: '앱에서 「데이터 내보내기」를 눌러도 파일이 만들어지지 않던 문제 수정: 이제 공유 창이 떠서 카카오톡·메일로 보내거나 「내 파일」·드라이브에 저장할 수 있어요',
+        en: 'Fixed “Export” creating no file in the app: it now opens the share sheet to send it or save it to Files / Drive',
+        zh: '修复应用内「导出」不生成文件的问题：现在会打开分享窗口，可发送或保存到「我的文件」/云端硬盘',
+      },
+      {
+        ko: '「데이터 불러오기」에서 메신저로 받은 백업 파일도 고를 수 있어요',
+        en: '“Import” can now pick backup files received by messenger',
+        zh: '「导入」现在可以选择通过聊天软件收到的备份文件',
+      },
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-10-18',
     items: [
