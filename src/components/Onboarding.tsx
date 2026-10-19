@@ -8,6 +8,7 @@ import {
   ChevronRight,
   GraduationCap,
   Hand,
+  Globe,
   IdCard,
   Lightbulb,
   Rocket,
@@ -138,7 +139,8 @@ const SETUP: SetupStep[] = ['text', 'sample', 'profile', 'pool', 'school', 'acad
 /** 처음 사용 안내: welcome → (화면 설명) → (초기 설정 단계) → done. Skippable at any point. */
 export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateState, onFinish, onShowTab, onVisit, onPreview }) => {
   const t = (l: L3) => tr(lang, l[0], l[1], l[2]);
-  const [phase, setPhase] = useState<'welcome' | 'tour' | 'setup' | 'done'>('welcome');
+  // Language comes first, so every screen after it is in the chosen language.
+  const [phase, setPhase] = useState<'language' | 'welcome' | 'tour' | 'setup' | 'done'>('language');
   const [index, setIndex] = useState(0);
   const [sampleChoice, setSampleChoice] = useState<'keep' | 'clear' | null>(null);
   const [reminderDenied, setReminderDenied] = useState(false);
@@ -263,10 +265,62 @@ export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateSta
 
   let body: React.ReactNode = null;
 
-  if (phase === 'welcome') {
+  if (phase === 'language') {
+    const langs: Array<[AppLanguage, string, string]> = [
+      ['ko', '한국어', '안녕하세요! 한국어로 안내할게요'],
+      ['en', 'English', 'Hello! The guide will be in English'],
+      ['zh', '中文', '你好！将用中文为你介绍'],
+    ];
     body = (
       <div className="space-y-6">
         <div className="space-y-3 pt-4">
+          <span className="w-16 h-16 rounded-3xl bg-accent-700 text-paper grid place-items-center">
+            <Globe className="w-8 h-8" strokeWidth={2.25} />
+          </span>
+          {/* Shown in all three languages: nothing is chosen yet */}
+          <h1 className="text-[1.5rem] font-extrabold text-ink leading-tight">
+            언어를 선택하세요
+            <span className="block text-[1.0625rem] font-bold text-slate-600 mt-1">Choose your language · 请选择语言</span>
+          </h1>
+        </div>
+        <div className="space-y-3" role="radiogroup">
+          {langs.map(([code, name, hello]) => (
+            <button
+              key={code}
+              type="button"
+              role="radio"
+              aria-checked={lang === code}
+              onClick={() => {
+                onUpdateState((prev) => ({ ...prev, language: code }));
+                setPhase('welcome');
+              }}
+              className={`w-full rounded-3xl px-5 py-4 flex items-center gap-4 text-left transition-colors ${
+                lang === code ? 'bg-accent-700 text-paper' : 'bg-surface text-ink border border-divider hover:bg-slate-100'
+              }`}
+            >
+              <span className="flex-1 min-w-0">
+                <span className="block text-[1.25rem] font-extrabold leading-snug">{name}</span>
+                <span className={`block text-[0.875rem] ${lang === code ? 'text-paper/85' : 'text-slate-600'}`}>{hello}</span>
+              </span>
+              <ChevronRight className="w-6 h-6 shrink-0" />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  } else if (phase === 'welcome') {
+    body = (
+      <div className="space-y-6">
+        <button
+          type="button"
+          onClick={() => setPhase('language')}
+          className="h-9 -ml-1 px-2 rounded-full text-[0.875rem] font-bold text-slate-700 inline-flex items-center gap-1 hover:bg-surface"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <Globe className="w-4 h-4" />
+          {tr(lang, '언어 바꾸기', 'Change language', '更改语言')}
+        </button>
+        <div className="space-y-3">
           <span className="w-16 h-16 rounded-3xl bg-accent-700 text-paper grid place-items-center">
             <Hand className="w-8 h-8" strokeWidth={2.25} />
           </span>
@@ -342,31 +396,6 @@ export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateSta
                 </span>
               </button>
             ))}
-          </div>
-          <div className="space-y-2">
-            <p className="text-[0.875rem] font-bold text-ink">{tr(lang, '언어', 'Language', '语言')}</p>
-            <div className="grid grid-cols-3 gap-2" role="radiogroup">
-              {(
-                [
-                  ['ko', '한국어'],
-                  ['en', 'English'],
-                  ['zh', '中文'],
-                ] as Array<[AppLanguage, string]>
-              ).map(([code, label]) => (
-                <button
-                  key={code}
-                  type="button"
-                  role="radio"
-                  aria-checked={lang === code}
-                  onClick={() => onUpdateState((prev) => ({ ...prev, language: code }))}
-                  className={`h-12 rounded-2xl text-[0.9375rem] font-bold ${
-                    lang === code ? 'bg-accent-700 text-paper' : 'bg-surface text-ink border border-divider'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       );
@@ -646,7 +675,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateSta
         ) : (
           <span className="text-[1.125rem] font-extrabold text-accent-700">{tr(lang, '틈틈', 'TeumTeum', 'TeumTeum')}</span>
         )}
-        {phase !== 'done' && (
+        {phase !== 'done' && phase !== 'language' && (
           <button
             type="button"
             onClick={() => onFinish('timetable')}

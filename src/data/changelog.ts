@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.1',
+    date: '2026-10-19',
+    items: [
+      {
+        ko: '처음 사용 안내가 언어 선택으로 시작해요. 고른 언어로 모든 안내와 예시 화면이 나와요',
+        en: 'The first-run guide now starts by choosing a language; every guide screen and example follows it',
+        zh: '初次使用指南从选择语言开始，所有说明和示例画面都会使用所选语言',
+      },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-10-19',
     items: [
