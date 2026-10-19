@@ -2081,7 +2081,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </SettingsCard>
 
       {/* ===== GROUP: 시간표 ===== */}
-      <div className="space-y-2" data-tour="settings-timetable">
+      <div className="space-y-2">
         <GroupHeader label={tr(lang, '시간표', 'Timetable', '课表')} />
 
         <SettingsCard

@@ -114,9 +114,21 @@ const COACH: Array<{ tab: TabKey; target: string; title: L3; text: L3 }> = [
   },
   {
     tab: 'settings',
-    target: 'settings-timetable',
-    title: ['내 시간표 넣는 곳', 'Where your timetable goes', '填写课表的地方'],
-    text: ['학교 · 학원 시간표와 과목은 여기서 넣어요. 다음 「처음 설정」에서 차근차근 알려드릴게요.', 'School and academy timetables are entered here. The setup steps come next.', '学校、补习班课表和科目在这里填写。接下来的「初次设置」会一步步说明。'],
+    target: '#settings-card-pool',
+    title: ['과목/수업 설정', 'Subjects & classes', '科目/课程设置'],
+    text: ['듣는 과목과 다니는 학원 이름을 먼저 여기에 넣어요. 시간표를 채울 때 이 목록에서 골라요.', 'First add your subjects and academies here; you’ll pick from them when filling timetables.', '先在这里添加科目和补习班名称，填写课表时从中选择。'],
+  },
+  {
+    tab: 'settings',
+    target: '#settings-card-school',
+    title: ['학교 시간표', 'School timetable', '学校课表'],
+    text: ['수업 시간을 정하고, 요일 × 교시 칸을 눌러 과목을 넣어요.', 'Set the class times, then tap each day × period cell to add the subject.', '设置上课时间，再点「星期 × 节次」格子填写科目。'],
+  },
+  {
+    tab: 'settings',
+    target: '#settings-card-academy',
+    title: ['학원 시간표', 'Academy timetable', '补习班课表'],
+    text: ['요일마다 학원과 시간을 넣으면 매주 반복돼요. 다음 「처음 설정」에서 차근차근 알려드릴게요.', 'Add each academy with its day and time; it repeats weekly. The setup steps come next.', '按星期填写补习班和时间，每周重复。接下来的「初次设置」会一步步说明。'],
   },
 ];
 
@@ -693,7 +705,9 @@ const Coach: React.FC<{
     onShowTab(step.tab);
     setRect(null);
     let cancelled = false;
-    const find = () => document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+    // A target is a data-tour name, or '#id' for an element with that id (e.g. a settings card).
+    const find = () =>
+      document.querySelector<HTMLElement>(step.target.startsWith('#') ? step.target : `[data-tour="${step.target}"]`);
     const measure = () => {
       const el = find();
       if (!el || cancelled) return;
