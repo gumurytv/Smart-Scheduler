@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Hand,
   IdCard,
+  Lightbulb,
   Rocket,
   Settings,
   Sparkles,
@@ -672,6 +673,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateSta
   );
 };
 
+/** Guide colour: a bright yellow that the app itself never uses, so guide parts can't be mistaken for the app. */
+const GUIDE_YELLOW = '#FFD34D';
+
 /** Spotlight on a real part of the screen (found by its data-tour attribute) with a speech bubble. */
 const Coach: React.FC<{
   lang: AppLanguage;
@@ -718,16 +722,28 @@ const Coach: React.FC<{
   }, [step]);
 
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
   const spaceAbove = rect ? rect.top : 0;
   const spaceBelow = rect ? vh - (rect.top + rect.height) : 0;
   // The bubble goes where there is more room; a very tall target gets it pinned near the bottom.
+  const placement: 'below' | 'above' | 'pinned' = !rect
+    ? 'pinned'
+    : spaceBelow >= 240 && spaceBelow >= spaceAbove
+    ? 'below'
+    : spaceAbove >= 240
+    ? 'above'
+    : 'pinned';
   const bubbleStyle: React.CSSProperties = !rect
     ? { top: '30%' }
-    : spaceBelow >= 230 && spaceBelow >= spaceAbove
-    ? { top: rect.top + rect.height + 12 }
-    : spaceAbove >= 230
-    ? { bottom: vh - rect.top + 12 }
+    : placement === 'below'
+    ? { top: rect.top + rect.height + 16 }
+    : placement === 'above'
+    ? { bottom: vh - rect.top + 16 }
     : { bottom: 84 };
+  // Pointer from the bubble to the target's centre (the bubble column is max-w-md with a 16px gutter).
+  const columnLeft = Math.max(0, (vw - Math.min(vw, 448)) / 2) + 16;
+  const cardWidth = Math.min(vw, 448) - 32;
+  const arrowX = rect ? Math.min(cardWidth - 28, Math.max(28, rect.left + rect.width / 2 - columnLeft)) : 0;
   const t = (l: L3) => tr(lang, l[0], l[1], l[2]);
 
   return (
@@ -735,36 +751,70 @@ const Coach: React.FC<{
       {/* Dim everything except the target (this layer also blocks taps on the app underneath) */}
       {rect ? (
         <div
-          className="fixed rounded-2xl ring-4 ring-accent transition-all duration-300 pointer-events-none"
-          style={{ ...rect, boxShadow: '0 0 0 9999px rgba(24, 20, 16, 0.66)' }}
+          className="fixed rounded-2xl transition-all duration-300 pointer-events-none"
+          style={{
+            ...rect,
+            boxShadow: `0 0 0 4px ${GUIDE_YELLOW}, 0 0 0 10px rgba(255, 211, 77, 0.35), 0 0 0 9999px rgba(18, 15, 12, 0.72)`,
+          }}
           aria-hidden="true"
         />
       ) : (
-        <div className="fixed inset-0 bg-[rgba(24,20,16,0.66)]" aria-hidden="true" />
+        <div className="fixed inset-0 bg-[rgba(18,15,12,0.72)]" aria-hidden="true" />
       )}
 
+      {/* Says plainly that the screen behind is an example */}
+      <div className="fixed top-2 inset-x-0 max-w-md mx-auto px-4 flex justify-center pointer-events-none">
+        <span
+          className="px-3 py-1 rounded-full text-[0.75rem] font-bold text-ink shadow-lg"
+          style={{ backgroundColor: GUIDE_YELLOW }}
+        >
+          {tr(lang, '예시 화면이에요 · 실제 기록이 아니에요', 'Example screen – not your data', '示例画面 · 不是你的记录')}
+        </span>
+      </div>
+
       <div className="fixed inset-x-0 max-w-md mx-auto px-4" style={bubbleStyle}>
-        <div className="rounded-3xl bg-paper shadow-2xl p-4 space-y-3">
+        <div className="relative rounded-3xl bg-ink text-paper shadow-2xl p-4 space-y-3 border-2" style={{ borderColor: GUIDE_YELLOW }}>
+          {placement !== 'pinned' && (
+            <span
+              className="absolute w-4 h-4 rotate-45 bg-ink border-2"
+              style={{
+                left: arrowX - 8,
+                borderColor: GUIDE_YELLOW,
+                ...(placement === 'below'
+                  ? { top: -9, borderRight: 'none', borderBottom: 'none' }
+                  : { bottom: -9, borderLeft: 'none', borderTop: 'none' }),
+              }}
+              aria-hidden="true"
+            />
+          )}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[0.75rem] font-bold text-accent-800">
-              {tr(lang, '화면 설명', 'The screens', '画面说明')}{' '}
-              <span className="font-mono tabular-nums text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.75rem] font-extrabold text-ink"
+                style={{ backgroundColor: GUIDE_YELLOW }}
+              >
+                <Lightbulb className="w-3.5 h-3.5" strokeWidth={2.75} />
+                {tr(lang, '안내', 'Guide', '指南')}
+              </span>
+              <span className="font-mono text-[0.75rem] tabular-nums text-paper/70">
                 {index + 1}/{total}
               </span>
             </span>
-            <button type="button" onClick={onSkip} className="h-8 px-3 rounded-full text-[0.8125rem] font-bold text-slate-700 hover:bg-surface">
+            <button type="button" onClick={onSkip} className="h-8 px-3 rounded-full text-[0.8125rem] font-bold text-paper/80 hover:bg-paper/10">
               {tr(lang, '건너뛰기', 'Skip', '跳过')}
             </button>
           </div>
           <div className="space-y-1">
-            <h2 className="text-[1.125rem] font-bold text-ink leading-snug">{t(step.title)}</h2>
-            <p className="text-[0.9375rem] text-slate-700 leading-relaxed break-keep">{t(step.text)}</p>
+            <h2 className="text-[1.125rem] font-bold leading-snug" style={{ color: GUIDE_YELLOW }}>
+              {t(step.title)}
+            </h2>
+            <p className="text-[0.9375rem] text-paper/90 leading-relaxed break-keep">{t(step.text)}</p>
           </div>
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <button
               type="button"
               onClick={onBack}
-              className="h-12 px-4 rounded-full bg-surface text-ink text-[0.9375rem] font-bold inline-flex items-center gap-1 hover:bg-slate-200"
+              className="h-12 px-4 rounded-full border-2 border-paper/40 text-paper text-[0.9375rem] font-bold inline-flex items-center gap-1 hover:bg-paper/10"
             >
               <ChevronLeft className="w-5 h-5" />
               {tr(lang, '이전', 'Back', '上一步')}
@@ -772,7 +822,8 @@ const Coach: React.FC<{
             <button
               type="button"
               onClick={onNext}
-              className="h-12 rounded-full bg-accent-700 text-paper text-[1rem] font-bold inline-flex items-center justify-center gap-1 hover:bg-accent-800"
+              className="h-12 rounded-full text-ink text-[1rem] font-extrabold inline-flex items-center justify-center gap-1 hover:brightness-95"
+              style={{ backgroundColor: GUIDE_YELLOW }}
             >
               {index === total - 1 ? tr(lang, '처음 설정 시작', 'Start setup', '开始设置') : tr(lang, '다음', 'Next', '下一步')}
               <ChevronRight className="w-5 h-5" />
