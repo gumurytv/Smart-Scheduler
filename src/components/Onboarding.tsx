@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
   BellRing,
   Building2,
@@ -34,6 +34,8 @@ interface OnboardingProps {
   onShowTab: (tab: TabKey) => void;
   /** Open a settings card while the guide waits (it comes back with 「안내로 돌아가기」). */
   onVisit: (exit: Exclude<OnboardingExit, 'timetable'>) => void;
+  /** While walking the screens, the app shows a filled-in example instead of the user's planner. */
+  onPreview: (on: boolean) => void;
 }
 
 export type TabKey = 'timetable' | 'schedule' | 'attendance' | 'memo' | 'settings';
@@ -121,7 +123,7 @@ type SetupStep = 'text' | 'sample' | 'profile' | 'pool' | 'school' | 'academy' |
 const SETUP: SetupStep[] = ['text', 'sample', 'profile', 'pool', 'school', 'academy', 'reminders'];
 
 /** 처음 사용 안내: welcome → (화면 설명) → (초기 설정 단계) → done. Skippable at any point. */
-export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateState, onFinish, onShowTab, onVisit }) => {
+export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateState, onFinish, onShowTab, onVisit, onPreview }) => {
   const t = (l: L3) => tr(lang, l[0], l[1], l[2]);
   const [phase, setPhase] = useState<'welcome' | 'tour' | 'setup' | 'done'>('welcome');
   const [index, setIndex] = useState(0);
@@ -129,6 +131,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateSta
   const [reminderDenied, setReminderDenied] = useState(false);
   // 「지금 해 보기」: the guide steps aside (a small button brings it back at the same step)
   const [away, setAway] = useState(false);
+
+  // The screen tour runs on example data; everything else shows the user's own planner.
+  useEffect(() => {
+    onPreview(phase === 'tour');
+  }, [phase, onPreview]);
+  useEffect(() => () => onPreview(false), [onPreview]);
 
   const textScale = state.textScale ?? 100;
   const profile = state.profile ?? { name: '', school: '', grade: '' };

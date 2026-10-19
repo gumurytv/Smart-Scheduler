@@ -23,6 +23,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         en: 'Replay it from “First-run guide” in the Settings top card',
         zh: '可随时在设置顶部卡片的「初次使用指南」中重看',
       },
+      {
+        ko: '사용 가이드에 최근 기능 설명 추가: 주간 보기에서 수업 추가, 과목 색·화면 구성, 완료된 보강 이력, 모두 지우기, 보내기·저장, 업데이트 이력',
+        en: 'User guide covers the latest features: adding from the week view, colours and layout, completed makeups, clear all, export via share, update history',
+        zh: '使用指南补充最新功能：周视图添加、科目颜色与布局、已完成补课、全部清除、分享导出、更新记录',
+      },
     ],
   },
   {

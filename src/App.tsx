@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   CalendarClock,
   CalendarDays,
@@ -84,7 +84,25 @@ export default function App() {
       return false;
     }
   });
+  // While the guide walks the screens, show a filled-in example instead of the user's (maybe empty) planner.
+  const [tourPreview, setTourPreview] = useState(false);
+  const tourSample = useMemo<PlannerState>(
+    () => ({
+      ...createInitialPlannerState(new Date()),
+      language: state.language,
+      textScale: state.textScale,
+      schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
+      profile: {
+        name: tr(state.language || 'ko', '김민준', 'Minjun Kim', '金敏俊'),
+        school: tr(state.language || 'ko', '한빛중학교', 'Hanbit Middle School', '韩光中学'),
+        grade: tr(state.language || 'ko', '2학년 3반', 'Grade 8 · Class 3', '初二3班'),
+      },
+    }),
+    [state.language, state.textScale]
+  );
+  const view = tourPreview ? tourSample : state;
   const finishOnboarding = (exit: OnboardingExit) => {
+    setTourPreview(false);
     try {
       localStorage.setItem(ONBOARDED_KEY, '1');
     } catch {
@@ -184,7 +202,7 @@ export default function App() {
   const todayFormatted = formatDateLabel(today, lang);
 
   // Count pending makeups for header quick badge
-  const pendingMakeupCount = Object.values(state.attendance).reduce((acc, dayAtt) => {
+  const pendingMakeupCount = Object.values(view.attendance).reduce((acc, dayAtt) => {
     if (!dayAtt.academies) return acc;
     const countInDay = Object.values(dayAtt.academies).filter(
       (r) => r.needsMakeup && !r.makeupCompleted
@@ -192,10 +210,10 @@ export default function App() {
     return acc + countInDay;
   }, 0);
 
-  const children = listChildren(state);
+  const children = listChildren(view);
   const multiChild = children.length > 1;
   // Remount the tabs on a child switch so no sheet or selection carries over.
-  const childKey = state.children?.activeId || 'c1';
+  const childKey = tourPreview ? 'tour-preview' : state.children?.activeId || 'c1';
   const activeIdx = Math.max(0, children.findIndex((c) => c.isActive));
   const activeChildName = childName(children[activeIdx].data, activeIdx, childFallbackName(lang));
 
@@ -297,19 +315,19 @@ export default function App() {
           <TimetableTab
             key={childKey}
             language={lang}
-            subjectPool={state.subjectPool}
-            masterTimetable={state.masterTimetable}
-            dailyOverrides={state.dailyOverrides}
-            timelineConfig={state.timelineConfig}
+            subjectPool={view.subjectPool}
+            masterTimetable={view.masterTimetable}
+            dailyOverrides={view.dailyOverrides}
+            timelineConfig={view.timelineConfig}
             onUpdateDailyOverrides={handleUpdateDailyOverrides}
-            schedules={state.schedules}
+            schedules={view.schedules}
             onUpdateSchedules={handleUpdateSchedules}
-            attendance={state.attendance}
+            attendance={view.attendance}
             onUpdateAttendance={handleUpdateAttendance}
-            profile={state.profile}
-            schoolTimeConfig={state.schoolTimeConfig}
-            subjectColors={state.subjectColors}
-            layout={state.timetableLayout}
+            profile={view.profile}
+            schoolTimeConfig={view.schoolTimeConfig}
+            subjectColors={view.subjectColors}
+            layout={view.timetableLayout}
             onEditProfile={() => {
               setSettingsFocus('profile');
               setActiveTab('settings');
@@ -321,10 +339,10 @@ export default function App() {
           <ScheduleTab
             key={childKey}
             language={lang}
-            schedules={state.schedules}
+            schedules={view.schedules}
             onUpdateSchedules={handleUpdateSchedules}
-            masterTimetable={state.masterTimetable}
-            dailyOverrides={state.dailyOverrides}
+            masterTimetable={view.masterTimetable}
+            dailyOverrides={view.dailyOverrides}
           />
         )}
 
@@ -332,13 +350,13 @@ export default function App() {
           <AttendanceTab
             key={childKey}
             language={lang}
-            attendance={state.attendance}
-            masterTimetable={state.masterTimetable}
-            dailyOverrides={state.dailyOverrides}
-            subjectPool={state.subjectPool}
+            attendance={view.attendance}
+            masterTimetable={view.masterTimetable}
+            dailyOverrides={view.dailyOverrides}
+            subjectPool={view.subjectPool}
             onUpdateAttendance={handleUpdateAttendance}
             onUpdateDailyOverrides={handleUpdateDailyOverrides}
-            schedules={state.schedules}
+            schedules={view.schedules}
           />
         )}
 
@@ -346,14 +364,14 @@ export default function App() {
           <MemoTab
             key={childKey}
             language={lang}
-            memos={state.memos}
+            memos={view.memos}
             onUpdateMemos={handleUpdateMemos}
           />
         )}
 
         {activeTab === 'settings' && (
           <SettingsTab
-            state={state}
+            state={view}
             onUpdateState={setState}
             focusSection={settingsFocus}
             onFocusHandled={() => setSettingsFocus(null)}
@@ -370,6 +388,7 @@ export default function App() {
           onUpdateState={setState}
           onFinish={finishOnboarding}
           onShowTab={setActiveTab}
+          onPreview={setTourPreview}
           onVisit={(card) => {
             setSettingsFocus(card);
             setActiveTab('settings');

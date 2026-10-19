@@ -18,7 +18,7 @@ export interface FeatureGuideSection {
 }
 
 /** Where a setup step lives: a settings card id, or 'top' for the settings header card. */
-export type SetupTarget = 'top' | 'profile' | 'range' | 'school' | 'academy' | 'pool' | 'backup' | 'reminders' | 'widgets';
+export type SetupTarget = 'top' | 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'backup' | 'reminders' | 'widgets';
 
 export interface SetupGuideStep {
   title: L10n;
@@ -86,6 +86,22 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
           zh: '在月视图中点击日期，下方会列出当天安排，可点击修改，或直接添加补课、日程。',
         },
       },
+      {
+        title: { ko: '주간 보기에서 추가', en: 'Add from the week view', zh: '在周视图中添加' },
+        desc: {
+          ko: '주간 보기에도 「보강 추가」 버튼이 있어요. 학원 시간표에서 날짜 줄의 빈 곳이나 ＋를 누르면 그날 학원 수업을 넣고, 「보강 · 특강」인지 「일반 수업」인지 골라요.',
+          en: 'The week view has “Makeup” too. In the academy timetable, tap a day’s free space or ＋ to add a class and choose “Makeup · special” or “Regular”.',
+          zh: '周视图也有「加补课」按钮。在补习班课表中点某天的空白处或＋添加课程，并选择「补课 · 特讲」或「普通课程」。',
+        },
+      },
+      {
+        title: { ko: '과목 색과 화면 구성', en: 'Colours and layout', zh: '科目颜色与画面布局' },
+        desc: {
+          ko: '과목에 색을 정하면 시간표가 그 색으로 보여요. 설정 → 시간표 화면 구성에서 「지금」 카드나 칸의 순서를 바꾸거나 숨길 수 있어요.',
+          en: 'Subject colours show on the timetable. Settings → Timetable layout reorders or hides the “Now” card and sections.',
+          zh: '设置科目颜色后课表会以该颜色显示。在 设置 → 课表画面布局 中可调整或隐藏「现在」卡片和各板块。',
+        },
+      },
     ],
   },
   {
@@ -149,6 +165,14 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
         },
       },
       {
+        title: { ko: '완료된 보강 이력', en: 'Completed makeups', zh: '已完成补课记录' },
+        desc: {
+          ko: '「완료된 보강 이력」을 펼치면 결석한 날과 보강한 날이 함께 보여요. 잘못 눌렀으면 「완료 취소」를 눌러요.',
+          en: 'Unfold “Completed makeups” to see the missed and makeup dates. Tap “Undo” if you marked one by mistake.',
+          zh: '展开「已完成补课记录」可看到缺课日和补课日。误点时可点「撤销」。',
+        },
+      },
+      {
         title: { ko: '월별 출석 현황', en: 'Monthly overview', zh: '月度出勤概况' },
         desc: {
           ko: '출석·지각·결석·보강 대기 숫자를 누르면 날짜별 이력이 팝업으로 나와요. 줄을 누르면 그 날짜로 이동해요.',
@@ -197,9 +221,9 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
       {
         title: { ko: '맨 위 카드', en: 'Top card', zh: '顶部卡片' },
         desc: {
-          ko: '언어, 글자 크기, 자녀 선택, 사용 가이드, 앱 초기화(항목을 골라 지우기)가 있어요.',
-          en: 'Language, text size, children, this guide, and reset (pick what to clear).',
-          zh: '包括语言、字体大小、选择孩子、使用指南和应用重置（可选择清除内容）。',
+          ko: '언어, 글자 크기, 자녀 선택, 사용 가이드, 처음 사용 안내(화면 설명·처음 설정 다시 보기), 앱 초기화(항목을 골라 지우기)가 있어요.',
+          en: 'Language, text size, children, this guide, the first-run guide (replay), and reset (pick what to clear).',
+          zh: '包括语言、字体大小、选择孩子、使用指南、初次使用指南（重看）和应用重置（可选择清除内容）。',
         },
       },
       {
@@ -219,11 +243,19 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
         },
       },
       {
+        title: { ko: '되돌리기 · 모두 지우기', en: 'Restore or clear a section', zh: '恢复默认 · 全部清除' },
+        desc: {
+          ko: '과목/수업 · 학교 시간표 · 학원 시간표 아래에 「이 섹션 기본값으로 되돌리기」와 「모든 설정값 지우기」가 있어요. 누르면 한 번 더 확인해요.',
+          en: 'Subjects, School and Academy timetable each have “Restore defaults” and “Clear everything” at the bottom, with a confirmation.',
+          zh: '科目/课程、学校课表、补习班课表下方都有「恢复默认」和「清除全部设置」，点击后会再次确认。',
+        },
+      },
+      {
         title: { ko: '백업 · 복원', en: 'Backup & restore', zh: '备份与恢复' },
         desc: {
-          ko: '전체를 파일로 내보내고, 불러올 때 원하는 항목만 골라 적용해요. 친구·가족이 보낸 파일을 새 자녀로 추가할 수도 있어요.',
-          en: 'Export everything to a file; when importing, apply only what you pick. A file from someone else can become a new child.',
-          zh: '将全部数据导出为文件；导入时只应用所选内容，也可把他人发来的文件添加为新孩子。',
+          ko: '「데이터 내보내기 (보내기·저장)」를 누르면 공유 창이 떠서 카카오톡·메일로 보내거나 내 파일·드라이브에 저장해요. 불러올 때는 원하는 항목만 골라 적용하고, 친구·가족이 보낸 파일을 새 자녀로 추가할 수도 있어요.',
+          en: '“Export” opens the share sheet to send it or save it to Files / Drive. When importing, apply only what you pick; a file from someone else can become a new child.',
+          zh: '点「导出（发送·保存）」会打开分享窗口，可通过聊天软件、邮件发送，或保存到我的文件/云端硬盘。导入时只应用所选内容，也可把他人发来的文件添加为新孩子。',
         },
       },
       {
@@ -232,6 +264,14 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
           ko: '보강·특강 전에 휴대폰 알림을 받고(10분~하루 전), 홈 화면 위젯 5종을 테마·글자 크기와 함께 추가해요.',
           en: 'Get a phone alert before makeups (10 min to a day ahead) and add five home-screen widgets with theme and text size.',
           zh: '在补课前收到手机提醒（提前10分钟至1天），并添加5种主屏幕小组件，可调主题和字体大小。',
+        },
+      },
+      {
+        title: { ko: '업데이트 이력', en: 'Update history', zh: '更新记录' },
+        desc: {
+          ko: '앱 맨 아래 「업데이트 이력」에서 버전마다 무엇이 바뀌었는지 볼 수 있어요.',
+          en: '“Update history” at the bottom lists what changed in each version.',
+          zh: '底部的「更新记录」列出每个版本的变化。',
         },
       },
     ],
@@ -247,6 +287,17 @@ export const SETUP_GUIDE: SetupGuideStep[] = [
       ko: '편한 언어를 고르고, 글씨가 작으면 글자 크기를 키워요.',
       en: 'Choose your language, and make the text bigger if needed.',
       zh: '选择语言，字太小可以调大字体。',
+    },
+  },
+  {
+    target: 'top',
+    optional: true,
+    title: { ko: '예시 데이터 지우기', en: 'Clear the example data', zh: '清除示例数据' },
+    where: { ko: '설정 맨 위 카드 → 앱 초기화', en: 'Settings · top card → Reset app', zh: '设置 · 顶部卡片 → 重置应用' },
+    desc: {
+      ko: '처음 보이는 시간표·일정·출석·메모는 예시예요. 학교·학원 시간표, 일정, 출석, 메모를 골라 「빈 상태로」 지우고 내 것으로 시작해요.',
+      en: 'The first timetable, events, attendance and memos are examples. Pick them in “Reset app” and clear them to start your own.',
+      zh: '一开始看到的课表、日程、出勤、备忘是示例。在「重置应用」中选择并清空，即可开始填写自己的。',
     },
   },
   {
@@ -337,9 +388,20 @@ export const SETUP_GUIDE: SetupGuideStep[] = [
     title: { ko: '백업해 두기', en: 'Make a backup', zh: '做好备份' },
     where: { ko: '설정 → 백업 · 복원', en: 'Settings → Backup & restore', zh: '设置 → 备份与恢复' },
     desc: {
-      ko: '다 입력했으면 「데이터 내보내기」로 파일을 저장해요. 휴대폰을 바꾸거나 가족과 시간표를 나눌 때 써요.',
-      en: 'When you’re done, save a file with “Export”. Use it when switching phones or sharing a timetable with family.',
-      zh: '填写完成后用「导出数据」保存文件，换手机或与家人共享课表时使用。',
+      ko: '다 입력했으면 「데이터 내보내기 (보내기·저장)」를 눌러 공유 창에서 내 파일·드라이브에 저장하거나 가족에게 보내요. 휴대폰을 바꿀 때도 써요.',
+      en: 'When you’re done, tap “Export” and save it to Files / Drive or send it to family from the share sheet. Handy when switching phones.',
+      zh: '填写完成后点「导出（发送·保存）」，在分享窗口中保存到我的文件/云端硬盘或发给家人。换手机时也能用。',
+    },
+  },
+  {
+    target: 'layout',
+    optional: true,
+    title: { ko: '시간표 화면 꾸미기', en: 'Arrange the timetable screen', zh: '调整课表画面' },
+    where: { ko: '설정 → 시간표 화면 구성', en: 'Settings → Timetable layout', zh: '设置 → 课表画面布局' },
+    desc: {
+      ko: '↑↓로 「지금」 카드나 칸의 순서를 바꾸고, 안 쓰는 칸은 스위치로 숨겨요.',
+      en: 'Use ↑↓ to reorder the “Now” card and sections, and switch off the ones you don’t use.',
+      zh: '用 ↑↓ 调整「现在」卡片和各板块的顺序，不用的可用开关隐藏。',
     },
   },
 ];
