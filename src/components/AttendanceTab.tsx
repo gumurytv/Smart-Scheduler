@@ -1133,6 +1133,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
       {/* 1. SELECTED-DAY (DEFAULT: TODAY) 1-TOUCH ATTENDANCE CHECK */}
       <section
         ref={checkCardRef}
+        data-tour="attendance-check"
         className="bg-surface rounded-2xl shadow-xs p-4 space-y-3.5 scroll-mt-4"
       >
         {/* Title row */}
@@ -1451,7 +1452,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
       {/* 2. PENDING MAKEUPS (right after today's check) */}
       {monthlyStats.pendingMakeups.length === 0 ? (
-        <section className="rounded-2xl shadow-xs bg-sage-100 px-4 py-3.5 flex items-center gap-3">
+        <section data-tour="pending-makeups" className="rounded-2xl shadow-xs bg-sage-100 px-4 py-3.5 flex items-center gap-3">
           <span className="w-10 h-10 rounded-full bg-sage-700 text-paper flex items-center justify-center shrink-0">
             <PartyPopper strokeWidth={2.5} className="w-5 h-5" />
           </span>
@@ -1465,7 +1466,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           </div>
         </section>
       ) : (
-        <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-2.5">
+        <section data-tour="pending-makeups" className="bg-surface rounded-2xl shadow-xs p-4 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <AlertCircle strokeWidth={2.75} className="w-4 h-4 text-accent-700 shrink-0" />

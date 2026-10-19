@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   CalendarClock,
   CalendarDays,
@@ -30,9 +30,12 @@ import { syncWidgetData } from './utils/widgetSync';
 import { syncMakeupReminders } from './native/reminders';
 import { registerBackButton, keepRepainted } from './native/androidShell';
 import { ChildrenSheet, childFallbackName } from './components/ChildrenSheet';
+import { Onboarding, OnboardingExit } from './components/Onboarding';
 import { childName, listChildren } from './utils/children';
 
 const STORAGE_KEY = 'smart_school_academy_planner_v1';
+// Set once the first-run guide was finished or skipped.
+const ONBOARDED_KEY = 'teumteum.onboarded';
 
 type TabKey = 'timetable' | 'schedule' | 'attendance' | 'memo' | 'settings';
 
@@ -70,9 +73,49 @@ function loadInitialState(): PlannerState {
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('timetable');
   // Settings section to open when arriving from another tab (e.g. "내 정보" from the 지금 card)
-  const [settingsFocus, setSettingsFocus] = useState<'profile' | null>(null);
+  const [settingsFocus, setSettingsFocus] = useState<string | null>(null);
   const [state, setState] = useState<PlannerState>(() => loadInitialState());
   const [isChildSheetOpen, setIsChildSheetOpen] = useState(false);
+  // 처음 사용 안내: only on a fresh install (no saved planner yet), or when replayed from Settings.
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem(ONBOARDED_KEY) && !localStorage.getItem(STORAGE_KEY);
+    } catch {
+      return false;
+    }
+  });
+  // While the guide walks the screens, show a filled-in example instead of the user's (maybe empty) planner.
+  const [tourPreview, setTourPreview] = useState(false);
+  const tourSample = useMemo<PlannerState>(
+    () => ({
+      ...createInitialPlannerState(new Date()),
+      language: state.language,
+      textScale: state.textScale,
+      schoolTimeConfig: { ...DEFAULT_SCHOOL_TIME_CONFIG },
+      profile: {
+        name: tr(state.language || 'ko', '김민준', 'Minjun Kim', '金敏俊'),
+        school: tr(state.language || 'ko', '한빛중학교', 'Hanbit Middle School', '韩光中学'),
+        grade: tr(state.language || 'ko', '2학년 3반', 'Grade 8 · Class 3', '初二3班'),
+      },
+    }),
+    [state.language, state.textScale]
+  );
+  const view = tourPreview ? tourSample : state;
+  const finishOnboarding = (exit: OnboardingExit) => {
+    setTourPreview(false);
+    try {
+      localStorage.setItem(ONBOARDED_KEY, '1');
+    } catch {
+      /* storage unavailable */
+    }
+    setShowOnboarding(false);
+    if (exit === 'timetable') {
+      setActiveTab('timetable');
+    } else {
+      setSettingsFocus(exit);
+      setActiveTab('settings');
+    }
+  };
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
@@ -159,7 +202,7 @@ export default function App() {
   const todayFormatted = formatDateLabel(today, lang);
 
   // Count pending makeups for header quick badge
-  const pendingMakeupCount = Object.values(state.attendance).reduce((acc, dayAtt) => {
+  const pendingMakeupCount = Object.values(view.attendance).reduce((acc, dayAtt) => {
     if (!dayAtt.academies) return acc;
     const countInDay = Object.values(dayAtt.academies).filter(
       (r) => r.needsMakeup && !r.makeupCompleted
@@ -167,10 +210,10 @@ export default function App() {
     return acc + countInDay;
   }, 0);
 
-  const children = listChildren(state);
+  const children = listChildren(view);
   const multiChild = children.length > 1;
   // Remount the tabs on a child switch so no sheet or selection carries over.
-  const childKey = state.children?.activeId || 'c1';
+  const childKey = tourPreview ? 'tour-preview' : state.children?.activeId || 'c1';
   const activeIdx = Math.max(0, children.findIndex((c) => c.isActive));
   const activeChildName = childName(children[activeIdx].data, activeIdx, childFallbackName(lang));
 
@@ -272,19 +315,19 @@ export default function App() {
           <TimetableTab
             key={childKey}
             language={lang}
-            subjectPool={state.subjectPool}
-            masterTimetable={state.masterTimetable}
-            dailyOverrides={state.dailyOverrides}
-            timelineConfig={state.timelineConfig}
+            subjectPool={view.subjectPool}
+            masterTimetable={view.masterTimetable}
+            dailyOverrides={view.dailyOverrides}
+            timelineConfig={view.timelineConfig}
             onUpdateDailyOverrides={handleUpdateDailyOverrides}
-            schedules={state.schedules}
+            schedules={view.schedules}
             onUpdateSchedules={handleUpdateSchedules}
-            attendance={state.attendance}
+            attendance={view.attendance}
             onUpdateAttendance={handleUpdateAttendance}
-            profile={state.profile}
-            schoolTimeConfig={state.schoolTimeConfig}
-            subjectColors={state.subjectColors}
-            layout={state.timetableLayout}
+            profile={view.profile}
+            schoolTimeConfig={view.schoolTimeConfig}
+            subjectColors={view.subjectColors}
+            layout={view.timetableLayout}
             onEditProfile={() => {
               setSettingsFocus('profile');
               setActiveTab('settings');
@@ -296,10 +339,10 @@ export default function App() {
           <ScheduleTab
             key={childKey}
             language={lang}
-            schedules={state.schedules}
+            schedules={view.schedules}
             onUpdateSchedules={handleUpdateSchedules}
-            masterTimetable={state.masterTimetable}
-            dailyOverrides={state.dailyOverrides}
+            masterTimetable={view.masterTimetable}
+            dailyOverrides={view.dailyOverrides}
           />
         )}
 
@@ -307,13 +350,13 @@ export default function App() {
           <AttendanceTab
             key={childKey}
             language={lang}
-            attendance={state.attendance}
-            masterTimetable={state.masterTimetable}
-            dailyOverrides={state.dailyOverrides}
-            subjectPool={state.subjectPool}
+            attendance={view.attendance}
+            masterTimetable={view.masterTimetable}
+            dailyOverrides={view.dailyOverrides}
+            subjectPool={view.subjectPool}
             onUpdateAttendance={handleUpdateAttendance}
             onUpdateDailyOverrides={handleUpdateDailyOverrides}
-            schedules={state.schedules}
+            schedules={view.schedules}
           />
         )}
 
@@ -321,21 +364,37 @@ export default function App() {
           <MemoTab
             key={childKey}
             language={lang}
-            memos={state.memos}
+            memos={view.memos}
             onUpdateMemos={handleUpdateMemos}
           />
         )}
 
         {activeTab === 'settings' && (
           <SettingsTab
-            state={state}
+            state={view}
             onUpdateState={setState}
             focusSection={settingsFocus}
             onFocusHandled={() => setSettingsFocus(null)}
             onOpenChildren={() => setIsChildSheetOpen(true)}
+            onReplayOnboarding={() => setShowOnboarding(true)}
           />
         )}
       </main>
+
+      {showOnboarding && (
+        <Onboarding
+          lang={lang}
+          state={state}
+          onUpdateState={setState}
+          onFinish={finishOnboarding}
+          onShowTab={setActiveTab}
+          onPreview={setTourPreview}
+          onVisit={(card) => {
+            setSettingsFocus(card);
+            setActiveTab('settings');
+          }}
+        />
+      )}
 
       {isChildSheetOpen && (
         <ChildrenSheet lang={lang} state={state} onUpdateState={setState} onClose={() => setIsChildSheetOpen(false)} />
@@ -343,6 +402,7 @@ export default function App() {
 
       {/* Bottom 5-Tab Navigation Bar (in flow, below the scroll area) */}
       <nav
+        data-tour="nav"
         aria-label={tr(lang, '메인 메뉴', 'Main Navigation', '主导航')}
         className="flex-none w-full z-40 bg-surface border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
       >

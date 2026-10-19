@@ -700,7 +700,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   return (
     <div className="space-y-4">
       {/* 1. UPCOMING / D-DAY HERO */}
-      <section className="bg-surface rounded-2xl shadow-xs p-3.5 space-y-3">
+      <section data-tour="schedule-upcoming" className="bg-surface rounded-2xl shadow-xs p-3.5 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <CalendarClock strokeWidth={2.75} className="w-4 h-4 text-accent-700 shrink-0" />
@@ -1270,6 +1270,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           <button
             type="button"
             onClick={() => openDateSheet(selectedDateStr)}
+            data-tour="schedule-add"
             className="inline-flex items-center gap-1 h-[32px] px-3 rounded-full bg-accent-700 text-paper text-[0.75rem] font-bold hover:bg-accent-800 active:scale-95 transition-all whitespace-nowrap shrink-0 shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" strokeWidth={3} />
