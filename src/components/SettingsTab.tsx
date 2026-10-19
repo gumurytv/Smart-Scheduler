@@ -1662,7 +1662,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   return (
     <div className="space-y-4">
       {/* ===== HERO: 설정 헤더 + 요약 통계 + 언어 전환 ===== */}
-      <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-4">
+      <section data-tour="settings-top" className="bg-surface rounded-2xl shadow-xs p-4 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <span className="w-12 h-12 rounded-2xl bg-accent-700 text-paper grid place-items-center shrink-0">
@@ -2081,7 +2081,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </SettingsCard>
 
       {/* ===== GROUP: 시간표 ===== */}
-      <div className="space-y-2">
+      <div className="space-y-2" data-tour="settings-timetable">
         <GroupHeader label={tr(lang, '시간표', 'Timetable', '课表')} />
 
         <SettingsCard

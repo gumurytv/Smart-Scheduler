@@ -648,7 +648,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
       {/* ===== GROUP: 오늘의 메모 (selected date) ===== */}
       <div className="space-y-2">
         <GroupHeader label={notebookGroupLabel} />
-        <section id="memo-notebook" className="bg-surface rounded-2xl shadow-xs p-3 space-y-2.5 scroll-mt-4">
+        <section id="memo-notebook" data-tour="memo-notebook" className="bg-surface rounded-2xl shadow-xs p-3 space-y-2.5 scroll-mt-4">
           <div className="flex items-center justify-between gap-2 px-1">
             <div className="flex items-center gap-1.5 min-w-0">
               <PencilLine strokeWidth={2.75} className="w-4 h-4 text-accent-700 shrink-0" />

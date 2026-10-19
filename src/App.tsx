@@ -364,7 +364,17 @@ export default function App() {
       </main>
 
       {showOnboarding && (
-        <Onboarding lang={lang} state={state} onUpdateState={setState} onFinish={finishOnboarding} />
+        <Onboarding
+          lang={lang}
+          state={state}
+          onUpdateState={setState}
+          onFinish={finishOnboarding}
+          onShowTab={setActiveTab}
+          onVisit={(card) => {
+            setSettingsFocus(card);
+            setActiveTab('settings');
+          }}
+        />
       )}
 
       {isChildSheetOpen && (
@@ -373,6 +383,7 @@ export default function App() {
 
       {/* Bottom 5-Tab Navigation Bar (in flow, below the scroll area) */}
       <nav
+        data-tour="nav"
         aria-label={tr(lang, '메인 메뉴', 'Main Navigation', '主导航')}
         className="flex-none w-full z-40 bg-surface border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
       >

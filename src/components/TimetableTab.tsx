@@ -1754,6 +1754,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       <section
         style={blockOrder('now')}
         aria-label={tr(lang, '지금', 'Now', '现在')}
+        data-tour="now"
         className="bg-ink text-paper rounded-[32px] p-5 shadow-md space-y-4"
       >
         {/* Identity row: makes the planner feel like the student's own */}
@@ -2065,6 +2066,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           <button
             type="button"
             onClick={() => openAddAcademyModal('18:00', '20:00', 'button', todayStr)}
+            data-tour="makeup-add"
             className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.9375rem] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-accent-800 shadow-xs"
           >
             <Plus className="w-4 h-4" strokeWidth={2.75} />
@@ -2077,8 +2079,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
       {/* The timetable itself (controls + the chosen view) moves as one block */}
       <div className="flex flex-col gap-4" style={blockOrder('main')}>
       {/* CONTROLS: view segment + date row + week strip */}
-      <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3.5">
+      <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3.5" data-tour="controls">
         <div
+          data-tour="view-mode"
           className="grid grid-cols-3 p-1 rounded-full bg-paper"
           role="tablist"
           aria-label={tr(lang, '보기 방식', 'View', '视图')}
@@ -2667,7 +2670,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
 
           {dailySubMode === 'timeline' ? (
             /* VERTICAL TIMELINE VIEW */
-            <section className="bg-surface rounded-2xl shadow-xs overflow-hidden" style={blockOrder('dayDetail')}>
+            <section data-tour="day-detail" className="bg-surface rounded-2xl shadow-xs overflow-hidden" style={blockOrder('dayDetail')}>
               <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2 flex-wrap">
                 <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
                   <CalendarRange className="w-4 h-4 text-accent-700" strokeWidth={2.5} />
@@ -2905,7 +2908,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
             </section>
           ) : (
             /* LIST VIEW */
-            <div className="space-y-4" style={blockOrder('dayDetail')}>
+            <div data-tour="day-detail" className="space-y-4" style={blockOrder('dayDetail')}>
               <section className="bg-surface rounded-2xl shadow-xs p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink">
