@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.2',
+    date: '2026-10-24',
+    items: [
+      {
+        ko: '업데이트를 더 빠르고 안정적으로 보내도록 배포 방식을 바꿨어요 (앱 기능은 그대로예요)',
+        en: 'Updates are now delivered faster and more reliably (no change to app features)',
+        zh: '改进了更新的发布方式，更快更稳定（应用功能不变）',
+      },
+    ],
+  },
+  {
     version: '1.4.1',
     date: '2026-10-19',
     items: [
