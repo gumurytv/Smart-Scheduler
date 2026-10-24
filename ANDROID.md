@@ -42,6 +42,9 @@ keyPassword=키 비밀번호
 > ⚠️ `upload-keystore.jks`와 비밀번호는 **반드시 따로 백업**하세요. 잃어버리면 업데이트를 올릴 수 없습니다. 교대근무 앱과 다른 키를 쓰는 것을 권장합니다.
 
 ## 4. 출시용 AAB 만들기
+
+> 💡 **자동 출시:** 버전을 올린 PR을 main에 머지하면 GitHub Actions가 AAB를 만들어 Play 비공개 테스트에 올려요. 설정과 사용법은 [docs/android-release.md](docs/android-release.md)를 보세요. 아래는 직접 만들 때의 방법이에요.
+
 ```bash
 npm run android:sync
 cd android && ./gradlew bundleRelease
