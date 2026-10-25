@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.3',
+    date: '2026-10-25',
+    items: [
+      {
+        ko: '설정 맨 아래에 「의견 보내기」를 추가했어요. 불편한 점이나 바라는 기능을 메일이나 Play 스토어로 알려 주세요',
+        en: 'New “Send feedback” at the bottom of Settings: tell us about problems or ideas by email or on Google Play',
+        zh: '设置底部新增「发送意见」：可通过邮件或 Play 商店告诉我们不便之处或希望的功能',
+      },
+    ],
+  },
+  {
     version: '1.4.2',
     date: '2026-10-24',
     items: [
