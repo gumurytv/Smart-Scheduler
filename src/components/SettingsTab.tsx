@@ -48,6 +48,7 @@ import {
   CalendarDays,
   StickyNote,
   Eraser,
+  MessageSquareText,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -85,6 +86,7 @@ import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/a
 import { ParsedBackup, parseBackup } from '../utils/backupImport';
 import { ImportSheet } from './ImportSheet';
 import { GuideSheet } from './GuideSheet';
+import { FeedbackPanel } from './FeedbackPanel';
 import { exportBackupFile } from '../native/backupFile';
 import { APP_VERSION, CHANGELOG } from '../data/changelog';
 import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
@@ -225,8 +227,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'updates';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'updates'];
+type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'updates' | 'feedback';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'updates', 'feedback'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -4262,6 +4264,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               );
             })}
           </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="feedback"
+          open={!!openCards.feedback}
+          onToggle={toggleCard}
+          tone="accent"
+          icon={MessageSquareText}
+          title={tr(lang, '의견 보내기', 'Send feedback', '发送意见')}
+          summary={tr(lang, '불편한 점 · 바라는 기능 알려 주기', 'Problems or ideas', '不便之处或希望的功能')}
+        >
+          <FeedbackPanel lang={lang} />
         </SettingsCard>
       </div>
 
