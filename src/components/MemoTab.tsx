@@ -49,6 +49,17 @@ const FULL_WEEKDAYS: { ko: string; en: string; zh: string }[] = [
 const LINE_PX = 28;
 const SHEET_PAD_TOP = 6;
 const MIN_SHEET_PX = 280;
+/** A to-do line: optional indent, then ☐ (open) or ☑ (done). */
+const TODO_LINE = /^(\s*)([☐☑])/;
+
+/** Flip the to-do box at the start of line `index`. */
+function toggleTodoLine(text: string, index: number): string {
+  const lines = text.split('\n');
+  const m = TODO_LINE.exec(lines[index] ?? '');
+  if (!m) return text;
+  lines[index] = m[1] + (m[2] === '☐' ? '☑' : '☐') + lines[index].slice(m[0].length);
+  return lines.join('\n');
+}
 
 function parseKey(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -243,6 +254,34 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
     const needed = Math.ceil((el.scrollHeight - SHEET_PAD_TOP) / LINE_PX) * LINE_PX + SHEET_PAD_TOP + 8;
     el.style.height = `${Math.max(MIN_SHEET_PX, needed)}px`;
   }, [displayedCurrentMemo, selectedDateStr]);
+
+  // 할 일 checkboxes: an invisible copy of the sheet tells where each ☐/☑ glyph sits,
+  // and a real checkbox is drawn on top of it (tap = toggle, the text keeps ☐/☑).
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  const [todoBoxes, setTodoBoxes] = useState<Array<{ line: number; done: boolean; top: number; left: number }>>([]);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const mirror = mirrorRef.current;
+      if (!mirror) return;
+      const boxes: Array<{ line: number; done: boolean; top: number; left: number }> = [];
+      mirror.querySelectorAll<HTMLElement>('[data-todo]').forEach((el) => {
+        boxes.push({
+          line: Number(el.dataset.todo),
+          done: el.textContent === '☑',
+          top: el.offsetTop + el.offsetHeight / 2,
+          left: el.offsetLeft + el.offsetWidth / 2,
+        });
+      });
+      setTodoBoxes(boxes);
+    };
+    measure();
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [displayedCurrentMemo]);
+  const todoDone = todoBoxes.filter((b) => b.done).length;
 
   const handleStepDate = (deltaDays: number) => {
     setSelectedDateStr(formatDateKey(addDays(selectedDateObj, deltaDays)));
@@ -692,6 +731,7 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
               </span>
             </div>
             <div aria-hidden="true" className="absolute top-0 bottom-0 left-[40px] w-px bg-accent-300" />
+            <div className="relative">
             <textarea
               ref={textareaRef}
               value={displayedCurrentMemo}
@@ -715,6 +755,53 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
               }}
               className="block w-full bg-transparent pl-[52px] pr-4 pb-2 text-[0.9375rem] text-ink placeholder:text-slate-500 focus:outline-none resize-none overflow-hidden break-words"
             />
+            {/* Same text, same box, invisible: only used to find the ☐/☑ glyphs */}
+            <div
+              ref={mirrorRef}
+              aria-hidden="true"
+              style={{ lineHeight: `${LINE_PX}px`, paddingTop: SHEET_PAD_TOP }}
+              className="absolute inset-x-0 top-0 invisible pointer-events-none pl-[52px] pr-4 text-[0.9375rem] whitespace-pre-wrap break-words"
+            >
+              {displayedCurrentMemo.split('\n').map((line, i) => {
+                const m = TODO_LINE.exec(line);
+                return (
+                  <div key={i}>
+                    {m ? (
+                      <>
+                        {m[1]}
+                        <span data-todo={i}>{m[2]}</span>
+                        {line.slice(m[0].length)}
+                      </>
+                    ) : (
+                      line || '\u200b'
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {todoBoxes.map((b) => (
+              <button
+                key={b.line}
+                type="button"
+                role="checkbox"
+                aria-checked={b.done}
+                aria-label={tr(lang, b.done ? '할 일 완료됨' : '할 일', b.done ? 'To-do done' : 'To-do', b.done ? '待办已完成' : '待办')}
+                // Keep the keyboard closed and the caret where it was
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleMemoChange(toggleTodoLine(displayedCurrentMemo, b.line))}
+                style={{ top: b.top, left: b.left }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 grid place-items-center"
+              >
+                <span
+                  className={`w-[19px] h-[19px] rounded-[5px] grid place-items-center transition-colors ${
+                    b.done ? 'bg-sage-700 text-paper' : 'bg-paper ring-2 ring-inset ring-slate-500'
+                  }`}
+                >
+                  {b.done && <Check strokeWidth={3.5} className="w-3.5 h-3.5" />}
+                </span>
+              </button>
+            ))}
+            </div>
           </div>
 
           {/* Footer: char count + clear */}
@@ -722,6 +809,13 @@ export const MemoTab: React.FC<MemoTabProps> = ({ language = 'ko', memos, onUpda
             <span className="text-[0.6875rem] text-slate-600">
               <span className="font-mono tabular-nums text-[0.8125rem] text-ink">{displayedCurrentMemo.length}</span>{' '}
               {tr(lang, '자', 'chars', '字')}
+              {todoBoxes.length > 0 && (
+                <span className={`ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold ${todoDone === todoBoxes.length ? 'bg-sage-200 text-sage-800' : 'bg-paper/70 text-slate-700'}`}>
+                  <Check strokeWidth={3} className="w-3 h-3" />
+                  {tr(lang, '할 일', 'To-do', '待办')}{' '}
+                  <span className="font-mono tabular-nums">{todoDone}/{todoBoxes.length}</span>
+                </span>
+              )}
             </span>
             {displayedCurrentMemo.trim().length > 0 &&
               (confirmClear ? (
