@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.4',
+    date: '2026-10-30',
+    items: [
+      {
+        ko: '출석 메달을 추가했어요 (설정 → 출석 메달에서 켜기). 한 달 출석률에 따라 금·은·동메달, 연속 출석 10·30·50·100회마다 배지를 받아요',
+        en: 'New attendance medals (turn on in Settings → Attendance medals): gold/silver/bronze for the monthly rate and badges for 10/30/50/100 classes in a row',
+        zh: '新增出勤奖牌（在设置 → 出勤奖牌中开启）：按月出勤率获得金/银/铜牌，连续出勤 10/30/50/100 次获得徽章',
+      },
+    ],
+  },
+  {
     version: '1.4.3',
     date: '2026-10-25',
     items: [
