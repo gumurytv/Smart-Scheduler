@@ -180,6 +180,14 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
           zh: '点击出勤/迟到/缺席/待补课数字可查看按日期的记录，点击某行可跳到该日期。',
         },
       },
+      {
+        title: { ko: '출석 메달 (선택)', en: 'Attendance medals (optional)', zh: '出勤奖牌（可选）' },
+        desc: {
+          ko: '설정 → 출석 메달을 켜면 한 달 출석률에 따라 금·은·동메달을, 연속 출석 10·30·50·100회마다 배지를 받아요. 메달을 누르면 메달함이 열려요.',
+          en: 'Turn on Settings → Attendance medals to earn gold/silver/bronze for the monthly rate and badges for 10/30/50/100 in a row. Tap the medal to open the medal box.',
+          zh: '在设置 → 出勤奖牌中开启后，按月出勤率获得金/银/铜牌，连续出勤 10/30/50/100 次获得徽章。点奖牌可打开奖牌盒。',
+        },
+      },
     ],
   },
   {
