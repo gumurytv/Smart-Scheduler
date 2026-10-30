@@ -357,6 +357,8 @@ export default function App() {
             onUpdateAttendance={handleUpdateAttendance}
             onUpdateDailyOverrides={handleUpdateDailyOverrides}
             schedules={view.schedules}
+            medalsEnabled={!!state.medalsEnabled}
+            medalScope={childKey}
           />
         )}
 

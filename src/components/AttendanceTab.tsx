@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -36,6 +36,8 @@ import {
   ScheduleItem,
 } from '../types';
 import { MakeupScheduleSheet } from './MakeupScheduleSheet';
+import { MedalCelebration, MedalSheet, MedalStrip } from './Medals';
+import { earnedMedalIds } from '../utils/medals';
 import { formatDateKey, getDayOfWeekKor, addDays } from '../data/initialData';
 import { resolveDailyTimetable } from '../utils/timetableHelpers';
 import {
@@ -55,6 +57,30 @@ interface AttendanceTabProps {
   /** Needed to put a scheduled makeup on the timetable. */
   onUpdateDailyOverrides?: (updater: (prev: DailyOverrides) => DailyOverrides) => void;
   schedules?: ScheduleItem[];
+  /** 출석 메달 (Settings → 앱). */
+  medalsEnabled?: boolean;
+  /** Which child the medals belong to (each child's medals are celebrated once). */
+  medalScope?: string;
+}
+
+const MEDALS_SEEN_KEY = 'teumteum.medalsSeen.';
+
+function loadSeenMedals(scope: string): string[] {
+  try {
+    const raw = window.localStorage.getItem(MEDALS_SEEN_KEY + scope);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSeenMedals(scope: string, ids: string[]) {
+  try {
+    window.localStorage.setItem(MEDALS_SEEN_KEY + scope, JSON.stringify(ids));
+  } catch {
+    // Only means the celebration may show again.
+  }
 }
 
 const STATUS_ORDER: AttendanceStatus[] = ['present', 'late', 'absent', 'cancelled'];
@@ -415,6 +441,8 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   onUpdateAttendance,
   onUpdateDailyOverrides,
   schedules,
+  medalsEnabled = false,
+  medalScope = 'c1',
 }) => {
   const lang = language;
   const today = useMemo(() => new Date(), []);
@@ -431,6 +459,26 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   // 보강 일정 등록 sheet: which missed class it is for
   const [planTarget, setPlanTarget] = useState<{ missedDate: string; academyName: string } | null>(null);
   const [showDoneMakeups, setShowDoneMakeups] = useState(false);
+  const [medalSheetOpen, setMedalSheetOpen] = useState(false);
+  // Newly earned medal/streak badge, celebrated once (per child, per device)
+  const [celebrate, setCelebrate] = useState<string | null>(null);
+  const [seenMedals, setSeenMedals] = useState<string[]>(() => loadSeenMedals(medalScope));
+  const unseenMedals = useMemo(() => {
+    if (!medalsEnabled || medalScope === 'tour-preview') return [];
+    const seen = new Set(seenMedals);
+    return earnedMedalIds(attendance, todayStr).filter((id) => !seen.has(id));
+  }, [medalsEnabled, medalScope, attendance, todayStr, seenMedals]);
+  useEffect(() => {
+    if (celebrate || unseenMedals.length === 0) return;
+    // The newest month medal first, otherwise the biggest streak badge
+    setCelebrate(unseenMedals.find((id) => id.startsWith('month:')) ?? unseenMedals[unseenMedals.length - 1]);
+  }, [unseenMedals, celebrate]);
+  const closeCelebration = () => {
+    const next = [...seenMedals, ...unseenMedals];
+    saveSeenMedals(medalScope, next);
+    setSeenMedals(next);
+    setCelebrate(null);
+  };
 
   /** Select a date and keep the shared month cursor (calendar + charts) in sync. */
   const selectDate = (dateStr: string) => {
@@ -1675,6 +1723,17 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           </div>
         </div>
 
+        {medalsEnabled && (
+          <MedalStrip
+            lang={lang}
+            attendance={attendance}
+            month={monthPrefix}
+            isCurrentMonth={isCurrentMonth}
+            todayStr={todayStr}
+            onOpen={() => setMedalSheetOpen(true)}
+          />
+        )}
+
         {/* KPI tiles */}
         <div className="grid grid-cols-4 gap-1.5">
           {kpis.map((k) => (
@@ -2251,6 +2310,11 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           />
         );
       })()}
+
+      {medalSheetOpen && (
+        <MedalSheet lang={lang} attendance={attendance} todayStr={todayStr} onClose={() => setMedalSheetOpen(false)} />
+      )}
+      {celebrate && <MedalCelebration lang={lang} id={celebrate} onClose={closeCelebration} />}
 
       {kpiDetail && (
         <div

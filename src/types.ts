@@ -200,6 +200,8 @@ export interface PlannerState {
   reminders?: ReminderConfig;
   /** 시간표 화면 구성: order and visibility of the timetable tab's sections. */
   timetableLayout?: TimetableLayout;
+  /** 출석 메달: medals and streaks on the attendance tab (off unless turned on in Settings). */
+  medalsEnabled?: boolean;
 }
 
 // 시간표 화면 구성 (Settings): sections are reordered within their group, and some can be hidden.

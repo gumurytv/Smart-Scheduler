@@ -71,6 +71,7 @@ export function resetPlannerParts(prev: PlannerState, parts: ResetPart[], mode: 
       subjectColors: undefined,
       reminders: undefined,
       timetableLayout: undefined,
+      medalsEnabled: undefined,
     };
   }
   return next;

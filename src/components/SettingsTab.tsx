@@ -49,6 +49,7 @@ import {
   StickyNote,
   Eraser,
   MessageSquareText,
+  Medal,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -87,6 +88,7 @@ import { ParsedBackup, parseBackup } from '../utils/backupImport';
 import { ImportSheet } from './ImportSheet';
 import { GuideSheet } from './GuideSheet';
 import { FeedbackPanel } from './FeedbackPanel';
+import { MedalIcon } from './Medals';
 import { exportBackupFile } from '../native/backupFile';
 import { APP_VERSION, CHANGELOG } from '../data/changelog';
 import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
@@ -227,8 +229,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'updates' | 'feedback';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'updates', 'feedback'];
+type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'updates' | 'feedback' | 'medals';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'updates', 'feedback', 'medals'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -4147,6 +4149,60 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   )
                 : tr(lang, '알림은 안드로이드 앱에서 와요. 웹 미리보기에서는 설정만 저장돼요.', 'Reminders arrive in the Android app; the web preview only saves the setting.', '提醒仅在安卓应用中发送，网页预览只保存设置。')}
             </p>
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="medals"
+          open={!!openCards.medals}
+          onToggle={toggleCard}
+          tone="accent"
+          icon={Medal}
+          title={tr(lang, '출석 메달', 'Attendance medals', '出勤奖牌')}
+          summary={
+            state.medalsEnabled
+              ? tr(lang, '켜짐 · 출석표에서 메달과 연속 출석 보기', 'On · medals and streaks in Attendance', '已开启 · 在出勤表查看奖牌和连续出勤')
+              : tr(lang, '꺼짐 · 꾸준히 출석하면 메달을 받아요', 'Off · earn medals for showing up', '已关闭 · 坚持出勤可获得奖牌')
+          }
+        >
+          <div className="p-3.5 space-y-3">
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-paper px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-[0.875rem] font-bold text-ink">{tr(lang, '출석 메달 사용', 'Use attendance medals', '使用出勤奖牌')}</div>
+                <div className="text-[0.6875rem] text-slate-600 leading-snug">
+                  {tr(
+                    lang,
+                    '출석표에 이달의 메달과 연속 출석(🔥)이 나타나요. 끄면 지금처럼 깔끔하게 보여요',
+                    'Shows the monthly medal and streak (🔥) in Attendance. Turn off for the plain view',
+                    '出勤表会显示本月奖牌和连续出勤（🔥）。关闭后保持简洁'
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!state.medalsEnabled}
+                aria-label={tr(lang, '출석 메달', 'Attendance medals', '出勤奖牌')}
+                onClick={() => onUpdateState((prev) => ({ ...prev, medalsEnabled: !prev.medalsEnabled }))}
+                className={`w-12 h-7 rounded-full p-0.5 transition-colors shrink-0 ${state.medalsEnabled ? 'bg-accent-700' : 'bg-slate-300'}`}
+              >
+                <span className={`block w-6 h-6 rounded-full bg-paper shadow-xs transition-transform ${state.medalsEnabled ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+            <div className="rounded-2xl bg-paper px-3 py-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <MedalIcon tier="gold" size={32} />
+                <MedalIcon tier="silver" size={32} />
+                <MedalIcon tier="bronze" size={32} />
+                <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '메달 받는 방법', 'How to earn', '如何获得')}</span>
+              </div>
+              <ul className="text-[0.6875rem] text-slate-700 leading-relaxed break-keep space-y-0.5">
+                <li>· {tr(lang, '한 달 출석률 100% 금 · 95% 은 · 90% 동메달', 'Monthly rate 100% gold · 95% silver · 90% bronze', '月出勤率 100% 金 · 95% 银 · 90% 铜')}</li>
+                <li>· {tr(lang, '빠지지 않고 10 · 30 · 50 · 100회 연속 출석하면 배지', 'Badges for 10 · 30 · 50 · 100 classes in a row', '连续出勤 10 · 30 · 50 · 100 次获得徽章')}</li>
+                <li>· {tr(lang, '결석해도 보강을 마치면 출석으로 쳐요', 'A missed class counts once its makeup is done', '缺席的课完成补课后算出勤')}</li>
+                <li>· {tr(lang, '메달은 자녀마다 따로 모여요', 'Each child collects their own medals', '每个孩子各自收集奖牌')}</li>
+              </ul>
+            </div>
           </div>
         </SettingsCard>
 
