@@ -61,6 +61,7 @@ export function emptyChildData(state: PlannerState, name: string): ChildData {
     ...extractChildData(base),
     subjectPool: { school: [...state.subjectPool.school], academy: [...state.subjectPool.academy] },
     subjectColors: state.subjectColors ? { ...state.subjectColors } : undefined,
+    theme: state.theme ? { ...state.theme } : undefined,
     profile: { name, school: '', grade: '' },
   };
 }

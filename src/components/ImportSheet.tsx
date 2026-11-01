@@ -79,7 +79,7 @@ export const ImportSheet: React.FC<ImportSheetProps> = ({ lang, fileName, parsed
     profile: {
       icon: IdCard,
       tone: 'bg-sage-800',
-      label: tr(lang, '내 정보', 'Profile', '个人信息'),
+      label: tr(lang, '내 정보 · 테마', 'Profile & theme', '个人信息 · 主题'),
       detail:
         [src.profile?.name, src.profile?.school, src.profile?.grade].map((v) => v?.trim()).filter(Boolean).join(' · ') ||
         tr(lang, '비어 있어요', 'Empty', '为空'),

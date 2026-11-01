@@ -202,6 +202,15 @@ export interface PlannerState {
   timetableLayout?: TimetableLayout;
   /** 출석 메달: medals and streaks on the attendance tab (off unless turned on in Settings). */
   medalsEnabled?: boolean;
+  /** 테마 (Settings → 앱): colour theme + optional accent. Per child, like the timetable. */
+  theme?: ThemeConfig;
+}
+
+export type ThemeId = 'default' | 'blossom' | 'ocean' | 'lavender' | 'forest' | 'dark';
+export interface ThemeConfig {
+  id: ThemeId;
+  /** 강조색 직접 고르기: hex from ACCENT_SWATCHES, replacing the theme's own accent. */
+  accent?: string;
 }
 
 // 시간표 화면 구성 (Settings): sections are reordered within their group, and some can be hidden.
@@ -248,6 +257,7 @@ export const CHILD_DATA_KEYS = [
   'profile',
   'schoolTimeConfig',
   'subjectColors',
+  'theme',
 ] as const;
 export type ChildData = Pick<PlannerState, (typeof CHILD_DATA_KEYS)[number]>;
 

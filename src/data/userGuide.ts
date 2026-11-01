@@ -227,6 +227,14 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
     },
     items: [
       {
+        title: { ko: '테마', en: 'Theme', zh: '主题' },
+        desc: {
+          ko: '앱 → 테마에서 기본·벚꽃·바다·라벤더·숲·다크 중 하나를 고르고, 강조색도 직접 바꿀 수 있어요. 자녀마다 따로 정해져요.',
+          en: 'App → Theme: pick Classic, Blossom, Ocean, Lavender, Forest or Dark, and optionally your own accent colour. Each child keeps their own.',
+          zh: '应用 → 主题：可选经典、樱花、海洋、薰衣草、森林或深色，也可自选强调色。每个孩子各自保存。',
+        },
+      },
+      {
         title: { ko: '맨 위 카드', en: 'Top card', zh: '顶部卡片' },
         desc: {
           ko: '언어, 글자 크기, 자녀 선택, 사용 가이드, 처음 사용 안내(화면 설명·처음 설정 다시 보기), 앱 초기화(항목을 골라 지우기)가 있어요.',
