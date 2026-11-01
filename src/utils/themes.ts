@@ -161,7 +161,45 @@ export function applyTheme(config: ThemeConfig | undefined) {
   });
   const dark = !!THEMES.find((t) => t.id === config?.id)?.dark;
   root.style.colorScheme = dark ? 'dark' : 'light';
+  applyNowCardStyle(config, vars, dark);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', vars['--color-paper'] || '#f5ead8');
+}
+
+/**
+ * The 지금 card is an ink-coloured card with paper text. In the dark theme ink is light, which
+ * made it the brightest thing on screen at night; there it becomes a dim card instead: inside the
+ * card ink/paper and the accent/sage scales take their light-theme roles (as on the default dark
+ * card), and the light panels inside it (.now-inner) go back to the dark theme's own colours.
+ */
+function applyNowCardStyle(config: ThemeConfig | undefined, vars: Record<string, string>, dark: boolean) {
+  const id = 'teumteum-now-card';
+  let el = document.getElementById(id) as HTMLStyleElement | null;
+  if (!dark) {
+    el?.remove();
+    return;
+  }
+  const spec = THEMES.find((t) => t.id === config?.id) ?? THEMES[0];
+  const [nh, nc] = spec.neutral;
+  const light: Record<string, string> = {};
+  scale('accent', config?.accent || spec.accent, false, light);
+  scale('sage', '#7a8a5e', false, light);
+  const decl = (o: Record<string, string>) =>
+    Object.entries(o)
+      .map(([k, v]) => `${k}:${v};`)
+      .join('');
+  const restore: Record<string, string> = {};
+  Object.keys(light).forEach((k) => {
+    if (vars[k]) restore[k] = vars[k];
+  });
+  const css =
+    `.now-card{${decl(light)}--color-ink:${oklchToHex([0.28, nc, nh])};--color-paper:${oklchToHex([0.9, nc * 0.6, nh])};}` +
+    `.now-card .now-inner{${decl(restore)}--color-ink:${vars['--color-ink']};--color-paper:${oklchToHex([0.23, nc, nh])};}`;
+  if (!el) {
+    el = document.createElement('style');
+    el.id = id;
+    document.head.appendChild(el);
+  }
+  el.textContent = css;
 }
 
 /** Small preview colours for the theme picker. */

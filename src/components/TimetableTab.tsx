@@ -1755,7 +1755,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         style={blockOrder('now')}
         aria-label={tr(lang, '지금', 'Now', '现在')}
         data-tour="now"
-        className="bg-ink text-paper rounded-[32px] p-5 shadow-md space-y-4"
+        className="now-card bg-ink text-paper rounded-[32px] p-5 shadow-md space-y-4"
       >
         {/* Identity row: makes the planner feel like the student's own */}
         {(() => {
@@ -1790,7 +1790,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
                   <button
                     type="button"
                     onClick={onEditProfile}
-                    className="h-8 px-3 ml-auto rounded-full bg-paper text-ink text-[0.6875rem] font-bold inline-flex items-center gap-1 shrink-0 whitespace-nowrap hover:bg-paper/90 transition-colors"
+                    className="now-inner h-8 px-3 ml-auto rounded-full bg-paper text-ink text-[0.6875rem] font-bold inline-flex items-center gap-1 shrink-0 whitespace-nowrap hover:bg-paper/90 transition-colors"
                   >
                     <UserRound className="w-3.5 h-3.5" strokeWidth={2.5} />
                     {tr(lang, '이름·학교 입력', 'Add name & school', '填写姓名·学校')}
@@ -2020,7 +2020,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
         )}
 
         {/* Today's makeup / special classes: contrasting light panel inside the hero */}
-        <div className="rounded-[24px] bg-paper text-ink p-4 space-y-2.5">
+        <div className="now-inner rounded-[24px] bg-paper text-ink p-4 space-y-2.5">
           <div className="text-[1rem] font-bold text-ink inline-flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-accent" />
             {tr(lang, '오늘 보강/특강', "Today's makeup / special classes", '今日补课/特讲')}
