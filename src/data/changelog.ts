@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.6',
+    date: '2026-11-01',
+    items: [
+      {
+        ko: '테마를 고를 수 있어요 (설정 → 테마). 기본·벚꽃·바다·라벤더·숲·다크 6가지에 강조색도 직접 바꿀 수 있고, 자녀마다 따로 정해져요',
+        en: 'Pick a theme in Settings → Theme: Classic, Blossom, Ocean, Lavender, Forest or Dark, plus your own accent colour; each child keeps their own',
+        zh: '可在设置 → 主题中选择经典、樱花、海洋、薰衣草、森林或深色，也可自选强调色，每个孩子各自保存',
+      },
+    ],
+  },
+  {
     version: '1.4.5',
     date: '2026-11-01',
     items: [
