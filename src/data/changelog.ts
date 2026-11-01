@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.5',
+    date: '2026-11-01',
+    items: [
+      {
+        ko: '메모장의 「☐ 할 일」을 눌러서 체크할 수 있어요. 메모 아래에 몇 개를 했는지도 보여줘요',
+        en: 'Tap a “☐ To-do” in the memo to check it off; the memo shows how many are done',
+        zh: '点备忘录中的「☐ 待办」即可勾选，备忘录下方会显示完成数量',
+      },
+    ],
+  },
+  {
     version: '1.4.4',
     date: '2026-10-30',
     items: [
