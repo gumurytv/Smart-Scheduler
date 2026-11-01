@@ -28,6 +28,7 @@ import { MemoTab } from './components/MemoTab';
 import { SettingsTab } from './components/SettingsTab';
 import { syncWidgetData } from './utils/widgetSync';
 import { syncMakeupReminders } from './native/reminders';
+import { applyTheme } from './utils/themes';
 import { registerBackButton, keepRepainted } from './native/androidShell';
 import { ChildrenSheet, childFallbackName } from './components/ChildrenSheet';
 import { Onboarding, OnboardingExit } from './components/Onboarding';
@@ -138,6 +139,11 @@ export default function App() {
   useLayoutEffect(() => {
     document.documentElement.style.fontSize = textScale === 100 ? '' : `${textScale}%`;
   }, [textScale]);
+
+  // 테마: colour tokens on <html> (per child)
+  useLayoutEffect(() => {
+    applyTheme(state.theme);
+  }, [state.theme]);
 
   // The content area is the scroll container: start each tab at the top.
   const mainRef = useRef<HTMLElement>(null);

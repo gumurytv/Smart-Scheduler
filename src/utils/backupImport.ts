@@ -108,7 +108,10 @@ export function applyImportParts(target: ChildData, src: ChildData, parts: Impor
   if (has('schedules')) next.schedules = src.schedules.map((s) => ({ ...s }));
   if (has('attendance')) next.attendance = { ...src.attendance };
   if (has('memos')) next.memos = { ...src.memos };
-  if (has('profile')) next.profile = src.profile ? { ...src.profile } : undefined;
+  if (has('profile')) {
+    next.profile = src.profile ? { ...src.profile } : undefined;
+    next.theme = src.theme ? { ...src.theme } : undefined;
+  }
   if (has('subjects')) {
     next.subjectPool = { school: [...src.subjectPool.school], academy: [...src.subjectPool.academy] };
     next.subjectColors = src.subjectColors ? { ...src.subjectColors } : undefined;

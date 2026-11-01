@@ -50,6 +50,7 @@ import {
   Eraser,
   MessageSquareText,
   Medal,
+  Palette,
 } from 'lucide-react';
 import {
   PlannerState,
@@ -89,6 +90,7 @@ import { ImportSheet } from './ImportSheet';
 import { GuideSheet } from './GuideSheet';
 import { FeedbackPanel } from './FeedbackPanel';
 import { MedalIcon } from './Medals';
+import { ACCENT_SWATCHES, THEMES, themeName, themeSwatch } from '../utils/themes';
 import { exportBackupFile } from '../native/backupFile';
 import { APP_VERSION, CHANGELOG } from '../data/changelog';
 import { planMakeupReminders, reminderLeadLabel, requestReminderPermission } from '../native/reminders';
@@ -229,8 +231,8 @@ const Stepper: React.FC<StepperProps> = ({ value, onChange, min, max, step = 1, 
   </div>
 );
 
-type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'updates' | 'feedback' | 'medals';
-const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'updates', 'feedback', 'medals'];
+type SettingsCardId = 'profile' | 'layout' | 'range' | 'school' | 'academy' | 'pool' | 'ai' | 'backup' | 'reminders' | 'widgets' | 'updates' | 'feedback' | 'medals' | 'theme';
+const SETTINGS_CARD_IDS: SettingsCardId[] = ['profile', 'layout', 'range', 'school', 'academy', 'pool', 'ai', 'backup', 'reminders', 'widgets', 'updates', 'feedback', 'medals', 'theme'];
 const OPEN_CARDS_STORAGE_KEY = 'smart-planner.settings.openCards.v1';
 
 function loadOpenCards(): Partial<Record<SettingsCardId, boolean>> {
@@ -4042,6 +4044,99 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       {/* ===== GROUP: 앱 ===== */}
       <div className="space-y-2">
         <GroupHeader label={tr(lang, '앱', 'App', '应用')} />
+
+        <SettingsCard
+          id="theme"
+          open={!!openCards.theme}
+          onToggle={toggleCard}
+          tone="accent"
+          icon={Palette}
+          title={tr(lang, '테마', 'Theme', '主题')}
+          summary={
+            themeName(state.theme?.id ?? 'default', lang) +
+            (state.theme?.accent ? tr(lang, ' · 강조색 직접 고름', ' · custom accent', ' · 自选强调色') : '')
+          }
+        >
+          <div className="p-3.5 space-y-4">
+            <div className="space-y-2">
+              <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '테마 고르기', 'Pick a theme', '选择主题')}</span>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={tr(lang, '테마', 'Theme', '主题')}>
+                {THEMES.map((t) => {
+                  const selected = (state.theme?.id ?? 'default') === t.id;
+                  const sw = themeSwatch(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => onUpdateState((prev) => ({ ...prev, theme: { id: t.id, accent: prev.theme?.accent } }))}
+                      className={`rounded-2xl p-1.5 text-left ${selected ? 'ring-[2.5px] ring-accent-700' : 'ring-1 ring-divider'}`}
+                    >
+                      {/* Mini screen: paper ground, a surface card, an accent button */}
+                      <span className="block rounded-xl p-1.5 space-y-1" style={{ background: sw.paper }} aria-hidden="true">
+                        <span className="block h-3 rounded-md" style={{ background: sw.surface }} />
+                        <span className="flex items-center gap-1">
+                          <span className="h-3 flex-1 rounded-full" style={{ background: sw.accent }} />
+                          <span className="w-3 h-3 rounded-full" style={{ background: sw.ink }} />
+                        </span>
+                      </span>
+                      <span className="flex items-center justify-between gap-1 px-1 pt-1">
+                        <span className="text-[0.75rem] font-bold text-ink truncate">
+                          {t.emoji} {tr(lang, ...t.name)}
+                        </span>
+                        {selected && <Check strokeWidth={3} className="w-3.5 h-3.5 text-accent-700 shrink-0" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[0.75rem] font-bold text-ink">{tr(lang, '강조색 직접 고르기', 'Accent colour', '自选强调色')}</span>
+                {state.theme?.accent && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateState((prev) => ({ ...prev, theme: { id: prev.theme?.id ?? 'default' } }))}
+                    className="h-8 px-3 rounded-full bg-paper text-[0.75rem] font-bold text-slate-700 hover:bg-slate-100"
+                  >
+                    {tr(lang, '테마 기본색으로', 'Use theme colour', '使用主题颜色')}
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label={tr(lang, '강조색', 'Accent colour', '强调色')}>
+                {ACCENT_SWATCHES.map((hex) => {
+                  const selected = state.theme?.accent === hex;
+                  const shown = themeSwatch(state.theme?.id ?? 'default', hex).accent;
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={hex}
+                      onClick={() => onUpdateState((prev) => ({ ...prev, theme: { id: prev.theme?.id ?? 'default', accent: hex } }))}
+                      className={`aspect-square rounded-full grid place-items-center ${selected ? 'ring-[2.5px] ring-offset-2 ring-offset-surface ring-ink' : ''}`}
+                      style={{ background: shown }}
+                    >
+                      {selected && <Check strokeWidth={3.5} className="w-4 h-4 text-paper" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[0.6875rem] text-slate-600 leading-snug break-keep">
+                {tr(
+                  lang,
+                  '버튼과 강조 부분의 색이 바뀌어요. 글씨가 잘 보이도록 밝기는 자동으로 맞춰요. 테마는 자녀마다 따로 정할 수 있어요.',
+                  'Changes buttons and highlights; brightness is adjusted so text stays readable. Each child can have their own theme.',
+                  '会改变按钮和强调部分的颜色，亮度会自动调整以保证文字清晰。每个孩子可以设置自己的主题。'
+                )}
+              </p>
+            </div>
+          </div>
+        </SettingsCard>
 
         <SettingsCard
           id="reminders"
