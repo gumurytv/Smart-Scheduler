@@ -870,6 +870,8 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
     nextStatus: SlotStatus | undefined
   ) => {
     if (!onUpdateAttendance) return;
+    // Attendance older than yesterday is locked (출석표): from yesterday on it follows the timetable.
+    if (dateStr < formatDateKey(addDays(new Date(), -1))) return;
     if (nextStatus === 'absent' && prevStatus !== 'absent') {
       onUpdateAttendance((prev) => {
         const day = { ...(prev[dateStr] || {}) };
@@ -1282,7 +1284,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               );
             })}
           </div>
-          {currentStatus === 'absent' && onUpdateAttendance && (
+          {currentStatus === 'absent' && onUpdateAttendance && editDateStr >= formatDateKey(addDays(new Date(), -1)) && (
             <p className="text-[0.6875rem] font-semibold text-accent-800">
               {tr(
                 lang,
