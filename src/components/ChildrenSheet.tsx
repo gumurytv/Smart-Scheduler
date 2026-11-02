@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Check, Pencil, Trash2, UserPlus, UserRound, X } from 'lucide-react';
+import { Check, Pencil, Trash2, UserPlus, X } from 'lucide-react';
+import { Avatar } from './Avatar';
 import { AppLanguage, PlannerState } from '../types';
 import { tr } from '../i18n/translations';
 import { addChild, childName, emptyChildData, listChildren, removeChild, renameChild, switchChild } from '../utils/children';
@@ -110,13 +111,13 @@ export const ChildrenSheet: React.FC<ChildrenSheetProps> = ({ lang, state, onUpd
                       aria-pressed={c.isActive}
                       className="flex-1 min-w-0 flex items-center gap-3 text-left"
                     >
-                      <span
-                        className={`w-10 h-10 rounded-full grid place-items-center shrink-0 ${
-                          c.isActive ? 'bg-accent-700 text-paper' : 'bg-paper text-slate-700'
-                        }`}
-                      >
-                        <UserRound className="w-5 h-5" />
-                      </span>
+                      <Avatar
+                        avatar={c.data.profile?.avatar}
+                        sizeClass="w-10 h-10"
+                        textClass="text-[1.375rem]"
+                        fallbackClass={c.isActive ? 'bg-accent-700 text-paper' : 'bg-paper text-slate-700'}
+                        className={c.isActive ? 'ring-2 ring-accent-700 ring-offset-2 ring-offset-surface' : ''}
+                      />
                       <span className="min-w-0">
                         <span className="block text-[0.9375rem] font-bold text-ink truncate">{c.name}</span>
                         <span className="block text-[0.6875rem] text-slate-600 truncate">

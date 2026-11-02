@@ -172,7 +172,11 @@ export interface UserProfile {
   name: string; // e.g. '김민준'
   school: string; // e.g. '한빛중학교'
   grade: string; // free text so any school system fits, e.g. '2학년 3반'
+  /** 프로필 사진: a built-in character or the user's own (small, square) photo. */
+  avatar?: ProfileAvatar;
 }
+
+export type ProfileAvatar = { kind: 'character'; id: string } | { kind: 'photo'; src: string };
 
 // 글자 크기 (Settings): percentage of the default text size, for easier reading.
 export type TextScale = 100 | 115 | 130 | 145;

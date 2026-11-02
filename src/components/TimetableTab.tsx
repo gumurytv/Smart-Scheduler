@@ -24,6 +24,7 @@ import {
   UserRound,
   PenLine,
 } from 'lucide-react';
+import { Avatar } from './Avatar';
 import {
   DAYS_OF_WEEK,
   UserProfile,
@@ -1762,7 +1763,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
           const name = profile?.name?.trim() ?? '';
           const school = profile?.school?.trim() ?? '';
           const grade = profile?.grade?.trim() ?? '';
-          const hasProfile = !!(name || school || grade);
+          const hasProfile = !!(name || school || grade || profile?.avatar);
           if (!hasProfile) {
             return (
               <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-paper/15">
@@ -1806,19 +1807,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({
               : hour < 18
                 ? tr(lang, '좋은 오후예요', 'Good afternoon', '下午好')
                 : tr(lang, '좋은 저녁이에요', 'Good evening', '晚上好');
-          const words = name.split(/\s+/).filter(Boolean);
-          const initials =
-            words.length >= 2 && /^[A-Za-z]/.test(words[0])
-              ? (Array.from(words[0])[0] + Array.from(words[1])[0]).toUpperCase()
-              : (Array.from(name)[0] ?? '').toUpperCase();
           const content = (
             <>
-              <span
-                aria-hidden="true"
-                className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[1.125rem] font-bold"
-              >
-                {initials || <UserRound className="w-5 h-5" strokeWidth={2.5} />}
-              </span>
+              <Avatar
+                avatar={profile?.avatar}
+                name={name}
+                sizeClass="w-12 h-12"
+                textClass="text-[1.625rem]"
+                className="ring-2 ring-paper/30 ring-offset-2 ring-offset-ink"
+              />
               <span className="flex-1 min-w-0">
                 <span className="block text-[0.75rem] font-semibold text-paper/80 truncate">
                   {name
