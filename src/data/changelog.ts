@@ -10,6 +10,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.8',
+    date: '2026-11-02',
+    items: [
+      {
+        ko: '연속 출석을 하루 단위로 세요. 그날 학교·학원 수업을 모두 출석해야 1일이에요',
+        en: 'Streaks now count days: a day counts when every school and academy class that day was attended',
+        zh: '连续出勤改为按天计算：当天学校和补习班课程全部出勤才算一天',
+      },
+      {
+        ko: '출석은 오늘과 어제만 체크할 수 있어요. 앞으로의 날짜는 공식휴강만 미리 표시할 수 있어요',
+        en: 'Attendance can be checked for today and yesterday only; future days take only an official day off',
+        zh: '出勤只能记录今天和昨天；未来的日期只能提前标记官方停课',
+      },
+    ],
+  },
+  {
     version: '1.4.7',
     date: '2026-11-02',
     items: [
