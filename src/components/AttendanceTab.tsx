@@ -767,11 +767,16 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
     };
   }, [selectedDateStr, masterTimetable, dailyOverrides, attendance, lang]);
 
-  // Past days are locked: attendance is checked on the day, not filled in afterwards.
-  const isPastDay = selectedDateStr < todayStr;
+  // Attendance is checked on the day, with one day of grace (yesterday stays open).
+  // Older days are locked; future days only take 공식휴강 (a known day off), not 출석 in advance.
+  const graceStartStr = formatDateKey(addDays(today, -1));
+  const isPastDay = selectedDateStr < graceStartStr;
+  const isFutureDay = selectedDateStr > todayStr;
+  const canPickStatus = (st: AttendanceStatus | null) =>
+    !isPastDay && (!isFutureDay || st === null || st === 'cancelled');
 
   const handleSetSchoolStatus = (status: AttendanceStatus | null) => {
-    if (isPastDay) return;
+    if (!canPickStatus(status)) return;
     onUpdateAttendance((prev) => {
       const next = { ...prev };
       const dayAtt = { ...(next[selectedDateStr] || {}) };
@@ -801,7 +806,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
   };
 
   const handleSetAcademyStatus = (academyName: string, status: AttendanceStatus | null) => {
-    if (isPastDay) return;
+    if (!canPickStatus(status)) return;
     onUpdateAttendance((prev) => {
       const next = { ...prev };
       const dayAtt = { ...(next[selectedDateStr] || {}) };
@@ -892,7 +897,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
 
   /** One tap: fill every not-yet-recorded class of the selected day (timetable-cancelled academies → 휴강). */
   const handleMarkAllPresent = () => {
-    if (isPastDay) return;
+    if (isPastDay || isFutureDay) return;
     const day = selectedDayResolved;
     onUpdateAttendance((prev) => {
       const next = { ...prev };
@@ -1113,19 +1118,20 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
         const meta = STATUS_META[st];
         const Icon = meta.Icon;
         const isSelected = current === st;
+        const locked = !canPickStatus(st);
         return (
           <button
             key={st}
             type="button"
             role="radio"
             aria-checked={isSelected}
-            aria-disabled={isPastDay || undefined}
-            disabled={isPastDay}
+            aria-disabled={locked || undefined}
+            disabled={locked}
             title={statusLabel(st, lang)}
             onClick={() => onPick(st)}
             className={`min-h-[50px] min-w-0 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[0.75rem] font-bold transition-all ${
-              isSelected ? `${meta.btnActive} shadow-xs` : isPastDay ? 'text-slate-400' : 'text-slate-700 hover:bg-paper'
-            } ${isPastDay ? 'cursor-not-allowed' : 'active:scale-[0.97]'}`}
+              isSelected ? `${meta.btnActive} shadow-xs` : locked ? 'text-slate-400' : 'text-slate-700 hover:bg-paper'
+            } ${locked ? 'cursor-not-allowed' : 'active:scale-[0.97]'}`}
           >
             <Icon strokeWidth={isSelected ? 3 : 2.5} className="w-4 h-4 shrink-0" />
             <span className="max-w-full truncate leading-tight">{statusShortLabel(st, lang)}</span>
@@ -1356,7 +1362,7 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
               </div>
             )}
           </div>
-          {dayFillable > 0 && !isPastDay && (
+          {dayFillable > 0 && !isPastDay && !isFutureDay && (
             <button
               type="button"
               onClick={handleMarkAllPresent}
@@ -1376,15 +1382,22 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
           )}
         </div>
 
-        {isPastDay && (
+        {(isPastDay || isFutureDay) && (
           <p className="flex items-start gap-2 rounded-2xl bg-surface px-3.5 py-2.5 text-[0.75rem] font-semibold text-slate-700 leading-snug break-keep">
             <Lock strokeWidth={2.5} className="w-4 h-4 shrink-0 mt-px text-slate-600" />
-            {tr(
-              lang,
-              '지난 날짜는 출석을 바꿀 수 없어요. 출석은 그날 체크해 주세요. 사유와 보강은 지금도 적을 수 있어요.',
-              'Past days are locked: check attendance on the day. You can still add reasons and makeups.',
-              '过去的日期不能修改出勤，请在当天记录。原因和补课仍可填写。'
-            )}
+            {isPastDay
+              ? tr(
+                  lang,
+                  '출석은 다음 날까지만 체크할 수 있어요. 이 날짜는 바꿀 수 없어요. 사유와 보강은 지금도 적을 수 있어요.',
+                  'Attendance can be checked until the next day; this day is locked. You can still add reasons and makeups.',
+                  '出勤只能在次日之前记录，此日期已锁定。原因和补课仍可填写。'
+                )
+              : tr(
+                  lang,
+                  '앞으로의 날짜는 미리 출석할 수 없어요. 미리 알고 있는 공식휴강만 표시할 수 있어요.',
+                  "Future days can't be marked present in advance; only a known official day off can be set.",
+                  '未来的日期不能提前记录出勤，只能标记已知的官方停课。'
+                )}
           </p>
         )}
 

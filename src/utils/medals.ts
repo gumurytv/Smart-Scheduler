@@ -89,11 +89,14 @@ const addDayKey = (key: string): string => {
 /**
  * Days in a row on which every planned class (school and academies) was attended.
  * Present, late and a made-up absence count; official days off are left out. A day with no
- * classes (weekend) is skipped. A past day with a missed or unchecked class ends the streak;
- * today only ends it once a class is actually missed (the rest may still be checked).
+ * classes (weekend) is skipped. A missed class ends the streak, and so does an unchecked one once
+ * its day can no longer be checked (older than yesterday); today and yesterday wait for the check.
  */
 export function attendanceStreak(attendance: AttendanceMap, todayStr: string, planned: PlannedDay): StreakInfo {
   const dates = Object.keys(attendance || {}).filter((d) => d <= todayStr).sort();
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  const g = new Date(ty, tm - 1, td - 1);
+  const graceStart = `${g.getFullYear()}-${String(g.getMonth() + 1).padStart(2, '0')}-${String(g.getDate()).padStart(2, '0')}`;
   let current = 0;
   let best = 0;
   if (dates.length === 0) return { current, best };
@@ -111,8 +114,8 @@ export function attendanceStreak(attendance: AttendanceMap, todayStr: string, pl
     if (results.every((x) => x === true)) {
       current += 1;
       best = Math.max(best, current);
-    } else if (date === todayStr && !results.includes(false)) {
-      // Today, not finished checking yet: keep the streak as it is.
+    } else if (date >= graceStart && !results.includes(false)) {
+      // Today or yesterday (still open for checking) and nothing missed yet: keep the streak.
     } else {
       current = 0;
     }
