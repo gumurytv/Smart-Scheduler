@@ -6,7 +6,6 @@ import {
   StickyNote,
   Settings,
   WifiOff,
-  UserRound,
   ChevronDown,
 } from 'lucide-react';
 import {
@@ -29,6 +28,7 @@ import { SettingsTab } from './components/SettingsTab';
 import { syncWidgetData } from './utils/widgetSync';
 import { syncMakeupReminders } from './native/reminders';
 import { applyTheme } from './utils/themes';
+import { Avatar } from './components/Avatar';
 import { registerBackButton, keepRepainted } from './native/androidShell';
 import { ChildrenSheet, childFallbackName } from './components/ChildrenSheet';
 import { Onboarding, OnboardingExit } from './components/Onboarding';
@@ -279,9 +279,12 @@ export default function App() {
               aria-label={tr(lang, `자녀 선택 · 지금 ${activeChildName}`, `Choose child · now ${activeChildName}`, `选择孩子 · 当前 ${activeChildName}`)}
               className="min-w-0 h-8 pl-1 pr-2 rounded-full bg-paper border border-divider inline-flex items-center gap-1 text-[0.75rem] font-bold text-ink hover:bg-slate-100"
             >
-              <span className="w-6 h-6 rounded-full bg-accent-700 text-paper grid place-items-center shrink-0">
-                <UserRound className="w-3.5 h-3.5" />
-              </span>
+              <Avatar
+                avatar={children[activeIdx].data.profile?.avatar}
+                sizeClass="w-6 h-6"
+                textClass="text-[0.9375rem]"
+                fallbackClass="bg-accent-700 text-paper"
+              />
               <span className="truncate max-w-[5.5rem]">{activeChildName}</span>
               <ChevronDown className="w-3.5 h-3.5 shrink-0 text-slate-600" />
             </button>

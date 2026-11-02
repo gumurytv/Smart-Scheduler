@@ -43,7 +43,6 @@ import {
   FlaskConical,
   Lock,
   IdCard,
-  UserRound,
   PenLine,
   CalendarDays,
   StickyNote,
@@ -90,6 +89,8 @@ import { ImportSheet } from './ImportSheet';
 import { GuideSheet } from './GuideSheet';
 import { FeedbackPanel } from './FeedbackPanel';
 import { MedalIcon } from './Medals';
+import { Avatar } from './Avatar';
+import { ANIMAL_CHARACTERS, PEOPLE_CHARACTERS, photoToAvatar } from '../utils/avatars';
 import { ACCENT_SWATCHES, THEMES, themeName, themeSwatch } from '../utils/themes';
 import { exportBackupFile } from '../native/backupFile';
 import { APP_VERSION, CHANGELOG } from '../data/changelog';
@@ -427,14 +428,6 @@ const ALL_GRADE_FILLS: string[] = Array.from(
   new Set(GRADE_CHIPS.flatMap((c) => (['ko', 'en', 'zh'] as AppLanguage[]).map((l) => gradeChipFill(c, l))))
 ).sort((a, b) => b.length - a.length);
 
-function profileInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length >= 2 && /^[A-Za-z]/.test(words[0])) {
-    return (Array.from(words[0])[0] + Array.from(words[1])[0]).toUpperCase();
-  }
-  return (Array.from(name.trim())[0] ?? '').toUpperCase();
-}
-
 const GroupHeader: React.FC<{ label: string }> = ({ label }) => (
   <h3 className="px-1.5 pt-1 text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-slate-600">{label}</h3>
 );
@@ -589,6 +582,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     name: state.profile?.name ?? '',
     school: state.profile?.school ?? '',
     grade: state.profile?.grade ?? '',
+    avatar: state.profile?.avatar,
+  };
+  const [avatarTab, setAvatarTab] = useState<'people' | 'animals'>(() =>
+    state.profile?.avatar?.kind === 'character' && state.profile.avatar.id.startsWith('a') ? 'animals' : 'people'
+  );
+  const [avatarError, setAvatarError] = useState(false);
+  const avatarFileRef = useRef<HTMLInputElement | null>(null);
+  const handleAvatarFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const avatar = await photoToAvatar(file);
+      setAvatarError(false);
+      updateProfile({ avatar });
+    } catch {
+      setAvatarError(true);
+    }
   };
   const profileNameRef = useRef<HTMLInputElement | null>(null);
   const profileGradeRef = useRef<HTMLInputElement | null>(null);
@@ -610,6 +619,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     onUpdateState((prev) => ({
       ...prev,
       profile: {
+        ...prev.profile,
         name: prev.profile?.name ?? '',
         school: prev.profile?.school ?? '',
         grade: prev.profile?.grade ?? '',
@@ -1948,12 +1958,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               const name = profile.name.trim();
               const school = profile.school.trim();
               const grade = profile.grade.trim();
-              const initials = profileInitials(name);
               return (
                 <div className="bg-ink text-paper rounded-[24px] p-4 flex items-center gap-3" aria-hidden="true">
-                  <span className="w-12 h-12 rounded-full bg-sage-700 text-paper grid place-items-center shrink-0 ring-2 ring-paper/30 ring-offset-2 ring-offset-ink text-[1.125rem] font-bold">
-                    {initials || <UserRound className="w-5 h-5" strokeWidth={2.5} />}
-                  </span>
+                  <Avatar
+                    avatar={profile.avatar}
+                    name={name}
+                    sizeClass="w-12 h-12"
+                    textClass="text-[1.625rem]"
+                    className="ring-2 ring-paper/30 ring-offset-2 ring-offset-ink"
+                  />
                   <span className="flex-1 min-w-0">
                     <span className="block text-[0.75rem] font-semibold text-paper/80 truncate">
                       {(() => {
@@ -1984,6 +1997,91 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </div>
               );
             })()}
+          </div>
+
+          {/* 프로필 사진: own photo or a character */}
+          <div className="space-y-2">
+            <span className="block text-[0.75rem] font-bold text-ink">{tr(lang, '프로필 사진', 'Profile picture', '头像')}</span>
+            <div className="flex items-center gap-3">
+              <Avatar avatar={profile.avatar} name={profile.name} sizeClass="w-16 h-16" textClass="text-[2.25rem]" />
+              <div className="flex-1 min-w-0 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => avatarFileRef.current?.click()}
+                  className="h-9 px-3.5 rounded-full bg-sage-700 text-paper text-[0.8125rem] font-bold inline-flex items-center gap-1.5 hover:bg-sage-800"
+                >
+                  <Camera className="w-4 h-4" strokeWidth={2.5} />
+                  {tr(lang, '내 사진 올리기', 'Upload a photo', '上传照片')}
+                </button>
+                {profile.avatar && (
+                  <button
+                    type="button"
+                    onClick={() => updateProfile({ avatar: undefined })}
+                    className="h-9 px-3.5 rounded-full bg-paper border border-divider text-[0.8125rem] font-bold text-slate-700 hover:bg-slate-100"
+                  >
+                    {tr(lang, '사진 빼기', 'Remove', '移除')}
+                  </button>
+                )}
+              </div>
+              <input
+                ref={avatarFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  void handleAvatarFile(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+            {avatarError && (
+              <p role="alert" className="text-[0.75rem] font-semibold text-accent-800">
+                {tr(lang, '사진을 열 수 없어요. 다른 사진을 골라 주세요.', "Couldn't open that picture. Please pick another.", '无法打开该图片，请选择其他图片。')}
+              </p>
+            )}
+            <div className="grid grid-cols-2 p-1 rounded-full bg-paper" role="tablist" aria-label={tr(lang, '캐릭터 종류', 'Character type', '角色类型')}>
+              {(['people', 'animals'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={avatarTab === tab}
+                  onClick={() => setAvatarTab(tab)}
+                  className={`h-8 rounded-full text-[0.8125rem] font-bold ${avatarTab === tab ? 'bg-sage-700 text-paper' : 'text-slate-700'}`}
+                >
+                  {tab === 'people' ? tr(lang, '🧑 사람', '🧑 People', '🧑 人物') : tr(lang, '🐶 동물', '🐶 Animals', '🐶 动物')}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-6 gap-1.5" role="radiogroup" aria-label={tr(lang, '캐릭터', 'Characters', '角色')}>
+              {(avatarTab === 'people' ? PEOPLE_CHARACTERS : ANIMAL_CHARACTERS).map((c) => {
+                const selected = profile.avatar?.kind === 'character' && profile.avatar.id === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-label={c.emoji}
+                    onClick={() => updateProfile({ avatar: { kind: 'character', id: c.id } })}
+                    className={`aspect-square rounded-full grid place-items-center text-[1.625rem] leading-none ${
+                      selected ? 'ring-[2.5px] ring-sage-700 ring-offset-2 ring-offset-surface' : ''
+                    }`}
+                    style={{ background: c.bg }}
+                  >
+                    <span className="translate-y-[0.04em]">{c.emoji}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[0.6875rem] text-slate-600 leading-snug">
+              {tr(
+                lang,
+                '사진은 작게 줄여서 이 기기에만 저장돼요. 백업 파일에는 함께 들어가요.',
+                'Photos are shrunk and kept on this device only (they are included in backups).',
+                '照片会被缩小并只保存在本设备上（备份文件中会包含）。'
+              )}
+            </p>
           </div>
 
           {/* Fields */}
@@ -2069,15 +2167,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
           </div>
 
-          {(profile.name || profile.school || profile.grade) && (
+          {(profile.name || profile.school || profile.grade || profile.avatar) && (
             <SectionResetButton
               lang={lang}
               label={tr(lang, '내 정보 지우기', 'Clear my profile', '清除我的信息')}
               confirmText={tr(
                 lang,
-                '이름·학교·학년을 모두 지울까요?',
-                'Clear your name, school and grade?',
-                '要清除姓名、学校和年级吗？'
+                '이름·학교·학년·프로필 사진을 모두 지울까요?',
+                'Clear your name, school, grade and picture?',
+                '要清除姓名、学校、年级和头像吗？'
               )}
               confirmLabel={tr(lang, '지우기', 'Clear', '清除')}
               onConfirm={handleClearProfile}
