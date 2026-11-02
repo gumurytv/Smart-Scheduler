@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.7',
+    date: '2026-11-02',
+    items: [
+      {
+        ko: '내 정보에서 프로필 사진을 정할 수 있어요. 내 사진을 올리거나 사람·동물 캐릭터 중에서 골라 보세요',
+        en: 'Set a profile picture in My profile: upload your own photo or pick a people or animal character',
+        zh: '可在我的信息中设置头像：上传自己的照片，或从人物、动物角色中选择',
+      },
+    ],
+  },
+  {
     version: '1.4.6',
     date: '2026-11-01',
     items: [
