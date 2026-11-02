@@ -12,7 +12,7 @@ export const MEDAL_TIERS: Array<{ tier: MedalTier; min: number }> = [
 ];
 /** A month needs at least this many counted classes before it can earn a medal. */
 export const MEDAL_MIN_CLASSES = 4;
-/** Streak badges: classes in a row without a missed class. */
+/** Streak badges: days in a row on which every planned class was attended. */
 export const STREAK_MILESTONES = [10, 30, 50, 100];
 
 /**
@@ -23,28 +23,6 @@ export function attendedForMedal(rec: AttendanceRecord): boolean | null {
   if (rec.status === 'cancelled') return null;
   if (rec.status === 'present' || rec.status === 'late') return true;
   return !!(rec.needsMakeup && rec.makeupCompleted);
-}
-
-/** Every counted class up to `untilDate` (inclusive), oldest first. */
-function countedClasses(attendance: AttendanceMap, untilDate: string): Array<{ date: string; attended: boolean }> {
-  const out: Array<{ date: string; attended: boolean }> = [];
-  Object.keys(attendance || {})
-    .filter((date) => date <= untilDate)
-    .sort()
-    .forEach((date) => {
-      const day = attendance[date];
-      if (!day) return;
-      const recs: AttendanceRecord[] = [];
-      if (day.school) recs.push(day.school);
-      Object.keys(day.academies || {})
-        .sort()
-        .forEach((name) => recs.push(day.academies![name]));
-      recs.forEach((rec) => {
-        const attended = attendedForMedal(rec);
-        if (attended !== null) out.push({ date, attended });
-      });
-    });
-  return out;
 }
 
 export interface MonthMedal {
@@ -99,24 +77,55 @@ export interface StreakInfo {
   best: number;
 }
 
-/** Classes in a row without a missed class (a made-up absence keeps the streak going). */
-export function attendanceStreak(attendance: AttendanceMap, todayStr: string): StreakInfo {
+/** What the timetable had planned for a day: school (any period) and the academy classes. */
+export type PlannedDay = (date: string) => { school: boolean; academies: Array<{ name: string; cancelled: boolean }> };
+
+const addDayKey = (key: string): string => {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+
+/**
+ * Days in a row on which every planned class (school and academies) was attended.
+ * Present, late and a made-up absence count; official days off are left out. A day with no
+ * classes (weekend) is skipped. A past day with a missed or unchecked class ends the streak;
+ * today only ends it once a class is actually missed (the rest may still be checked).
+ */
+export function attendanceStreak(attendance: AttendanceMap, todayStr: string, planned: PlannedDay): StreakInfo {
+  const dates = Object.keys(attendance || {}).filter((d) => d <= todayStr).sort();
   let current = 0;
   let best = 0;
-  countedClasses(attendance, todayStr).forEach(({ attended }) => {
-    current = attended ? current + 1 : 0;
-    best = Math.max(best, current);
-  });
+  if (dates.length === 0) return { current, best };
+  for (let date = dates[0]; date <= todayStr; date = addDayKey(date)) {
+    const day = attendance[date] || {};
+    const plan = planned(date);
+    const recs: Array<AttendanceRecord | undefined> = [];
+    if (plan.school || day.school) recs.push(day.school);
+    const names = new Set(plan.academies.filter((a) => !a.cancelled).map((a) => a.name));
+    Object.keys(day.academies || {}).forEach((n) => names.add(n));
+    names.forEach((n) => recs.push(day.academies?.[n]));
+    const counted = recs.filter((r) => r?.status !== 'cancelled');
+    if (counted.length === 0) continue;
+    const results = counted.map((r) => (r ? attendedForMedal(r) : undefined));
+    if (results.every((x) => x === true)) {
+      current += 1;
+      best = Math.max(best, current);
+    } else if (date === todayStr && !results.includes(false)) {
+      // Today, not finished checking yet: keep the streak as it is.
+    } else {
+      current = 0;
+    }
+  }
   return { current, best };
 }
 
 /** Everything earned so far, as stable ids (used to celebrate each one once). */
-export function earnedMedalIds(attendance: AttendanceMap, todayStr: string): string[] {
+export function earnedMedalIds(attendance: AttendanceMap, todayStr: string, bestStreak: number): string[] {
   const thisMonth = todayStr.slice(0, 7);
   const ids = medalMonths(attendance, thisMonth)
     .filter((m) => m.month < thisMonth && m.tier)
     .map((m) => `month:${m.month}:${m.tier}`);
-  const { best } = attendanceStreak(attendance, todayStr);
-  STREAK_MILESTONES.filter((n) => best >= n).forEach((n) => ids.push(`streak:${n}`));
+  STREAK_MILESTONES.filter((n) => bestStreak >= n).forEach((n) => ids.push(`streakday:${n}`));
   return ids;
 }

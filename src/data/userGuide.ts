@@ -183,9 +183,9 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
       {
         title: { ko: '출석 메달 (선택)', en: 'Attendance medals (optional)', zh: '出勤奖牌（可选）' },
         desc: {
-          ko: '설정 → 출석 메달을 켜면 한 달 출석률에 따라 금·은·동메달을, 연속 출석 10·30·50·100회마다 배지를 받아요. 메달을 누르면 메달함이 열려요.',
-          en: 'Turn on Settings → Attendance medals to earn gold/silver/bronze for the monthly rate and badges for 10/30/50/100 in a row. Tap the medal to open the medal box.',
-          zh: '在设置 → 出勤奖牌中开启后，按月出勤率获得金/银/铜牌，连续出勤 10/30/50/100 次获得徽章。点奖牌可打开奖牌盒。',
+          ko: '설정 → 출석 메달을 켜면 한 달 출석률에 따라 금·은·동메달을, 그날 수업을 모두 출석한 날이 10·30·50·100일 이어질 때마다 배지를 받아요. 지난 날짜의 출석은 바꿀 수 없어요. 메달을 누르면 메달함이 열려요.',
+          en: 'Turn on Settings → Attendance medals to earn gold/silver/bronze for the monthly rate and badges for 10/30/50/100 days in a row with every class attended (past days cannot be changed). Tap the medal to open the medal box.',
+          zh: '在设置 → 出勤奖牌中开启后，按月出勤率获得金/银/铜牌，当天课程全部出勤的日子连续 10/30/50/100 天获得徽章（过去的日期不能修改）。点奖牌可打开奖牌盒。',
         },
       },
     ],

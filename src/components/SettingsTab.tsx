@@ -4391,7 +4391,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
               <ul className="text-[0.6875rem] text-slate-700 leading-relaxed break-keep space-y-0.5">
                 <li>· {tr(lang, '한 달 출석률 100% 금 · 95% 은 · 90% 동메달', 'Monthly rate 100% gold · 95% silver · 90% bronze', '月出勤率 100% 金 · 95% 银 · 90% 铜')}</li>
-                <li>· {tr(lang, '빠지지 않고 10 · 30 · 50 · 100회 연속 출석하면 배지', 'Badges for 10 · 30 · 50 · 100 classes in a row', '连续出勤 10 · 30 · 50 · 100 次获得徽章')}</li>
+                <li>· {tr(lang, '그날 수업을 모두 출석한 날이 10 · 30 · 50 · 100일 이어지면 배지', 'Badges for 10 · 30 · 50 · 100 days in a row with every class attended', '当天课程全部出勤的日子连续 10 · 30 · 50 · 100 天获得徽章')}</li>
                 <li>· {tr(lang, '결석해도 보강을 마치면 출석으로 쳐요', 'A missed class counts once its makeup is done', '缺席的课完成补课后算出勤')}</li>
                 <li>· {tr(lang, '메달은 자녀마다 따로 모여요', 'Each child collects their own medals', '每个孩子各自收集奖牌')}</li>
               </ul>

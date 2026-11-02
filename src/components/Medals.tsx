@@ -7,7 +7,7 @@ import {
   MEDAL_TIERS,
   MedalTier,
   STREAK_MILESTONES,
-  attendanceStreak,
+  StreakInfo,
   medalMonths,
   monthMedal,
 } from '../utils/medals';
@@ -63,10 +63,10 @@ export const MedalStrip: React.FC<{
   month: string;
   isCurrentMonth: boolean;
   todayStr: string;
+  streak: StreakInfo;
   onOpen: () => void;
-}> = ({ lang, attendance, month, isCurrentMonth, todayStr, onOpen }) => {
+}> = ({ lang, attendance, month, isCurrentMonth, todayStr, streak, onOpen }) => {
   const m = useMemo(() => monthMedal(attendance, month), [attendance, month]);
-  const streak = useMemo(() => attendanceStreak(attendance, todayStr), [attendance, todayStr]);
   const isPast = month < todayStr.slice(0, 7);
   const tl = m.tier ? tierLabel(m.tier, lang) : '';
 
@@ -113,7 +113,7 @@ export const MedalStrip: React.FC<{
           <span className="font-mono text-[1.125rem] font-bold tabular-nums">{streak.current}</span>
         </span>
         <span className="text-[0.625rem] font-semibold text-slate-600 whitespace-nowrap">
-          {tr(lang, '연속 출석', 'in a row', '连续出勤')}
+          {tr(lang, '일 연속 출석', 'days in a row', '天连续出勤')}
         </span>
       </span>
       <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
@@ -126,11 +126,11 @@ export const MedalSheet: React.FC<{
   lang: AppLanguage;
   attendance: AttendanceMap;
   todayStr: string;
+  streak: StreakInfo;
   onClose: () => void;
-}> = ({ lang, attendance, todayStr, onClose }) => {
+}> = ({ lang, attendance, todayStr, streak, onClose }) => {
   const thisMonth = todayStr.slice(0, 7);
   const months = useMemo(() => medalMonths(attendance, thisMonth), [attendance, thisMonth]);
-  const streak = useMemo(() => attendanceStreak(attendance, todayStr), [attendance, todayStr]);
   const counts = { gold: 0, silver: 0, bronze: 0 } as Record<MedalTier, number>;
   months.forEach((m) => {
     if (m.tier && m.month < thisMonth) counts[m.tier]++;
@@ -186,12 +186,12 @@ export const MedalSheet: React.FC<{
                 {tr(lang, '연속 출석', 'Attendance streak', '连续出勤')}
               </h4>
               <span className="text-[0.6875rem] text-slate-600">
-                {tr(lang, `최고 기록 ${streak.best}회`, `Best ${streak.best}`, `最高 ${streak.best} 次`)}
+                {tr(lang, `최고 기록 ${streak.best}일`, `Best ${streak.best} days`, `最高 ${streak.best} 天`)}
               </span>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="font-mono text-[2rem] font-bold text-accent-700 tabular-nums leading-none">{streak.current}</span>
-              <span className="text-[0.8125rem] font-bold text-ink">{tr(lang, '회째 이어가는 중', 'classes in a row', '次连续')}</span>
+              <span className="text-[0.8125rem] font-bold text-ink">{tr(lang, '일째 이어가는 중', 'days in a row', '天连续')}</span>
             </div>
             <div className="grid grid-cols-4 gap-1.5">
               {STREAK_MILESTONES.map((n) => {
@@ -200,7 +200,7 @@ export const MedalSheet: React.FC<{
                   <div
                     key={n}
                     className={`rounded-xl py-2 flex flex-col items-center ${got ? 'bg-accent-100 text-accent-800' : 'bg-paper text-slate-500'}`}
-                    aria-label={tr(lang, `${n}회 연속 ${got ? '달성' : '미달성'}`, `${n} in a row ${got ? 'earned' : 'not yet'}`, `连续${n}次 ${got ? '已达成' : '未达成'}`)}
+                    aria-label={tr(lang, `${n}일 연속 ${got ? '달성' : '미달성'}`, `${n} days in a row ${got ? 'earned' : 'not yet'}`, `连续${n}天 ${got ? '已达成' : '未达成'}`)}
                   >
                     {got ? <Flame className="w-5 h-5" strokeWidth={2.5} /> : <Lock className="w-5 h-5" />}
                     <span className="font-mono text-[0.875rem] font-bold tabular-nums">{n}</span>
@@ -212,9 +212,9 @@ export const MedalSheet: React.FC<{
               <p className="text-[0.75rem] text-slate-700 break-keep">
                 {tr(
                   lang,
-                  `${nextMilestone}회 배지까지 ${nextMilestone - streak.current}번 남았어요`,
-                  `${nextMilestone - streak.current} more for the ${nextMilestone} badge`,
-                  `距离 ${nextMilestone} 次徽章还差 ${nextMilestone - streak.current} 次`
+                  `${nextMilestone}일 배지까지 ${nextMilestone - streak.current}일 남았어요`,
+                  `${nextMilestone - streak.current} more days for the ${nextMilestone}-day badge`,
+                  `距离 ${nextMilestone} 天徽章还差 ${nextMilestone - streak.current} 天`
                 )}
               </p>
             )}
@@ -281,6 +281,15 @@ export const MedalSheet: React.FC<{
                   `官方停课不计入；每月需记录 ${MEDAL_MIN_CLASSES} 次以上`
                 )}
               </li>
+              <li>
+                ·{' '}
+                {tr(
+                  lang,
+                  '연속 출석은 그날 계획된 학교·학원 수업을 모두 출석한 날을 하루로 세요. 수업이 없는 날은 건너뛰어요',
+                  'A streak day is a day on which every planned school and academy class was attended; days without classes are skipped',
+                  '连续出勤以天计：当天计划的学校和补习班课程全部出勤才算一天，没有课的日子跳过'
+                )}
+              </li>
             </ul>
           </section>
         </div>
@@ -296,10 +305,10 @@ export const MedalCelebration: React.FC<{ lang: AppLanguage; id: string; onClose
   const tier = (isMonth ? b : null) as MedalTier | null;
   const title = isMonth
     ? tr(lang, `${monthName(a, lang)} ${tierLabel(tier!, lang)}!`, `${tierLabel(tier!, lang)} for ${monthName(a, lang)}!`, `${monthName(a, lang)}${tierLabel(tier!, lang)}！`)
-    : tr(lang, `${a}회 연속 출석!`, `${a} classes in a row!`, `连续出勤 ${a} 次！`);
+    : tr(lang, `${a}일 연속 출석!`, `${a} days in a row!`, `连续出勤 ${a} 天！`);
   const text = isMonth
     ? tr(lang, '한 달 동안 정말 꾸준했어요. 멋져요!', 'You kept it up all month. Great job!', '整个月都很坚持，太棒了！')
-    : tr(lang, '한 번도 빠지지 않고 해냈어요. 대단해요!', "You didn't miss a single one. Amazing!", '一次都没缺席，真厉害！');
+    : tr(lang, '하루도 빠지지 않고 해냈어요. 대단해요!', "You didn't miss a single day. Amazing!", '一天都没缺席，真厉害！');
   return (
     <div className="fixed inset-0 z-[55] bg-slate-900/60 flex items-center justify-center px-6" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
       <div className="relative w-full max-w-xs rounded-[28px] bg-paper shadow-2xl px-5 pt-7 pb-5 text-center space-y-3 overflow-hidden" onClick={(e) => e.stopPropagation()}>
