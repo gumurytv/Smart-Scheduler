@@ -3728,327 +3728,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <GroupHeader label={tr(lang, '데이터', 'Data', '数据')} />
 
         <SettingsCard
-          id="ai"
-          open={!!openCards.ai}
-          onToggle={toggleCard}
-          tone="other"
-          icon={ScanLine}
-          title={tr(lang, 'AI 시간표 이미지 인식', 'AI Timetable Recognition', 'AI 课表图片识别')}
-          summary={aiEnabled ? aiSummaryLine : tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · coming soon', '实验功能 · 即将推出')}
-        >
-          {!aiEnabled ? (
-            <div className="p-4 space-y-4">
-              <div className="rounded-xl bg-other-100 border border-other-300 p-3.5 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-other-800">
-                  <FlaskConical className="w-4 h-4" strokeWidth={2.75} />
-                  <span className="text-[0.8125rem] font-bold">
-                    {tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · Coming soon', '实验功能 · 即将推出')}
-                  </span>
-                </div>
-                <p className="text-[0.75rem] text-other-800 leading-relaxed">
-                  {tr(
-                    lang,
-                    '시간표 사진 한 장으로 요일·교시·과목과 학원 일정을 자동으로 채워 주는 기능이에요. 지금은 비공개 테스트 중이라 정식 출시 후에 쓸 수 있어요.',
-                    'Fill in your days, periods, subjects and academy classes from a single timetable photo. It is in private testing and will open after the official release.',
-                    '只需一张课表照片，即可自动填入星期、节次、科目和补习班日程。目前处于内部测试中，正式发布后即可使用。'
-                  )}
-                </p>
-              </div>
-
-              <ol className="space-y-2">
-                {[
-                  {
-                    icon: Camera,
-                    title: tr(lang, '사진 찍기', 'Take a photo', '拍照'),
-                    body: tr(lang, '가정통신문·칠판·손글씨 시간표를 찍거나 올려요.', 'Snap or upload a printed, blackboard or handwritten timetable.', '拍摄或上传通知单、黑板或手写课表。'),
-                  },
-                  {
-                    icon: ScanLine,
-                    title: tr(lang, 'AI가 읽기', 'AI reads it', 'AI 识别'),
-                    body: tr(lang, '요일·교시·과목·학원 시간을 뽑아 표로 보여 줘요.', 'It extracts days, periods, subjects and academy times into a table.', '提取星期、节次、科目和补习班时间并以表格显示。'),
-                  },
-                  {
-                    icon: Check,
-                    title: tr(lang, '확인하고 합치기', 'Review and merge', '核对并合并'),
-                    body: tr(lang, '틀린 곳을 고친 뒤 기본 시간표에 합쳐요.', 'Fix anything it got wrong, then merge into your timetable.', '修改错误后合并到固定课表。'),
-                  },
-                ].map((step, i) => (
-                  <li key={i} className="flex items-start gap-3 rounded-xl bg-paper px-3 py-2.5">
-                    <span className="w-8 h-8 rounded-full bg-surface text-slate-700 grid place-items-center shrink-0">
-                      <step.icon className="w-4 h-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[0.8125rem] font-bold text-ink">
-                        <span className="font-mono text-slate-500 mr-1">{i + 1}</span>
-                        {step.title}
-                      </span>
-                      <span className="block text-[0.75rem] text-slate-600 leading-relaxed">{step.body}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-
-              <div className="grid grid-cols-1 gap-2" aria-disabled="true">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full min-h-[56px] px-4 rounded-xl border-[1.5px] border-dashed border-slate-300 bg-paper/60 text-slate-500 text-xs font-bold flex items-center justify-center gap-2 cursor-not-allowed"
-                >
-                  <Lock className="w-4 h-4" />
-                  {tr(lang, '사진으로 시간표 인식 · 준비 중', 'Recognize from photo · In preparation', '照片识别课表 · 准备中')}
-                </button>
-              </div>
-              <p className="text-[0.6875rem] text-slate-600 text-center">
-                {tr(
-                  lang,
-                  '지금은 [학교 시간표] 표에서 칸을 눌러 직접 입력할 수 있어요.',
-                  'For now, tap the cells in the [School timetable] table to enter it yourself.',
-                  '目前可在【学校课表】表格中点击格子手动输入。'
-                )}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mx-4 mt-4 rounded-xl bg-other-100 border border-other-300 px-3 py-2 flex items-center gap-1.5 text-other-800">
-                <FlaskConical className="w-3.5 h-3.5 shrink-0" strokeWidth={2.75} />
-                <span className="text-[0.6875rem] font-semibold">
-                  {tr(
-                    lang,
-                    '실험 기능 · 테스트 모드로 켜져 있어요. 결과를 꼭 확인한 뒤 합쳐 주세요.',
-                    'Experimental · enabled in test mode. Please review results before merging.',
-                    '实验功能 · 已在测试模式下开启。合并前请仔细核对结果。'
-                  )}
-                </span>
-              </div>
-          <div className="p-4 space-y-4">
-            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
-              {tr(
-                lang,
-                '가정통신문·칠판·손글씨 시간표 사진을 AI가 분석해요. 결과를 표에서 확인·수정한 뒤 기본 시간표에 합칠 수 있어요.',
-                'AI reads photos of printed, blackboard or handwritten timetables. Review and edit the result, then merge it into your timetable.',
-                'AI 会分析通知单、黑板或手写课表照片。可在表格中核对修改后合并到固定课表。'
-              )}
-            </p>
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageFileChange}
-              className="hidden"
-            />
-
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                disabled={aiLoading}
-                onClick={() => imageInputRef.current?.click()}
-                className="w-full min-h-[64px] px-4 py-5 rounded-xl border-[1.5px] border-dashed border-other-400 bg-other-100 text-other-800 text-xs font-bold flex items-center justify-center gap-2 hover:bg-other-200 disabled:opacity-60 active:scale-98 transition-all"
-              >
-                {aiLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {tr(
-                      lang,
-                      'Gemini AI가 시간표 이미지를 정밀 분석 중입니다...',
-                      'Gemini AI is analyzing your timetable image...',
-                      'Gemini AI 正在精准解析课表图片...'
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-4 h-4" />
-                    {tr(
-                      lang,
-                      '카메라로 시간표 촬영 또는 이미지 업로드',
-                      'Take Photo or Upload Timetable Image',
-                      '拍摄课表照片或上传图片'
-                    )}
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={aiLoading}
-                onClick={handleRunSampleImageDemo}
-                className="w-full min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100 disabled:opacity-60"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                {tr(
-                  lang,
-                  '샘플 가정통신문 시간표 이미지로 AI 인식 즉시 체험하기',
-                  'Try Instant Demo with Sample Timetable Image',
-                  '使用示例课表图片立即体验 AI 自动识别'
-                )}
-              </button>
-            </div>
-
-            {uploadedPreviewUrl && (
-              <div className="rounded-xl overflow-hidden bg-paper p-2">
-                <img
-                  src={uploadedPreviewUrl}
-                  alt={tr(lang, '업로드한 시간표 미리보기', 'Uploaded timetable preview', '已上传的课表预览')}
-                  referrerPolicy="no-referrer"
-                  className="max-h-44 mx-auto object-contain rounded-lg"
-                />
-              </div>
-            )}
-
-            {aiError && (
-              <div className="p-3.5 rounded-xl bg-accent-100 border border-accent-300 flex items-start gap-2 text-xs text-accent-900">
-                <AlertCircle className="w-4 h-4 text-accent-800 shrink-0 mt-0.5" />
-                <span>{aiError}</span>
-              </div>
-            )}
-
-            {aiMergeSuccess && (
-              <div className="p-3.5 rounded-xl bg-sage-100 border border-sage-300 flex items-start gap-2 text-xs font-bold text-sage-900">
-                <CheckCircle2 className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
-                <span>{aiMergeSuccess}</span>
-              </div>
-            )}
-
-            {aiPreviewEntries.length > 0 && (
-              <div className="space-y-3 pt-2 border-t border-divider">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold text-ink">
-                      {tr(
-                        lang,
-                        `AI 추출 결과 검수 표 (${aiPreviewEntries.length}건)`,
-                        `Editable AI Preview Table (${aiPreviewEntries.length} items)`,
-                        `AI 识别结果核对表 (${aiPreviewEntries.length}条)`
-                      )}
-                    </h3>
-                    {aiSummary && (
-                      <p className="text-[0.6875rem] text-slate-600 mt-0.5">{aiSummary}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="max-h-72 overflow-y-auto border border-divider rounded-xl divide-y divide-divider">
-                  {aiPreviewEntries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="p-2.5 bg-paper flex items-center gap-1.5 flex-wrap text-xs"
-                    >
-                      <select
-                        value={entry.day}
-                        onChange={(e) =>
-                          handleUpdatePreviewEntry(entry.id, {
-                            day: e.target.value as DayOfWeek,
-                          })
-                        }
-                        className="h-8 px-2 rounded-full border border-divider bg-surface font-bold text-ink"
-                      >
-                        {DAYS_OF_WEEK.map((d) => (
-                          <option key={d} value={d}>
-                            {translateDay(d, lang)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={entry.type}
-                        onChange={(e) =>
-                          handleUpdatePreviewEntry(entry.id, {
-                            type: e.target.value as 'school' | 'academy',
-                            period: e.target.value === 'academy' ? 0 : 1,
-                          })
-                        }
-                        className={`h-8 px-2.5 rounded-full border font-bold ${
-                          entry.type === 'school'
-                            ? 'bg-sage-100 border-sage-300 text-sage-800'
-                            : 'bg-accent-100 border-accent-300 text-accent-800'
-                        }`}
-                      >
-                        <option value="school">{tr(lang, '학교', 'School', '学校')}</option>
-                        <option value="academy">{tr(lang, '학원', 'Academy', '补习班')}</option>
-                      </select>
-
-                      {entry.type === 'school' && (
-                        <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={entry.period}
-                          onChange={(e) =>
-                            handleUpdatePreviewEntry(entry.id, {
-                              period: Number(e.target.value) || 1,
-                            })
-                          }
-                          className="w-12 h-8 px-1.5 rounded-full border border-divider bg-surface text-center font-mono"
-                          title={tr(lang, '교시', 'Period', '节次')}
-                          aria-label={tr(lang, '교시', 'Period', '节次')}
-                        />
-                      )}
-
-                      <input
-                        type="time"
-                        value={entry.startTime}
-                        onChange={(e) =>
-                          handleUpdatePreviewEntry(entry.id, {
-                            startTime: e.target.value,
-                          })
-                        }
-                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
-                      />
-                      <span className="text-slate-400">~</span>
-                      <input
-                        type="time"
-                        value={entry.endTime}
-                        onChange={(e) =>
-                          handleUpdatePreviewEntry(entry.id, {
-                            endTime: e.target.value,
-                          })
-                        }
-                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
-                      />
-
-                      <input
-                        type="text"
-                        value={entry.subject}
-                        onChange={(e) =>
-                          handleUpdatePreviewEntry(entry.id, {
-                            subject: e.target.value,
-                          })
-                        }
-                        className="flex-1 min-w-[90px] h-8 px-2.5 rounded-full border border-divider bg-surface font-bold text-ink focus:outline-none focus:border-accent"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePreviewEntry(entry.id)}
-                        className="p-1 text-slate-600 hover:text-accent-800"
-                        aria-label={tr(lang, '삭제', 'Delete', '删除')}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleMergeAiPreviewToMaster}
-                  className="w-full min-h-[40px] py-2 px-4 rounded-full bg-accent-700 text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-800"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  {tr(
-                    lang,
-                    '검수 완료 · 기존 시간표에 병합하기',
-                    'Confirm & Merge into Master Timetable',
-                    '核对完成 · 合并到现有课表'
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-            </>
-          )}
-        </SettingsCard>
-
-        <SettingsCard
           id="backup"
           open={!!openCards.backup}
           onToggle={toggleCard}
@@ -4525,6 +4204,341 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           summary={tr(lang, '불편한 점 · 바라는 기능 알려 주기', 'Problems or ideas', '不便之处或希望的功能')}
         >
           <FeedbackPanel lang={lang} />
+        </SettingsCard>
+      </div>
+
+      {/* ===== GROUP: 실험실 (features that are not open yet) ===== */}
+      <div className="space-y-2">
+        <GroupHeader label={tr(lang, '실험실', 'Labs', '实验室')} />
+        <p className="px-1.5 -mt-1 flex items-center gap-1.5 text-[0.6875rem] text-slate-600 leading-snug break-keep">
+          <FlaskConical strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0 text-other-600" />
+          {tr(
+            lang,
+            '앞으로 공개할 기능을 먼저 모아 둔 곳이에요. 아직 준비 중이라 바뀔 수 있어요.',
+            'Features that are coming later. They are still being prepared and may change.',
+            '这里是即将推出的功能，仍在准备中，可能会有变化。'
+          )}
+        </p>
+
+        <SettingsCard
+          id="ai"
+          open={!!openCards.ai}
+          onToggle={toggleCard}
+          tone="other"
+          icon={ScanLine}
+          title={tr(lang, 'AI 시간표 이미지 인식', 'AI Timetable Recognition', 'AI 课表图片识别')}
+          summary={aiEnabled ? aiSummaryLine : tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · coming soon', '实验功能 · 即将推出')}
+        >
+          {!aiEnabled ? (
+            <div className="p-4 space-y-4">
+              <div className="rounded-xl bg-other-100 border border-other-300 p-3.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-other-800">
+                  <FlaskConical className="w-4 h-4" strokeWidth={2.75} />
+                  <span className="text-[0.8125rem] font-bold">
+                    {tr(lang, '실험 기능 · 곧 공개 예정', 'Experimental · Coming soon', '实验功能 · 即将推出')}
+                  </span>
+                </div>
+                <p className="text-[0.75rem] text-other-800 leading-relaxed">
+                  {tr(
+                    lang,
+                    '시간표 사진 한 장으로 요일·교시·과목과 학원 일정을 자동으로 채워 주는 기능이에요. 지금은 비공개 테스트 중이라 정식 출시 후에 쓸 수 있어요.',
+                    'Fill in your days, periods, subjects and academy classes from a single timetable photo. It is in private testing and will open after the official release.',
+                    '只需一张课表照片，即可自动填入星期、节次、科目和补习班日程。目前处于内部测试中，正式发布后即可使用。'
+                  )}
+                </p>
+              </div>
+
+              <ol className="space-y-2">
+                {[
+                  {
+                    icon: Camera,
+                    title: tr(lang, '사진 찍기', 'Take a photo', '拍照'),
+                    body: tr(lang, '가정통신문·칠판·손글씨 시간표를 찍거나 올려요.', 'Snap or upload a printed, blackboard or handwritten timetable.', '拍摄或上传通知单、黑板或手写课表。'),
+                  },
+                  {
+                    icon: ScanLine,
+                    title: tr(lang, 'AI가 읽기', 'AI reads it', 'AI 识别'),
+                    body: tr(lang, '요일·교시·과목·학원 시간을 뽑아 표로 보여 줘요.', 'It extracts days, periods, subjects and academy times into a table.', '提取星期、节次、科目和补习班时间并以表格显示。'),
+                  },
+                  {
+                    icon: Check,
+                    title: tr(lang, '확인하고 합치기', 'Review and merge', '核对并合并'),
+                    body: tr(lang, '틀린 곳을 고친 뒤 기본 시간표에 합쳐요.', 'Fix anything it got wrong, then merge into your timetable.', '修改错误后合并到固定课表。'),
+                  },
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-3 rounded-xl bg-paper px-3 py-2.5">
+                    <span className="w-8 h-8 rounded-full bg-surface text-slate-700 grid place-items-center shrink-0">
+                      <step.icon className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[0.8125rem] font-bold text-ink">
+                        <span className="font-mono text-slate-500 mr-1">{i + 1}</span>
+                        {step.title}
+                      </span>
+                      <span className="block text-[0.75rem] text-slate-600 leading-relaxed">{step.body}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="grid grid-cols-1 gap-2" aria-disabled="true">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full min-h-[56px] px-4 rounded-xl border-[1.5px] border-dashed border-slate-300 bg-paper/60 text-slate-500 text-xs font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+                >
+                  <Lock className="w-4 h-4" />
+                  {tr(lang, '사진으로 시간표 인식 · 준비 중', 'Recognize from photo · In preparation', '照片识别课表 · 准备中')}
+                </button>
+              </div>
+              <p className="text-[0.6875rem] text-slate-600 text-center">
+                {tr(
+                  lang,
+                  '지금은 [학교 시간표] 표에서 칸을 눌러 직접 입력할 수 있어요.',
+                  'For now, tap the cells in the [School timetable] table to enter it yourself.',
+                  '目前可在【学校课表】表格中点击格子手动输入。'
+                )}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mx-4 mt-4 rounded-xl bg-other-100 border border-other-300 px-3 py-2 flex items-center gap-1.5 text-other-800">
+                <FlaskConical className="w-3.5 h-3.5 shrink-0" strokeWidth={2.75} />
+                <span className="text-[0.6875rem] font-semibold">
+                  {tr(
+                    lang,
+                    '실험 기능 · 테스트 모드로 켜져 있어요. 결과를 꼭 확인한 뒤 합쳐 주세요.',
+                    'Experimental · enabled in test mode. Please review results before merging.',
+                    '实验功能 · 已在测试模式下开启。合并前请仔细核对结果。'
+                  )}
+                </span>
+              </div>
+          <div className="p-4 space-y-4">
+            <p className="text-[0.6875rem] text-slate-600 leading-relaxed">
+              {tr(
+                lang,
+                '가정통신문·칠판·손글씨 시간표 사진을 AI가 분석해요. 결과를 표에서 확인·수정한 뒤 기본 시간표에 합칠 수 있어요.',
+                'AI reads photos of printed, blackboard or handwritten timetables. Review and edit the result, then merge it into your timetable.',
+                'AI 会分析通知单、黑板或手写课表照片。可在表格中核对修改后合并到固定课表。'
+              )}
+            </p>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageFileChange}
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                disabled={aiLoading}
+                onClick={() => imageInputRef.current?.click()}
+                className="w-full min-h-[64px] px-4 py-5 rounded-xl border-[1.5px] border-dashed border-other-400 bg-other-100 text-other-800 text-xs font-bold flex items-center justify-center gap-2 hover:bg-other-200 disabled:opacity-60 active:scale-98 transition-all"
+              >
+                {aiLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {tr(
+                      lang,
+                      'Gemini AI가 시간표 이미지를 정밀 분석 중입니다...',
+                      'Gemini AI is analyzing your timetable image...',
+                      'Gemini AI 正在精准解析课表图片...'
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4" />
+                    {tr(
+                      lang,
+                      '카메라로 시간표 촬영 또는 이미지 업로드',
+                      'Take Photo or Upload Timetable Image',
+                      '拍摄课表照片或上传图片'
+                    )}
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={aiLoading}
+                onClick={handleRunSampleImageDemo}
+                className="w-full min-h-[40px] px-3 py-2 rounded-full bg-transparent text-ink border border-divider text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100 disabled:opacity-60"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {tr(
+                  lang,
+                  '샘플 가정통신문 시간표 이미지로 AI 인식 즉시 체험하기',
+                  'Try Instant Demo with Sample Timetable Image',
+                  '使用示例课表图片立即体验 AI 自动识别'
+                )}
+              </button>
+            </div>
+
+            {uploadedPreviewUrl && (
+              <div className="rounded-xl overflow-hidden bg-paper p-2">
+                <img
+                  src={uploadedPreviewUrl}
+                  alt={tr(lang, '업로드한 시간표 미리보기', 'Uploaded timetable preview', '已上传的课表预览')}
+                  referrerPolicy="no-referrer"
+                  className="max-h-44 mx-auto object-contain rounded-lg"
+                />
+              </div>
+            )}
+
+            {aiError && (
+              <div className="p-3.5 rounded-xl bg-accent-100 border border-accent-300 flex items-start gap-2 text-xs text-accent-900">
+                <AlertCircle className="w-4 h-4 text-accent-800 shrink-0 mt-0.5" />
+                <span>{aiError}</span>
+              </div>
+            )}
+
+            {aiMergeSuccess && (
+              <div className="p-3.5 rounded-xl bg-sage-100 border border-sage-300 flex items-start gap-2 text-xs font-bold text-sage-900">
+                <CheckCircle2 className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
+                <span>{aiMergeSuccess}</span>
+              </div>
+            )}
+
+            {aiPreviewEntries.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-divider">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-ink">
+                      {tr(
+                        lang,
+                        `AI 추출 결과 검수 표 (${aiPreviewEntries.length}건)`,
+                        `Editable AI Preview Table (${aiPreviewEntries.length} items)`,
+                        `AI 识别结果核对表 (${aiPreviewEntries.length}条)`
+                      )}
+                    </h3>
+                    {aiSummary && (
+                      <p className="text-[0.6875rem] text-slate-600 mt-0.5">{aiSummary}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto border border-divider rounded-xl divide-y divide-divider">
+                  {aiPreviewEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="p-2.5 bg-paper flex items-center gap-1.5 flex-wrap text-xs"
+                    >
+                      <select
+                        value={entry.day}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            day: e.target.value as DayOfWeek,
+                          })
+                        }
+                        className="h-8 px-2 rounded-full border border-divider bg-surface font-bold text-ink"
+                      >
+                        {DAYS_OF_WEEK.map((d) => (
+                          <option key={d} value={d}>
+                            {translateDay(d, lang)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={entry.type}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            type: e.target.value as 'school' | 'academy',
+                            period: e.target.value === 'academy' ? 0 : 1,
+                          })
+                        }
+                        className={`h-8 px-2.5 rounded-full border font-bold ${
+                          entry.type === 'school'
+                            ? 'bg-sage-100 border-sage-300 text-sage-800'
+                            : 'bg-accent-100 border-accent-300 text-accent-800'
+                        }`}
+                      >
+                        <option value="school">{tr(lang, '학교', 'School', '学校')}</option>
+                        <option value="academy">{tr(lang, '학원', 'Academy', '补习班')}</option>
+                      </select>
+
+                      {entry.type === 'school' && (
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={entry.period}
+                          onChange={(e) =>
+                            handleUpdatePreviewEntry(entry.id, {
+                              period: Number(e.target.value) || 1,
+                            })
+                          }
+                          className="w-12 h-8 px-1.5 rounded-full border border-divider bg-surface text-center font-mono"
+                          title={tr(lang, '교시', 'Period', '节次')}
+                          aria-label={tr(lang, '교시', 'Period', '节次')}
+                        />
+                      )}
+
+                      <input
+                        type="time"
+                        value={entry.startTime}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            startTime: e.target.value,
+                          })
+                        }
+                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
+                      />
+                      <span className="text-slate-400">~</span>
+                      <input
+                        type="time"
+                        value={entry.endTime}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            endTime: e.target.value,
+                          })
+                        }
+                        className="w-22 h-8 px-1.5 rounded-full border border-divider bg-surface font-mono"
+                      />
+
+                      <input
+                        type="text"
+                        value={entry.subject}
+                        onChange={(e) =>
+                          handleUpdatePreviewEntry(entry.id, {
+                            subject: e.target.value,
+                          })
+                        }
+                        className="flex-1 min-w-[90px] h-8 px-2.5 rounded-full border border-divider bg-surface font-bold text-ink focus:outline-none focus:border-accent"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePreviewEntry(entry.id)}
+                        className="p-1 text-slate-600 hover:text-accent-800"
+                        aria-label={tr(lang, '삭제', 'Delete', '删除')}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleMergeAiPreviewToMaster}
+                  className="w-full min-h-[40px] py-2 px-4 rounded-full bg-accent-700 text-paper text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-accent-800"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {tr(
+                    lang,
+                    '검수 완료 · 기존 시간표에 병합하기',
+                    'Confirm & Merge into Master Timetable',
+                    '核对完成 · 合并到现有课表'
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+            </>
+          )}
         </SettingsCard>
       </div>
 
