@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.9',
+    date: '2026-11-09',
+    items: [
+      {
+        ko: '설정에 「실험실」을 따로 만들어, 앞으로 공개할 AI 시간표 인식 기능을 다른 메뉴와 구분했어요',
+        en: 'Settings now has a separate “Labs” section for the upcoming AI timetable recognition',
+        zh: '设置中新增「实验室」分区，将即将推出的 AI 课表识别与其他菜单分开',
+      },
+    ],
+  },
+  {
     version: '1.4.8',
     date: '2026-11-02',
     items: [
