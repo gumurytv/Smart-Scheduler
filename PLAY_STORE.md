@@ -77,9 +77,20 @@ Play Console에 그대로 복사해서 쓰는 문구와 설문 답변입니다. 
 |---|---|---|
 | 앱 아이콘 | `icon-512.png` | 512 × 512 PNG |
 | 그래픽 이미지 | `feature-graphic.png` | 1024 × 500 PNG |
-| 휴대전화 스크린샷 | `screenshot-1.png` ~ `screenshot-5.png` | 1080 × 1920 PNG (순서대로 올리기) |
+| 휴대전화 스크린샷 | `screenshot-1.png` ~ `screenshot-8.png` | 1080 × 1920 PNG (순서대로 올리기) |
 
-스크린샷은 앱의 샘플 데이터로 찍었어요 (프로필 예시: 김민준 · 한빛중학교 · 2학년 3반).
+스크린샷은 앱의 샘플 데이터로 찍었어요 (프로필 예시: 김민준 · 한빛중학교 · 2학년 3반, 여우 캐릭터). 2026-11-11에 1.4.9 화면으로 다시 만들었어요.
+
+| 순서 | 제목 |
+|---|---|
+| 1 | 지금 수업, 다음 수업을 한눈에 |
+| 2 | 시험·수행평가 D-Day 한눈에 |
+| 3 | 출석 체크와 출석 메달 |
+| 4 | 꾸준히 출석하면 메달과 배지 |
+| 5 | 날짜별 메모와 할 일 체크 |
+| 6 | 테마 6가지로 나만의 화면 |
+| 7 | 밤에도 눈이 편한 다크 테마 |
+| 8 | 큰 글씨 · 3개 국어 지원 |
 
 ---
 
@@ -148,6 +159,34 @@ main에 머지될 때마다 `.github/workflows/pages.yml`이 자동으로 배포
    - 처음에는 **단계적 출시 20%** 정도로 시작해서, 문제가 없으면 100%로 올리는 걸 추천해요.
 3. **검토를 위해 변경사항 전송** → 게시 개요에서 「검토용으로 전송」
 4. 등록정보(스토어 문구 · 스크린샷)가 최신인지 확인: 위 1번 문구를 그대로 붙여 넣어요.
+
+### 프로덕션 첫 출시 노트 (500자 이내, 복사해서 쓰기)
+```
+<ko-KR>
+틈틈 정식 출시! 학교·학원 시간표, 일정, 출석, 메모를 한곳에서 관리하세요.
+• 「지금」 카드로 현재 수업과 다음 수업까지 남은 시간 확인
+• 보강 일정 등록부터 완료 이력까지, 보강 알림
+• 출석 메달과 연속 출석 배지(선택)
+• 메모 할 일 체크, 테마 6가지, 프로필 사진
+• 자녀별 관리, 큰 글씨, 한국어·English·中文
+</ko-KR>
+<en-US>
+TeumTeum is here! School and academy timetables, events, attendance and memos in one place.
+• The “Now” card shows your class and the time to the next one
+• Makeup scheduling, history and reminders
+• Optional attendance medals and streak badges
+• Memo to-dos, six themes and profile pictures
+• Per-child planners, large text, Korean/English/Chinese
+</en-US>
+<zh-CN>
+TeumTeum 正式发布！在一个应用中管理学校和补习班课表、日程、出勤和备忘。
+• 「现在」卡片显示当前课程和距下一节课的时间
+• 补课登记、记录和提醒
+• 出勤奖牌和连续出勤徽章（可选）
+• 备忘待办勾选、6 种主题、头像
+• 按孩子分别管理、大字体、韩语/英语/中文
+</zh-CN>
+```
 
 ### 프로덕션 신청 질문 답변 (복사해서 쓰기)
 
