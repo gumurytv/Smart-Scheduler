@@ -10,6 +10,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.10',
+    date: '2026-11-11',
+    items: [
+      {
+        ko: '사용 가이드에 최근 기능(할 일 체크, 출석 체크 기간, 프로필 사진, 의견 보내기, 실험실)을 더했어요',
+        en: 'The user guide now covers recent features: memo to-dos, the attendance window, profile pictures, feedback and Labs',
+        zh: '使用指南新增最近的功能：备忘待办、出勤记录期限、头像、意见反馈和实验室',
+      },
+    ],
+  },
+  {
     version: '1.4.9',
     date: '2026-11-09',
     items: [
