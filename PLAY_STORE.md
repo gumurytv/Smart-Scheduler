@@ -72,12 +72,136 @@ Play Console에 그대로 복사해서 쓰는 문구와 설문 답변입니다. 
 틈틈이 쌓는 하루, 틈틈과 함께 정리해 보세요.
 ```
 
+### 번역: 영어 (en-US) · 중국어 간체 (zh-CN)
+「기본 스토어 등록정보」 → **번역 관리 → 직접 번역 추가**에서 두 언어를 추가하고 아래를 붙여 넣어요.
+스크린샷 8장과 그래픽 이미지(1024 × 500)는 `store-assets/en/`, `store-assets/zh/`에 언어별로 있어요.
+
+#### 영어 (en-US)
+앱 이름
+```
+TeumTeum – Timetable Planner
+```
+간단한 설명
+```
+School and academy timetables, events, attendance and memos, all in one place.
+```
+자세한 설명
+```
+School, then academy, then another academy.
+TeumTeum puts a busy student's whole day on one screen.
+
+■ Now, and what's next
+• Open the app and the “Now” card shows your current class and how long until the next one.
+• Today's makeup and special classes are right there, and you can add or edit them for any date.
+• Get a phone reminder before each makeup or special class (10 minutes to a day ahead).
+• Add your name, school, grade and a profile picture (your own photo or a people/animal character) to make it yours.
+
+■ School + academy timetables together
+• Fill in the school timetable by tapping a cell and picking a subject.
+• Set class times at once with a preset (first period, length, breaks, lunch) or period by period.
+• Academy classes are kept by day and time.
+• Mark a single day as cancelled, absent or self-study and leave a note.
+• Tap a free slot to add something; overlapping times are flagged.
+• Day, week and month views, with a colour for every subject.
+
+■ Schedule
+• Upcoming events sit on top with a D-Day count; today's are highlighted.
+• Month, week and day views; school, academy and other events by colour and icon.
+• Never miss a project, exam or academy test.
+
+■ Attendance
+• Check today's attendance in one go: present, late, absent or day off.
+• Mark missed classes “needs makeup”, schedule the makeup onto the timetable, and keep a history once it's done.
+• See the month at a glance with a calendar and charts, and the dates of every late, absence and makeup.
+• Attendance medals (optional): gold, silver or bronze for the monthly rate, and badges for days in a row.
+
+■ Memo
+• One page per day, with to-do, homework, supplies and exam tags.
+• Tap the box in front of a to-do to check it off and see how many are done.
+• The memo calendar shows which days have notes, and search finds any memo.
+
+■ Easy for everyone
+• Several children? Keep a planner for each and switch at the top.
+• A built-in guide explains every screen and the first setup step by step.
+• Four text sizes for easier reading.
+• Six themes (Classic, Blossom, Ocean, Lavender, Forest, Dark) and your own accent colour.
+• Send feedback right from the app.
+• Korean, English and Chinese.
+
+■ Your data stays on your device
+• No sign-up, no login, no ads.
+• Everything is stored on your phone and works offline.
+• Export a backup file and, when importing, apply only the parts you choose — even from a file a friend or family member sent.
+
+Little by little, every day — plan it with TeumTeum.
+```
+
+#### 중국어 간체 (zh-CN)
+앱 이름
+```
+TeumTeum – 学校·补习班课表
+```
+간단한 설명
+```
+学校和补习班课表、日程、出勤、备忘一站式管理，当前课程和下一个日程一目了然！
+```
+자세한 설명
+```
+放学去补习班，补习班结束又去下一个补习班。
+TeumTeum 把忙碌学生的一天整理在一个画面里。
+
+■ 现在，以及接下来
+• 打开应用，「现在」卡片会显示当前课程，以及距下一节课还有多久。
+• 今天的补课/特讲一目了然，也可以在任意日期添加或修改。
+• 补课/特讲开始前用手机通知提醒（提前 10 分钟到 1 天）。
+• 填写姓名、学校、年级，再选一张头像（自己的照片或人物/动物角色），打造专属计划本。
+
+■ 学校 + 补习班课表一起管理
+• 学校课表只需点格子选择科目。
+• 用预设（第一节开始时间、课时长度、课间、午休）一次设好上课时间，也可以逐节设置。
+• 补习班课程按星期和时间分别管理。
+• 可将某一天标记为停课、缺席或自习，并留下备注。
+• 点空闲时间即可添加日程，时间冲突会提前提醒。
+• 支持日、周、月视图，每个科目可设置颜色。
+
+■ 日程表
+• 即将到来的日程带 D-Day 显示在最上方，今天的日程会特别突出。
+• 月、周、日视图，学校、补习班和其他日程按颜色和图标区分。
+• 不再错过作业、考试和补习班测验。
+
+■ 出勤表
+• 一次记录今天的出勤：出勤、迟到、缺席、停课。
+• 缺课可标记为「需补课」，登记补课时间后加入课表，完成后留下记录。
+• 用月历和图表查看整月出勤，并按日期查看迟到、缺席和补课记录。
+• 出勤奖牌（可选）：按月出勤率获得金、银、铜牌，连续出勤还能获得徽章。
+
+■ 备忘录
+• 每天一页，带待办、作业、准备物品、考试标签。
+• 点待办前面的方框即可勾选，并显示完成数量。
+• 备忘日历标出有备忘的日期，还能搜索所有备忘。
+
+■ 人人都好用
+• 有多个孩子？可以为每个孩子分别管理，并在顶部快速切换。
+• 内置使用指南，逐步说明每个画面和初次设置。
+• 字体大小可调 4 级。
+• 6 种主题（经典、樱花、海洋、薰衣草、森林、深色）并可自选强调色。
+• 可直接在应用中发送意见。
+• 支持韩语、English、中文。
+
+■ 数据只保存在你的设备上
+• 无需注册、无需登录、没有广告。
+• 所有记录都保存在手机里，没有网络也能使用。
+• 可导出备份文件；导入时只应用你选择的内容，家人或朋友发来的文件也能用。
+
+点点滴滴的每一天，用 TeumTeum 好好整理。
+```
+
 ### 그래픽 (`store-assets/` 폴더)
 | 항목 | 파일 | 규격 |
 |---|---|---|
 | 앱 아이콘 | `icon-512.png` | 512 × 512 PNG |
 | 그래픽 이미지 | `feature-graphic.png` | 1024 × 500 PNG |
-| 휴대전화 스크린샷 | `screenshot-1.png` ~ `screenshot-8.png` | 1080 × 1920 PNG (순서대로 올리기) |
+| 휴대전화 스크린샷 | `screenshot-1.png` ~ `screenshot-8.png` (한국어), `en/`, `zh/` (영어 · 중국어) | 1080 × 1920 PNG (순서대로 올리기) |
 
 스크린샷은 앱의 샘플 데이터로 찍었어요 (프로필 예시: 김민준 · 한빛중학교 · 2학년 3반, 여우 캐릭터). 2026-11-11에 1.4.9 화면으로 다시 만들었어요.
 
