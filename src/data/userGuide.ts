@@ -151,9 +151,9 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
       {
         title: { ko: '출석 체크', en: 'Check attendance', zh: '出勤打卡' },
         desc: {
-          ko: '날짜를 고르고 수업마다 출석·지각·결석·휴강을 눌러요. 사유도 적을 수 있어요.',
-          en: 'Pick a date and mark each class present, late, absent or cancelled, with an optional reason.',
-          zh: '选择日期，为每节课标记出勤、迟到、缺席或停课，可填写原因。',
+          ko: '날짜를 고르고 수업마다 출석·지각·결석·휴강을 눌러요. 사유도 적을 수 있어요. 출석은 오늘과 어제만 체크할 수 있고, 앞으로의 날짜는 공식휴강만 미리 표시할 수 있어요.',
+          en: 'Pick a date and mark each class present, late, absent or cancelled, with an optional reason. Attendance can be checked for today and yesterday only; future days take only an official day off.',
+          zh: '选择日期，为每节课标记出勤、迟到、缺席或停课，可填写原因。出勤只能记录今天和昨天，未来的日期只能提前标记官方停课。',
         },
       },
       {
@@ -208,6 +208,14 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
         },
       },
       {
+        title: { ko: '할 일 체크', en: 'Check off to-dos', zh: '勾选待办' },
+        desc: {
+          ko: '「☐ 할 일」로 쓴 줄은 앞의 네모를 누르면 체크돼요. 메모 아래에 「할 일 2/3」처럼 몇 개 했는지 보여줘요.',
+          en: 'Tap the box in front of a “☐ To-do” line to check it off; the memo shows progress like “To-do 2/3”.',
+          zh: '点「☐ 待办」行前的方框即可勾选，备忘下方会显示「待办 2/3」这样的进度。',
+        },
+      },
+      {
         title: { ko: '달력과 검색', en: 'Calendar and search', zh: '日历与搜索' },
         desc: {
           ko: '메모 달력에서 메모가 있는 날을 보고, 검색으로 지난 메모를 찾아요.',
@@ -221,9 +229,9 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
     menu: 'settings',
     name: { ko: '설정', en: 'Settings', zh: '设置' },
     summary: {
-      ko: '시간표 틀, 데이터, 알림, 위젯을 관리해요.',
-      en: 'Timetable setup, data, reminders and widgets.',
-      zh: '管理课表框架、数据、提醒和小组件。',
+      ko: '내 정보, 시간표 틀, 데이터, 테마·알림·위젯, 의견 보내기를 관리해요.',
+      en: 'Profile, timetable setup, data, theme, reminders, widgets and feedback.',
+      zh: '管理我的信息、课表框架、数据、主题、提醒、小组件和意见反馈。',
     },
     items: [
       {
@@ -240,6 +248,14 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
           ko: '언어, 글자 크기, 자녀 선택, 사용 가이드, 처음 사용 안내(화면 설명·처음 설정 다시 보기), 앱 초기화(항목을 골라 지우기)가 있어요.',
           en: 'Language, text size, children, this guide, the first-run guide (replay), and reset (pick what to clear).',
           zh: '包括语言、字体大小、选择孩子、使用指南、初次使用指南（重看）和应用重置（可选择清除内容）。',
+        },
+      },
+      {
+        title: { ko: '내 정보 · 프로필 사진', en: 'Profile & picture', zh: '我的信息 · 头像' },
+        desc: {
+          ko: '이름·학교·학년을 넣고, 내 사진을 올리거나 사람·동물 캐릭터를 골라 프로필 사진으로 써요. 「지금」 카드와 자녀 선택에 보여요.',
+          en: 'Add name, school and grade, and use your own photo or a people/animal character as your picture. It shows on the “Now” card and the child switcher.',
+          zh: '填写姓名、学校、年级，并上传照片或选择人物/动物角色作为头像，会显示在「现在」卡片和孩子切换处。',
         },
       },
       {
@@ -285,9 +301,25 @@ export const FEATURE_GUIDE: FeatureGuideSection[] = [
       {
         title: { ko: '업데이트 이력', en: 'Update history', zh: '更新记录' },
         desc: {
-          ko: '앱 맨 아래 「업데이트 이력」에서 버전마다 무엇이 바뀌었는지 볼 수 있어요.',
-          en: '“Update history” at the bottom lists what changed in each version.',
-          zh: '底部的「更新记录」列出每个版本的变化。',
+          ko: '앱 → 「업데이트 이력」에서 버전마다 무엇이 바뀌었는지 볼 수 있어요.',
+          en: 'App → “Update history” lists what changed in each version.',
+          zh: '应用 → 「更新记录」列出每个版本的变化。',
+        },
+      },
+      {
+        title: { ko: '의견 보내기', en: 'Send feedback', zh: '发送意见' },
+        desc: {
+          ko: '앱 → 「의견 보내기」에서 종류를 고르고 내용을 적으면 메일로 보낼 수 있어요. Play 스토어에 의견을 남길 수도 있어요.',
+          en: 'App → “Send feedback”: pick a type, write a note and send it by email, or leave a review on Google Play.',
+          zh: '应用 → 「发送意见」：选择类型并填写内容后可通过邮件发送，也可以在 Play 商店留言。',
+        },
+      },
+      {
+        title: { ko: '실험실', en: 'Labs', zh: '实验室' },
+        desc: {
+          ko: '맨 아래 「실험실」에는 앞으로 공개할 기능(AI 시간표 이미지 인식)이 모여 있어요. 아직 준비 중이에요.',
+          en: '“Labs” at the bottom holds features coming later (AI timetable recognition). They are still being prepared.',
+          zh: '底部的「实验室」收集了即将推出的功能（AI 课表图片识别），仍在准备中。',
         },
       },
     ],
@@ -332,9 +364,9 @@ export const SETUP_GUIDE: SetupGuideStep[] = [
     title: { ko: '내 정보', en: 'Profile', zh: '我的信息' },
     where: { ko: '설정 → 내 정보', en: 'Settings → Profile', zh: '设置 → 我的信息' },
     desc: {
-      ko: '이름·학교·학년을 넣으면 시간표 「지금」 카드에 보여요.',
-      en: 'Name, school and grade appear on the timetable’s “Now” card.',
-      zh: '填写姓名、学校、年级后会显示在课表的「现在」卡片上。',
+      ko: '이름·학교·학년을 넣으면 시간표 「지금」 카드에 보여요. 내 사진이나 캐릭터를 골라 프로필 사진도 정할 수 있어요.',
+      en: 'Name, school and grade appear on the timetable’s “Now” card. You can also pick a photo or a character as your picture.',
+      zh: '填写姓名、学校、年级后会显示在课表的「现在」卡片上，还可以选择照片或角色作为头像。',
     },
   },
   {
