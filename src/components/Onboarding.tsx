@@ -554,7 +554,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ lang, state, onUpdateSta
             title: on ? tr(lang, '알림 켜짐', 'Reminders on', '提醒已开启') : tr(lang, '알림 켜기', 'Turn on reminders', '开启提醒'),
             hint: isNativeApp
               ? tr(lang, '알림 권한을 물어보면 「허용」을 눌러 주세요', 'Tap “Allow” when asked', '询问权限时请点「允许」')
-              : tr(lang, '알림은 안드로이드 앱에서 와요', 'Reminders arrive in the Android app', '提醒在安卓应用中发送'),
+              : tr(lang, '알림은 휴대폰 앱에서 와요', 'Reminders arrive in the phone app', '提醒在手机应用中发送'),
             selected: on,
             onClick: async () => {
               if (on) {

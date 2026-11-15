@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { AppLanguage } from '../types';
 import { tr } from '../i18n/translations';
 import { APP_VERSION } from '../data/changelog';
-import { isNativeApp } from '../native/androidShell';
+import { isAndroidApp, isIosApp } from '../native/androidShell';
 
 export const FEEDBACK_EMAIL = 'dbo0ofly@gmail.com';
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.gumurytv.teumteum';
@@ -21,7 +21,9 @@ const LANGUAGE_NAMES: Record<AppLanguage, string> = { ko: '한국어', en: 'Engl
 /** Short device description for the mail footer (no personal data). */
 function deviceLabel(): string {
   const android = /Android\s+([\d.]+)/.exec(navigator.userAgent);
-  if (isNativeApp) return android ? `Android app (Android ${android[1]})` : 'Android app';
+  const ios = /OS (\d+(?:_\d+)*) like Mac OS X/.exec(navigator.userAgent);
+  if (isIosApp) return ios ? `iPhone app (iOS ${ios[1].replace(/_/g, '.')})` : 'iPhone app';
+  if (isAndroidApp) return android ? `Android app (Android ${android[1]})` : 'Android app';
   return android ? `Web (Android ${android[1]})` : 'Web';
 }
 
@@ -30,7 +32,7 @@ function deviceLabel(): string {
  * (mailto:, the Play Store) to the system, so a plain navigation is enough there.
  */
 function openExternal(url: string) {
-  if (isNativeApp || url.startsWith('mailto:')) window.location.href = url;
+  if (isAndroidApp || isIosApp || url.startsWith('mailto:')) window.location.href = url;
   else window.open(url, '_blank', 'noopener');
 }
 
@@ -111,6 +113,8 @@ export const FeedbackPanel: React.FC<{ lang: AppLanguage }> = ({ lang }) => {
         {tr(lang, '메일로 보내기', 'Send by email', '通过邮件发送')}
         <ArrowRight className="w-4 h-4 shrink-0" />
       </button>
+      {/* The iPhone app has no App Store page yet; it gets its own review link once published. */}
+      {!isIosApp && (
       <button
         type="button"
         onClick={() => openExternal(PLAY_STORE_URL)}
@@ -119,6 +123,7 @@ export const FeedbackPanel: React.FC<{ lang: AppLanguage }> = ({ lang }) => {
         {tr(lang, 'Play 스토어에 의견 남기기', 'Review on Google Play', '在 Play 商店留言')}
         <ArrowRight className="w-4 h-4 shrink-0" />
       </button>
+      )}
 
       <p className="text-[0.6875rem] text-slate-600 leading-relaxed break-keep">
         {tr(

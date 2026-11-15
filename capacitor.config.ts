@@ -1,13 +1,17 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// Android app shell for 틈틈 (TeumTeum).
-// appId is the Play Store package name — it can never change after the first release.
+// Android and iPhone app shell for 틈틈 (TeumTeum).
+// appId is the Play Store package name and the iOS bundle ID — it can never change after the first release.
 const config: CapacitorConfig = {
   appId: 'com.gumurytv.teumteum',
   appName: '틈틈',
   webDir: 'dist',
   android: {
     // Organic paper colour, so no white flash shows before the web app paints.
+    backgroundColor: '#f5ead8',
+  },
+  ios: {
+    // Same paper colour behind the WebView on iPhone.
     backgroundColor: '#f5ead8',
   },
   plugins: {

@@ -3,6 +3,9 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 
 export const isNativeApp = Capacitor.isNativePlatform();
+/** Android-only parts (home-screen widgets, back button) check this; the iPhone app has none of them yet. */
+export const isAndroidApp = Capacitor.getPlatform() === 'android';
+export const isIosApp = Capacitor.getPlatform() === 'ios';
 
 // Mark the document so CSS can opt out of effects the Android WebView repaints badly
 // (see `.native-app` in index.css).

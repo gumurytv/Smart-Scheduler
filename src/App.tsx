@@ -260,7 +260,7 @@ export default function App() {
       {/* App shell: fixed-height column (header · scrolling content · tab bar). Only <main>
           scrolls, so the page itself never does — the Android WebView repaints reliably this way. */}
       {/* Top Header */}
-      <header className="flex-none z-30 bg-surface border-b border-divider px-4 h-14 flex items-center justify-between gap-2">
+      <header className="flex-none z-30 bg-surface border-b border-divider px-4 box-content h-14 pt-[env(safe-area-inset-top)] flex items-center justify-between gap-2">
         <div className="min-w-0 flex items-center gap-2">
           <h1 className="flex items-baseline gap-1.5 min-w-0">
             <span className="text-[1.25rem] font-extrabold tracking-tight text-accent-700 shrink-0">
@@ -415,7 +415,7 @@ export default function App() {
       <nav
         data-tour="nav"
         aria-label={tr(lang, '메인 메뉴', 'Main Navigation', '主导航')}
-        className="flex-none w-full z-40 bg-surface border-t border-divider px-1.5 h-16 grid grid-cols-5 items-center"
+        className="flex-none w-full z-40 bg-surface border-t border-divider px-1.5 box-content h-16 pb-[env(safe-area-inset-bottom)] grid grid-cols-5 items-center"
       >
         {navTabs.map((tab) => {
           const IconComponent = tab.icon;
