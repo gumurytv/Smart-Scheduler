@@ -81,7 +81,7 @@ import {
   timetableBlockRank,
 } from '../types';
 import { isAiTimetableEnabled } from '../utils/featureFlags';
-import { API_BASE_URL, isNativeApp } from '../native/androidShell';
+import { API_BASE_URL, isAndroidApp, isNativeApp } from '../native/androidShell';
 import { getPlacedHomeWidgets, pinHomeWidget } from '../native/homeWidgets';
 import { RESET_PARTS, ResetMode, ResetPart, resetPlannerParts } from '../utils/appReset';
 import { ParsedBackup, parseBackup } from '../utils/backupImport';
@@ -745,7 +745,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     void getPlacedHomeWidgets().then(setPlacedWidgets);
   };
   useEffect(() => {
-    if (!isNativeApp) return;
+    if (!isAndroidApp) return;
     refreshPlacedWidgets();
     // The launcher's "add widget" prompt pauses the app; recount when it comes back.
     const onVisible = () => {
@@ -1727,8 +1727,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               },
               {
                 key: 'widgets',
-                value: isNativeApp ? placedTotal : HOME_WIDGET_IDS.length,
-                label: isNativeApp
+                value: isAndroidApp ? placedTotal : HOME_WIDGET_IDS.length,
+                label: isAndroidApp
                   ? tr(lang, '홈 화면 위젯', 'On home', '主屏幕小组件')
                   : tr(lang, '위젯 종류', 'Widgets', '小组件种类'),
                 tone: 'text-other-700',
@@ -4086,7 +4086,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           icon={Smartphone}
           title={tr(lang, '홈 화면 위젯', 'Home Screen Widgets', '主屏幕小组件')}
           summary={
-            !isNativeApp
+            !isAndroidApp
               ? tr(
                   lang,
                   `안드로이드 앱에서 사용 · 미리보기 ${HOME_WIDGET_IDS.length}종`,
@@ -4110,7 +4110,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         >
           <div className="p-4 space-y-3">
             <p className="rounded-2xl bg-other-100 text-other-800 px-3.5 py-3 text-[0.75rem] font-semibold leading-snug">
-              {isNativeApp
+              {isAndroidApp
                 ? tr(
                     lang,
                     '원하는 위젯을 홈 화면에 추가하세요. 위젯 테마(밝게/어둡게)와 글자 크기도 여기서 바꿀 수 있어요.',
@@ -4135,7 +4135,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               className="w-full h-12 rounded-full bg-accent-700 text-paper text-[0.875rem] font-bold inline-flex items-center justify-center gap-2 hover:bg-accent-800 shadow-xs"
             >
               <Smartphone className="w-4 h-4" strokeWidth={2.75} />
-              {isNativeApp
+              {isAndroidApp
                 ? tr(lang, '위젯 보기 · 추가하기', 'Browse & add widgets', '浏览并添加小组件')
                 : tr(lang, '위젯 미리보기', 'Preview widgets', '预览小组件')}
             </button>
@@ -4816,7 +4816,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     {tr(lang, '홈 화면 위젯', 'Home screen widgets', '主屏幕小组件')}
                   </h3>
                   <p className="text-[0.6875rem] text-slate-600">
-                    {isNativeApp
+                    {isAndroidApp
                       ? tr(
                           lang,
                           '테마와 글자 크기는 모든 위젯에 함께 적용돼요',
@@ -4920,7 +4920,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                         </div>
                         <p className="mt-0.5 text-[0.6875rem] text-slate-600">{meta.description(lang)}</p>
                       </div>
-                      {isNativeApp ? (
+                      {isAndroidApp ? (
                         <button
                           type="button"
                           onClick={() => void handlePinWidget(id)}
